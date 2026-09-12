@@ -1,0 +1,250 @@
+datasource db {
+  provider = "postgresql"
+}
+
+
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id           String   @id
+  name         String
+  email        String   @unique
+  phone        String
+  role         String   // "ADMIN" | "EMPLOYEE" | "DEALER"
+  avatarUrl    String?
+  department   String?
+  employeeCode String?
+  dealerId     String?
+  allowedPages String   @default("[]") // JSON string array of routes
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Employee {
+  id                 String    @id
+  code               String    @unique
+  name               String
+  phone              String
+  email              String?
+  designation        String?
+  territory          String?
+  targetMonthly      Float     @default(0)
+  currentMonthSales  Float     @default(0)
+  activeOrdersCount  Int       @default(0)
+  checkInStatus      String    @default("CHECKED_OUT")
+  lastCheckInTime    String?
+  lastLocation       String?
+  baseSalary         Float     @default(0)
+  assignedDealerIds  String    @default("[]") // JSON string array
+  dateOfJoining      String?
+  remarks            String?
+  systemRole         String    @default("EMPLOYEE") // "ADMIN" | "EMPLOYEE" | "DEALER"
+  allowedPages       String    @default("[]") // JSON string array
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+}
+
+model Dealer {
+  id                 String   @id
+  code               String   @unique
+  name               String
+  ownerName          String
+  phone              String
+  city               String
+  state              String
+  address            String
+  creditLimit        Float    @default(0)
+  outstandingBalance Float    @default(0)
+  tier               String   @default("Silver") // "Platinum" | "Gold" | "Silver"
+  totalPurchases     Float    @default(0)
+  availableRewards   Float    @default(0)
+  plumbersCount      Int      @default(0)
+  assignedRepId      String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}
+
+model Plumber {
+  id                    String   @id
+  dealerId              String
+  dealerName            String
+  name                  String
+  phone                 String
+  status                String   @default("ACTIVE")
+  totalAllocatedRewards Float    @default(0)
+  rewardHistoryCount    Int      @default(0)
+  dateAdded             String
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+}
+
+model Product {
+  id             String           @id
+  code           String           @unique // F-1 to F-99
+  name           String
+  category       String           // pipes | fittings | valves | solvents | tape
+  material       String           // uPVC | CPVC | PTFE
+  standard       String
+  sizeMm         String?
+  sizeInch       String?
+  application    String
+  moq            Int              @default(1)
+  packingSummary String
+  tags           String           @default("[]") // JSON string array
+  inStock        Boolean          @default(true)
+  stockStatus    String           @default("IN_STOCK")
+  isArchived     Boolean          @default(false)
+  imageUrl       String?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  variants       ProductVariant[]
+}
+
+model ProductVariant {
+  id          String   @id @default(uuid())
+  productId   String
+  length      String?
+  size        String?
+  mrp         Float
+  packingQty  Int      @default(1)
+  packingUnit String   @default("Pcs")
+  inStock     Boolean  @default(true)
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+}
+
+model Order {
+  id                 String      @id
+  orderNumber        String      @unique
+  employeeId         String
+  employeeName       String
+  dealerId           String
+  dealerName         String
+  dealerPhone        String
+  dealerCity         String
+  subtotal           Float
+  gstAmount          Float
+  totalAmount        Float
+  status             String      @default("SUBMITTED")
+  notes              String?
+  adminNotes         String?
+  rejectionReason    String?
+  rewardEstimated    Float       @default(0)
+  rewardDealerShare  Float       @default(0)
+  rewardPlumberShare Float       @default(0)
+  createdAt          DateTime    @default(now())
+  submittedAt        String?
+  approvedAt         String?
+  erpSyncAt          String?
+  confirmedAt        String?
+  invoicedAt         String?
+  invoiceNumber      String?
+  items              OrderItem[]
+}
+
+model OrderItem {
+  id                 String  @id @default(uuid())
+  orderId            String
+  productId          String
+  productCode        String
+  productName        String
+  variantId          String
+  variantDescription String
+  unitPrice          Float
+  quantity           Int
+  packingQty         Int
+  packingUnit        String
+  totalAmount        Float
+  order              Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+}
+
+model RewardTransaction {
+  id           String   @id
+  dealerId     String
+  orderId      String?
+  orderNumber  String?
+  plumberId    String?
+  plumberName  String?
+  type         String
+  amount       Float
+  balanceAfter Float
+  description  String
+  createdAt    DateTime @default(now())
+}
+
+model AttendanceRecord {
+  id           String   @id
+  employeeId   String
+  employeeName String
+  type         String   // "CHECK_IN" | "CHECK_OUT"
+  timestamp    DateTime @default(now())
+  latitude     Float
+  longitude    Float
+  locationName String
+  photoUrl     String
+  verified     Boolean  @default(true)
+}
+
+model DailyAttendanceSummary {
+  id                String  @id
+  date              String  // YYYY-MM-DD
+  employeeId        String
+  employeeCode      String
+  employeeName      String
+  territory         String
+  phone             String
+  status            String
+  checkInJson       String? // JSON string
+  checkOutJson      String? // JSON string
+  hoursWorked       Float   @default(0)
+  dealerVisitsCount Int     @default(0)
+  ordersCount       Int     @default(0)
+  notes             String?
+}
+
+model LeaveRequest {
+  id              String   @id
+  employeeId      String
+  employeeName    String
+  leaveType       String
+  startDate       String
+  endDate         String
+  daysCount       Float
+  reason          String
+  status          String   @default("PENDING")
+  isHalfDay       Boolean  @default(false)
+  contactNumber   String?
+  rejectionReason String?
+  createdAt       DateTime @default(now())
+}
+
+model AppSetting {
+  key       String   @id
+  value     String   // JSON string storing configuration
+  updatedAt DateTime @updatedAt
+}
+
+model AuditLog {
+  id         String   @id
+  userId     String
+  userName   String
+  role       String
+  action     String
+  entityType String
+  entityId   String
+  details    String
+  timestamp  DateTime @default(now())
+}
+
+model IntegrationEvent {
+  id             String   @id
+  type           String
+  title          String
+  targetId       String
+  status         String
+  payloadSummary String
+  timestamp      DateTime @default(now())
+  latencyMs      Int?
+}

@@ -38,4 +38,6 @@ yarn-error.log*
 
 # typescript
 *.tsbuildinfo
-next-env.d.ts
+FILTEC CATALOGUE_01.07.2026..pdf
+public/catalogues/*.pdf
+
