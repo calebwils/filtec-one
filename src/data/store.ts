@@ -43,8 +43,9 @@ import {
   ALL_DEALER_PAGES
 } from './initialSeed';
 import { useEffect, useState } from 'react';
+import { sortProductsNaturally } from '@/lib/catalogueUtils';
 
-const STORAGE_KEY = 'filtec_pretech1_state_v4';
+const STORAGE_KEY = 'filtec_pretech1_state_v5';
 
 export interface AppState {
   currentUser: User;
@@ -75,7 +76,7 @@ export interface AppState {
 const getInitialState = (): AppState => {
   return {
     currentUser: INITIAL_USERS[1], // Purna Chandra Nayak (Employee Demo) as initial default
-    products: CATALOGUE_PRODUCTS,
+    products: sortProductsNaturally(CATALOGUE_PRODUCTS),
     dealers: INITIAL_DEALERS,
     employees: INITIAL_EMPLOYEES,
     plumbers: INITIAL_PLUMBERS,
@@ -232,13 +233,17 @@ export const store = {
         const json = await res.json();
         if (json.success && json.data) {
           const d = json.data;
-          const syncedProducts = (d.products?.length ? d.products : globalState.products).map((p: any) => {
-            const seed = CATALOGUE_PRODUCTS.find((c) => c.code === p.code || c.id === p.id);
-            return {
-              ...p,
-              imageUrl: p.imageUrl || seed?.imageUrl || null
-            };
-          });
+          const syncedProducts: Product[] = sortProductsNaturally<Product>(
+            (d.products?.length ? d.products : globalState.products).map((p: any) => {
+              const seed = CATALOGUE_PRODUCTS.find(
+                (c) => c.code === p.code || c.id === p.id || c.code.replace(/\D/g, '') === (p.code || '').replace(/\D/g, '')
+              );
+              return {
+                ...p,
+                imageUrl: p.imageUrl || seed?.imageUrl || null
+              } as Product;
+            })
+          );
 
           globalState = {
             ...globalState,
@@ -1497,6 +1502,18 @@ export const store = {
       auditLogs: [audit, ...globalState.auditLogs]
     };
     notify();
+
+    // Persist to PostgreSQL
+    if (typeof window !== 'undefined') {
+      fetch('/api/data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'TOGGLE_PRODUCT_STOCK',
+          payload: { productId, inStock: newStock }
+        })
+      }).catch((err) => console.warn('PostgreSQL toggle stock failed:', err));
+    }
   },
 
   // Toggle Variant Stock
@@ -1577,11 +1594,24 @@ export const store = {
 
     globalState = {
       ...globalState,
-      products: [newProduct, ...globalState.products],
+      products: sortProductsNaturally([newProduct, ...globalState.products]),
       auditLogs: [audit, ...globalState.auditLogs],
       integrationEvents: [erpEvent, ...globalState.integrationEvents]
     };
     notify();
+
+    // Persist to PostgreSQL
+    if (typeof window !== 'undefined') {
+      fetch('/api/data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'CREATE_PRODUCT',
+          payload: newProduct
+        })
+      }).catch((err) => console.warn('PostgreSQL create product failed:', err));
+    }
+
     return newProduct;
   },
 
@@ -1596,8 +1626,10 @@ export const store = {
       ...data
     };
 
-    const updatedProducts = [...globalState.products];
-    updatedProducts[pIndex] = updatedProduct;
+    const updatedProducts: Product[] = sortProductsNaturally<Product>([
+      ...globalState.products.filter((p) => p.id !== productId),
+      updatedProduct
+    ]);
 
     const audit: AuditLog = {
       id: `aud-${Date.now()}`,
@@ -1617,6 +1649,18 @@ export const store = {
       auditLogs: [audit, ...globalState.auditLogs]
     };
     notify();
+
+    // Persist to PostgreSQL
+    if (typeof window !== 'undefined') {
+      fetch('/api/data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'UPDATE_PRODUCT',
+          payload: { id: productId, ...data }
+        })
+      }).catch((err) => console.warn('PostgreSQL update product failed:', err));
+    }
   },
 
   // Delete / Archive Product (with integrity check against existing orders)
@@ -1656,6 +1700,18 @@ export const store = {
       };
       notify();
 
+      // Persist to PostgreSQL
+      if (typeof window !== 'undefined') {
+        fetch('/api/data', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'UPDATE_PRODUCT',
+            payload: { id: productId, isArchived: true, inStock: false }
+          })
+        }).catch((err) => console.warn('PostgreSQL archive product failed:', err));
+      }
+
       return {
         success: true,
         archivedOnly: true,
@@ -1683,6 +1739,18 @@ export const store = {
         auditLogs: [audit, ...globalState.auditLogs]
       };
       notify();
+
+      // Persist to PostgreSQL
+      if (typeof window !== 'undefined') {
+        fetch('/api/data', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'DELETE_PRODUCT',
+            payload: { productId }
+          })
+        }).catch((err) => console.warn('PostgreSQL delete product failed:', err));
+      }
 
       return {
         success: true,

@@ -2,7 +2,8 @@
 
 import React, { useEffect } from 'react';
 import { Product } from '@/types';
-import { X, ZoomIn, Package, ShieldCheck, Download, ExternalLink } from 'lucide-react';
+import { X, Check, ShieldCheck, Download, Package, Layers } from 'lucide-react';
+import { formatProductCode } from '@/lib/catalogueUtils';
 
 interface ProductImageModalProps {
   product: Product | null;
@@ -39,8 +40,8 @@ export function ProductImageModal({ product, isOpen, onClose }: ProductImageModa
         {/* Header Bar */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-neutral-150 bg-neutral-50/80">
           <div className="flex items-center gap-2">
-            <span className="font-mono font-bold text-xs bg-[#111827] text-white px-2.5 py-1 rounded">
-              {product.code}
+            <span className="font-mono font-bold text-xs bg-[#111827] text-white px-2.5 py-1 rounded whitespace-nowrap">
+              {formatProductCode(product.code)}
             </span>
             <span
               className={`text-xs font-semibold px-2 py-0.5 rounded border ${
@@ -140,7 +141,7 @@ export function ProductImageModal({ product, isOpen, onClose }: ProductImageModa
           {product.variants && product.variants.length > 0 && (
             <div className="border border-neutral-200 rounded-lg overflow-hidden">
               <div className="bg-neutral-100/70 px-3.5 py-2 text-xs font-semibold text-neutral-800 border-b border-neutral-200 flex items-center justify-between">
-                <span>Catalogue Pricing & Packing</span>
+                <span>Catalogue Specifications & Packing</span>
                 <span className="text-[10px] font-mono font-normal text-neutral-500">
                   {product.variants.length} Specification Variant{product.variants.length > 1 ? 's' : ''}
                 </span>
@@ -151,7 +152,7 @@ export function ProductImageModal({ product, isOpen, onClose }: ProductImageModa
                     <tr>
                       <th className="py-2 px-3">Variant / Size</th>
                       <th className="py-2 px-3">Standard Packing</th>
-                      <th className="py-2 px-3 text-right">Official MRP</th>
+                      <th className="py-2 px-3 text-right">Availability</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-neutral-150">
@@ -163,8 +164,14 @@ export function ProductImageModal({ product, isOpen, onClose }: ProductImageModa
                         <td className="py-2 px-3 font-mono text-neutral-600">
                           {v.packingQty} {v.packingUnit}
                         </td>
-                        <td className="py-2 px-3 font-mono font-bold text-neutral-900 text-right">
-                          ₹{v.mrp.toFixed(2)}
+                        <td className="py-2 px-3 text-right">
+                          <span className={`text-[10px] font-mono font-bold uppercase px-1.5 py-0.5 rounded ${
+                            v.inStock !== false
+                              ? 'bg-emerald-50 text-emerald-700'
+                              : 'bg-rose-50 text-rose-700'
+                          }`}>
+                            {v.inStock !== false ? 'In Stock' : 'Out of Stock'}
+                          </span>
                         </td>
                       </tr>
                     ))}

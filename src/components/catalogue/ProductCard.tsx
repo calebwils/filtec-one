@@ -5,6 +5,7 @@ import { Product, ProductVariant } from '@/types';
 import { store } from '@/data/store';
 import { Plus, Check, Info, Package, Shield, Maximize2 } from 'lucide-react';
 import { ProductImageModal } from './ProductImageModal';
+import { formatProductCode } from '@/lib/catalogueUtils';
 
 export function ProductCard({
   product,
@@ -62,8 +63,8 @@ export function ProductCard({
           {/* Top Header: Code & Category Tag */}
           <div className="flex items-center justify-between mb-2.5">
             <div className="flex items-center gap-1.5">
-              <span className="tech-code font-bold text-xs bg-[#111827] text-white px-2 py-0.5 rounded">
-                {product.code}
+              <span className="tech-code font-bold text-xs bg-[#111827] text-white px-2 py-0.5 rounded font-mono whitespace-nowrap">
+                {formatProductCode(product.code)}
               </span>
               <span
                 className={`text-[10px] font-medium uppercase px-1.5 py-0.5 rounded border ${
@@ -183,7 +184,7 @@ export function ProductCard({
                         )}
                       </div>
                       <div className="text-[10px] text-[#6B7280] font-mono">
-                        ₹{variant.mrp.toFixed(2)} ({variant.packingQty} {variant.packingUnit})
+                        Packing: {variant.packingQty} {variant.packingUnit}
                       </div>
                     </button>
                   );
@@ -193,16 +194,16 @@ export function ProductCard({
           )}
         </div>
 
-        {/* Bottom Actions: Pricing & Quick Add */}
+        {/* Bottom Actions: Packing & Quick Add */}
         <div className="mt-4 pt-3 border-t border-[#F3F4F6] flex items-center justify-between">
           <div>
             <span className="text-[10px] uppercase font-mono text-[#9CA3AF] block leading-none">
-              Catalog MRP
+              Standard Packing
             </span>
-            <div className="text-base font-bold text-[#111827] font-mono leading-tight">
-              ₹{selectedVariant?.mrp.toFixed(2)}
+            <div className="text-sm font-bold text-[#111827] font-mono leading-tight">
+              {selectedVariant?.packingQty || 1} {selectedVariant?.packingUnit || 'Pcs'}
               <span className="text-[10px] text-[#6B7280] font-normal ml-1 font-sans">
-                / {selectedVariant?.packingUnit || 'pc'}
+                / bundle
               </span>
             </div>
           </div>

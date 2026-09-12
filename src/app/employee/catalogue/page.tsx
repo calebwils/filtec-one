@@ -8,6 +8,7 @@ import { MobileBottomNav } from '@/components/navigation/MobileBottomNav';
 import { ProductCard } from '@/components/catalogue/ProductCard';
 import { useAppStore } from '@/data/store';
 import { ProductCategory, MaterialType, Product } from '@/types';
+import { sortProductsNaturally, matchesProductSearch } from '@/lib/catalogueUtils';
 import {
   Search,
   Filter,
@@ -30,7 +31,7 @@ export default function CataloguePage() {
 
   // Multi-attribute search matching codes, names, sizes, materials, tags
   const filteredProducts = useMemo(() => {
-    return products.filter((product) => {
+    const list = products.filter((product) => {
       // Category filter
       if (selectedCategory !== 'all' && product.category !== selectedCategory) {
         return false;
@@ -44,41 +45,10 @@ export default function CataloguePage() {
         return false;
       }
 
-      // Search Query filter
-      if (searchQuery.trim()) {
-        const query = searchQuery.toLowerCase().trim();
-        const matchesCode = product.code.toLowerCase().includes(query);
-        const matchesName = product.name.toLowerCase().includes(query);
-        const matchesCategory = product.category.toLowerCase().includes(query);
-        const matchesMaterial = product.material.toLowerCase().includes(query);
-        const matchesStandard = product.standard.toLowerCase().includes(query);
-        const matchesSizeMm = product.sizeMm?.toLowerCase().includes(query) || false;
-        const matchesSizeInch = product.sizeInch?.toLowerCase().includes(query) || false;
-        const matchesTags = product.tags.some((t) => t.toLowerCase().includes(query));
-
-        // Intelligent synonyms (e.g. 'one inch' -> '1"', 'tape' -> 'teflon')
-        const matchesSynonyms =
-          (query.includes('one inch') && (product.sizeInch?.includes('1"') || product.tags.includes('1 inch'))) ||
-          (query.includes('half inch') && (product.sizeInch?.includes('1/2"') || product.tags.includes('1/2 inch'))) ||
-          (query.includes('hot water') && product.material === 'CPVC');
-
-        if (
-          !matchesCode &&
-          !matchesName &&
-          !matchesCategory &&
-          !matchesMaterial &&
-          !matchesStandard &&
-          !matchesSizeMm &&
-          !matchesSizeInch &&
-          !matchesTags &&
-          !matchesSynonyms
-        ) {
-          return false;
-        }
-      }
-
-      return true;
+      return matchesProductSearch(product, searchQuery);
     });
+
+    return sortProductsNaturally(list);
   }, [products, searchQuery, selectedCategory, selectedMaterial, selectedStandard]);
 
   const cartTotalAmount = cart.items.reduce((acc, i) => acc + i.totalAmount, 0);
@@ -96,7 +66,7 @@ export default function CataloguePage() {
               Product Catalogue
             </h1>
             <p className="text-xs text-[#6B7280] mt-0.5">
-              Official technical specifications and wholesale price list
+              Official technical specifications and packaging directory
             </p>
           </div>
 
@@ -130,7 +100,7 @@ export default function CataloguePage() {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search by code (F-3, F-42), size (25mm, 1 inch), standard (SCH-40, SDR-11), CPVC..."
+              placeholder="Search by code (F1, F42), size (25mm, 1 inch), standard (SCH-40, SDR-11), CPVC..."
               className="w-full pl-10 pr-10 py-2.5 rounded-lg border border-[#E5E7EB] text-xs focus:outline-none focus:ring-1 focus:ring-[#DC2626] bg-[#F9FAFB]"
             />
             {searchQuery && (
@@ -303,7 +273,7 @@ export default function CataloguePage() {
               </div>
               <div>
                 <div className="text-xs font-bold text-white font-mono">
-                  ₹{cartTotalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  {cart.items.reduce((s, i) => s + i.quantity, 0)} Total Units
                 </div>
                 <div className="text-[10px] text-neutral-400">
                   {cart.items.length} items in field order

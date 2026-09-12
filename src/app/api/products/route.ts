@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { sortProductsNaturally } from '@/lib/catalogueUtils';
 
 export async function GET(req: Request) {
   try {
@@ -17,8 +18,7 @@ export async function GET(req: Request) {
 
     const products = await prisma.product.findMany({
       where,
-      include: { variants: true },
-      orderBy: { code: 'asc' }
+      include: { variants: true }
     });
 
     const parsed = products.map((p) => ({
@@ -26,10 +26,12 @@ export async function GET(req: Request) {
       tags: p.tags ? JSON.parse(p.tags) : []
     }));
 
+    const sortedProducts = sortProductsNaturally(parsed);
+
     return NextResponse.json({
       success: true,
-      count: parsed.length,
-      products: parsed
+      count: sortedProducts.length,
+      products: sortedProducts
     });
   } catch (error: any) {
     console.error('Error fetching products:', error);

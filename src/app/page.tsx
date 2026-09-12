@@ -537,7 +537,7 @@ export default function LoginPage() {
                             <span className="font-bold text-sm text-[#111827] group-hover:text-blue-700 transition-colors truncate">
                               {emp.name}
                             </span>
-                            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-neutral-100 text-neutral-600 font-semibold shrink-0">
+                            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-neutral-100 text-neutral-600 font-semibold shrink-0 whitespace-nowrap">
                               {emp.code}
                             </span>
                           </div>

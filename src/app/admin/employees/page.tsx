@@ -200,16 +200,16 @@ export default function AdminEmployeesPage() {
                 <table className="w-full text-left text-xs border-collapse">
                   <thead>
                     <tr className="bg-[#F9FAFB] border-b border-[#E5E7EB] text-[#4B5563] uppercase font-mono text-[10px]">
-                      <th className="py-3 px-3 text-center w-12">Sr. No.</th>
-                      <th className="py-3 px-3">Employee ID</th>
-                      <th className="py-3 px-4">Name & Designation</th>
-                      <th className="py-3 px-3">System Role & Access</th>
-                      <th className="py-3 px-4">Contact</th>
-                      <th className="py-3 px-3">Territory</th>
-                      <th className="py-3 px-3">Target / Sales</th>
-                      <th className="py-3 px-3">Remarks</th>
-                      <th className="py-3 px-3">Status</th>
-                      <th className="py-3 px-4 text-right">Actions</th>
+                      <th className="py-3 px-3 text-center w-12 whitespace-nowrap">Sr. No.</th>
+                      <th className="py-3 px-3 whitespace-nowrap min-w-[140px]">Employee ID</th>
+                      <th className="py-3 px-4 whitespace-nowrap">Name & Designation</th>
+                      <th className="py-3 px-3 whitespace-nowrap">System Role & Access</th>
+                      <th className="py-3 px-4 whitespace-nowrap">Contact</th>
+                      <th className="py-3 px-3 whitespace-nowrap">Territory</th>
+                      <th className="py-3 px-3 whitespace-nowrap">Target / Sales</th>
+                      <th className="py-3 px-3 whitespace-nowrap">Remarks</th>
+                      <th className="py-3 px-3 whitespace-nowrap">Status</th>
+                      <th className="py-3 px-4 text-right whitespace-nowrap">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#F3F4F6]">
@@ -230,8 +230,8 @@ export default function AdminEmployeesPage() {
                           </td>
 
                           {/* Employee ID */}
-                          <td className="py-3 px-3">
-                            <span className="tech-code font-bold text-xs bg-[#111827] text-white px-2 py-0.5 rounded font-mono">
+                          <td className="py-3 px-3 whitespace-nowrap">
+                            <span className="tech-code font-bold text-xs bg-[#111827] text-white px-2.5 py-1 rounded font-mono whitespace-nowrap inline-block">
                               {emp.code}
                             </span>
                           </td>

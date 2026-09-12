@@ -3,7 +3,7 @@ import { Product } from '@/types';
 export const CATALOGUE_PRODUCTS: Product[] = [
   {
     "id": "f-1",
-    "code": "F-1",
+    "code": "F1",
     "name": "15 MM (1/2\") uPVC Pipe SCH-40",
     "category": "pipes",
     "material": "uPVC",
@@ -50,7 +50,7 @@ export const CATALOGUE_PRODUCTS: Product[] = [
   },
   {
     "id": "f-2",
-    "code": "F-2",
+    "code": "F2",
     "name": "20 MM (3/4\") uPVC Pipe SCH-40",
     "category": "pipes",
     "material": "uPVC",
@@ -97,7 +97,7 @@ export const CATALOGUE_PRODUCTS: Product[] = [
   },
   {
     "id": "f-3",
-    "code": "F-3",
+    "code": "F3",
     "name": "25 MM (1\") uPVC Pipe SCH-40",
     "category": "pipes",
     "material": "uPVC",
@@ -144,7 +144,7 @@ export const CATALOGUE_PRODUCTS: Product[] = [
   },
   {
     "id": "f-4",
-    "code": "F-4",
+    "code": "F4",
     "name": "32 MM (1 1/4\") uPVC Pipe SCH-40",
     "category": "pipes",
     "material": "uPVC",
@@ -191,7 +191,7 @@ export const CATALOGUE_PRODUCTS: Product[] = [
   },
   {
     "id": "f-5",
-    "code": "F-5",
+    "code": "F5",
     "name": "40 MM (1 1/2\") uPVC Pipe SCH-40",
     "category": "pipes",
     "material": "uPVC",
@@ -238,7 +238,7 @@ export const CATALOGUE_PRODUCTS: Product[] = [
   },
   {
     "id": "f-6",
-    "code": "F-6",
+    "code": "F6",
     "name": "50 MM (2\") uPVC Pipe SCH-40",
     "category": "pipes",
     "material": "uPVC",
@@ -285,7 +285,7 @@ export const CATALOGUE_PRODUCTS: Product[] = [
   },
   {
     "id": "f-7",
-    "code": "F-7",
+    "code": "F7",
     "name": "15 MM (1/2\") uPVC Pipe SCH-80",
     "category": "pipes",
     "material": "uPVC",
@@ -332,7 +332,7 @@ export const CATALOGUE_PRODUCTS: Product[] = [
   },
   {
     "id": "f-8",
-    "code": "F-8",
+    "code": "F8",
     "name": "20 MM (3/4\") uPVC Pipe SCH-80",
     "category": "pipes",
     "material": "uPVC",
@@ -379,7 +379,7 @@ export const CATALOGUE_PRODUCTS: Product[] = [
   },
   {
     "id": "f-9",
-    "code": "F-9",
+    "code": "F9",
     "name": "25 MM (1\") uPVC Pipe SCH-80",
     "category": "pipes",
     "material": "uPVC",
@@ -426,7 +426,7 @@ export const CATALOGUE_PRODUCTS: Product[] = [
   },
   {
     "id": "f-10",
-    "code": "F-10",
+    "code": "F10",
     "name": "32 MM (1 1/4\") uPVC Pipe SCH-80",
     "category": "pipes",
     "material": "uPVC",
@@ -473,7 +473,7 @@ export const CATALOGUE_PRODUCTS: Product[] = [
   },
   {
     "id": "f-11",
-    "code": "F-11",
+    "code": "F11",
     "name": "40 MM (1 1/2\") uPVC Pipe SCH-80",
     "category": "pipes",
     "material": "uPVC",
@@ -520,7 +520,7 @@ export const CATALOGUE_PRODUCTS: Product[] = [
   },
   {
     "id": "f-12",
-    "code": "F-12",
+    "code": "F12",
     "name": "50 MM (2\") uPVC Pipe SCH-80",
     "category": "pipes",
     "material": "uPVC",
@@ -567,7 +567,7 @@ export const CATALOGUE_PRODUCTS: Product[] = [
   },
   {
     "id": "f-13",
-    "code": "F-13",
+    "code": "F13",
     "name": "15 mm (1/2\") uPVC Elbow (Plain)",
     "category": "fittings",
     "material": "uPVC",
@@ -603,7 +603,7 @@ export const CATALOGUE_PRODUCTS: Product[] = [
   },
   {
     "id": "f-14",
-    "code": "F-14",
+    "code": "F14",
     "name": "20 mm (3/4\") uPVC Elbow (Plain)",
     "category": "fittings",
     "material": "uPVC",
@@ -639,7 +639,7 @@ export const CATALOGUE_PRODUCTS: Product[] = [
   },
   {
     "id": "f-15",
-    "code": "F-15",
+    "code": "F15",
     "name": "25 mm (1\") uPVC Elbow (Plain)",
     "category": "fittings",
     "material": "uPVC",
@@ -675,7 +675,7 @@ export const CATALOGUE_PRODUCTS: Product[] = [
   },
   {
     "id": "f-16",
-    "code": "F-16",
+    "code": "F16",
     "name": "15 mm (1/2\") uPVC Tee (Plain)",
     "category": "fittings",
     "material": "uPVC",
@@ -711,7 +711,7 @@ export const CATALOGUE_PRODUCTS: Product[] = [
   },
   {
     "id": "f-17",
-    "code": "F-17",
+    "code": "F17",
     "name": "20 mm (3/4\") uPVC Tee (Plain)",
     "category": "fittings",
     "material": "uPVC",
@@ -747,7 +747,7 @@ export const CATALOGUE_PRODUCTS: Product[] = [
   },
   {
     "id": "f-18",
-    "code": "F-18",
+    "code": "F18",
     "name": "25 mm (1\") uPVC Tee (Plain)",
     "category": "fittings",
     "material": "uPVC",
@@ -783,7 +783,7 @@ export const CATALOGUE_PRODUCTS: Product[] = [
   },
   {
     "id": "f-19",
-    "code": "F-19",
+    "code": "F19",
     "name": "15 mm (1/2\") uPVC Coupler (Plain)",
     "category": "fittings",
     "material": "uPVC",
@@ -819,7 +819,7 @@ export const CATALOGUE_PRODUCTS: Product[] = [
   },
   {
     "id": "f-20",
-    "code": "F-20",
+    "code": "F20",
     "name": "20 mm (3/4\") uPVC Coupler (Plain)",
     "category": "fittings",
     "material": "uPVC",
@@ -855,7 +855,7 @@ export const CATALOGUE_PRODUCTS: Product[] = [
   },
   {
     "id": "f-21",
-    "code": "F-21",
+    "code": "F21",
     "name": "25 mm (1\") uPVC Coupler (Plain)",
     "category": "fittings",
     "material": "uPVC",
@@ -891,7 +891,7 @@ export const CATALOGUE_PRODUCTS: Product[] = [
   },
   {
     "id": "f-22",
-    "code": "F-22",
+    "code": "F22",
     "name": "20x15 mm (3/4\" x 1/2\") uPVC Brass Elbow",
     "category": "fittings",
     "material": "uPVC",
@@ -926,7 +926,7 @@ export const CATALOGUE_PRODUCTS: Product[] = [
   },
   {
     "id": "f-23",
-    "code": "F-23",
+    "code": "F23",
     "name": "20x15 mm (3/4\" x 1/2\") uPVC Brass Tee",
     "category": "fittings",
     "material": "uPVC",
@@ -961,7 +961,7 @@ export const CATALOGUE_PRODUCTS: Product[] = [
   },
   {
     "id": "f-24",
-    "code": "F-24",
+    "code": "F24",
     "name": "20x15 mm (3/4\" x 1/2\") uPVC Brass M.T.A",
     "category": "fittings",
     "material": "uPVC",
@@ -996,7 +996,7 @@ export const CATALOGUE_PRODUCTS: Product[] = [
   },
   {
     "id": "f-25",
-    "code": "F-25",
+    "code": "F25",
     "name": "20x20 mm (3/4\" x 3/4\") uPVC Brass M.T.A",
     "category": "fittings",
     "material": "uPVC",
@@ -1031,7 +1031,7 @@ export const CATALOGUE_PRODUCTS: Product[] = [
   },
   {
     "id": "f-26",
-    "code": "F-26",
+    "code": "F26",
     "name": "25x25 mm (1\" x 1\") uPVC Brass M.T.A",
     "category": "fittings",
     "material": "uPVC",
@@ -1066,7 +1066,7 @@ export const CATALOGUE_PRODUCTS: Product[] = [
   },
   {
     "id": "f-27",
-    "code": "F-27",
+    "code": "F27",
     "name": "20x15 mm (3/4\" x 1/2\") uPVC Brass F.T.A",
     "category": "fittings",
     "material": "uPVC",
@@ -1101,7 +1101,7 @@ export const CATALOGUE_PRODUCTS: Product[] = [
   },
   {
     "id": "f-28",
-    "code": "F-28",
+    "code": "F28",
     "name": "15 mm (1/2\") Nail Clamp",
     "category": "fittings",
     "material": "uPVC",
@@ -1135,7 +1135,7 @@ export const CATALOGUE_PRODUCTS: Product[] = [
   },
   {
     "id": "f-29",
-    "code": "F-29",
+    "code": "F29",
     "name": "20 mm (3/4\") Nail Clamp",
     "category": "fittings",
     "material": "uPVC",
@@ -1169,7 +1169,7 @@ export const CATALOGUE_PRODUCTS: Product[] = [
   },
   {
     "id": "f-30",
-    "code": "F-30",
+    "code": "F30",
     "name": "25 mm (1\") Nail Clamp",
     "category": "fittings",
     "material": "uPVC",
@@ -1203,7 +1203,7 @@ export const CATALOGUE_PRODUCTS: Product[] = [
   },
   {
     "id": "f-31",
-    "code": "F-31",
+    "code": "F31",
     "name": "32 mm (1 1/4\") Nail Clamp",
     "category": "fittings",
     "material": "uPVC",
@@ -1237,7 +1237,7 @@ export const CATALOGUE_PRODUCTS: Product[] = [
   },
   {
     "id": "f-32",
-    "code": "F-32",
+    "code": "F32",
     "name": "40 mm (1 1/2\") Nail Clamp",
     "category": "fittings",
     "material": "uPVC",
@@ -1271,7 +1271,7 @@ export const CATALOGUE_PRODUCTS: Product[] = [
   },
   {
     "id": "f-33",
-    "code": "F-33",
+    "code": "F33",
     "name": "50 mm (2\") Nail Clamp",
     "category": "fittings",
     "material": "uPVC",
@@ -1305,7 +1305,7 @@ export const CATALOGUE_PRODUCTS: Product[] = [
   },
   {
     "id": "f-34",
-    "code": "F-34",
+    "code": "F34",
     "name": "15 mm (1/2\") Metal Clamp (Heavy Duty Powder Coated)",
     "category": "fittings",
     "material": "uPVC",
@@ -1340,7 +1340,7 @@ export const CATALOGUE_PRODUCTS: Product[] = [
   },
   {
     "id": "f-35",
-    "code": "F-35",
+    "code": "F35",
     "name": "20 mm (3/4\") Metal Clamp (Heavy Duty Powder Coated)",
     "category": "fittings",
     "material": "uPVC",
@@ -1375,7 +1375,7 @@ export const CATALOGUE_PRODUCTS: Product[] = [
   },
   {
     "id": "f-36",
-    "code": "F-36",
+    "code": "F36",
     "name": "25 mm (1\") Metal Clamp (Heavy Duty Powder Coated)",
     "category": "fittings",
     "material": "uPVC",
@@ -1410,7 +1410,7 @@ export const CATALOGUE_PRODUCTS: Product[] = [
   },
   {
     "id": "f-37",
-    "code": "F-37",
+    "code": "F37",
     "name": "32 mm (1 1/4\") Metal Clamp (Heavy Duty Powder Coated)",
     "category": "fittings",
     "material": "uPVC",
@@ -1445,7 +1445,7 @@ export const CATALOGUE_PRODUCTS: Product[] = [
   },
   {
     "id": "f-38",
-    "code": "F-38",
+    "code": "F38",
     "name": "40 mm (1 1/2\") Metal Clamp (Heavy Duty Powder Coated)",
     "category": "fittings",
     "material": "uPVC",
@@ -1480,7 +1480,7 @@ export const CATALOGUE_PRODUCTS: Product[] = [
   },
   {
     "id": "f-39",
-    "code": "F-39",
+    "code": "F39",
     "name": "50 mm (2\") Metal Clamp (Heavy Duty Powder Coated)",
     "category": "fittings",
     "material": "uPVC",
@@ -1515,7 +1515,7 @@ export const CATALOGUE_PRODUCTS: Product[] = [
   },
   {
     "id": "f-40",
-    "code": "F-40",
+    "code": "F40",
     "name": "20 MM (3/4\") CPVC Pipe SDR-11",
     "category": "pipes",
     "material": "CPVC",
@@ -1552,7 +1552,7 @@ export const CATALOGUE_PRODUCTS: Product[] = [
   },
   {
     "id": "f-41",
-    "code": "F-41",
+    "code": "F41",
     "name": "25 MM (1\") CPVC Pipe SDR-11",
     "category": "pipes",
     "material": "CPVC",
@@ -1589,7 +1589,7 @@ export const CATALOGUE_PRODUCTS: Product[] = [
   },
   {
     "id": "f-42",
-    "code": "F-42",
+    "code": "F42",
     "name": "32 MM (1 1/4\") CPVC Pipe SDR-11",
     "category": "pipes",
     "material": "CPVC",
@@ -1626,7 +1626,7 @@ export const CATALOGUE_PRODUCTS: Product[] = [
   },
   {
     "id": "f-43",
-    "code": "F-43",
+    "code": "F43",
     "name": "40 MM (1 1/2\") CPVC Pipe SDR-11",
     "category": "pipes",
     "material": "CPVC",
@@ -1663,7 +1663,7 @@ export const CATALOGUE_PRODUCTS: Product[] = [
   },
   {
     "id": "f-44",
-    "code": "F-44",
+    "code": "F44",
     "name": "50 MM (2\") CPVC Pipe SDR-11",
     "category": "pipes",
     "material": "CPVC",
@@ -1700,7 +1700,7 @@ export const CATALOGUE_PRODUCTS: Product[] = [
   },
   {
     "id": "f-45",
-    "code": "F-45",
+    "code": "F45",
     "name": "20 mm (3/4\") CPVC Elbow (Plain)",
     "category": "fittings",
     "material": "CPVC",
@@ -1735,7 +1735,7 @@ export const CATALOGUE_PRODUCTS: Product[] = [
   },
   {
     "id": "f-46",
-    "code": "F-46",
+    "code": "F46",
     "name": "25 mm (1\") CPVC Elbow (Plain)",
     "category": "fittings",
     "material": "CPVC",
@@ -1770,7 +1770,7 @@ export const CATALOGUE_PRODUCTS: Product[] = [
   },
   {
     "id": "f-47",
-    "code": "F-47",
+    "code": "F47",
     "name": "20 mm (3/4\") CPVC Tee (Plain)",
     "category": "fittings",
     "material": "CPVC",
@@ -1805,7 +1805,7 @@ export const CATALOGUE_PRODUCTS: Product[] = [
   },
   {
     "id": "f-48",
-    "code": "F-48",
+    "code": "F48",
     "name": "25 mm (1\") CPVC Tee (Plain)",
     "category": "fittings",
     "material": "CPVC",
@@ -1840,7 +1840,7 @@ export const CATALOGUE_PRODUCTS: Product[] = [
   },
   {
     "id": "f-49",
-    "code": "F-49",
+    "code": "F49",
     "name": "20 mm (3/4\") CPVC MTA (Plain)",
     "category": "fittings",
     "material": "CPVC",
@@ -1875,7 +1875,7 @@ export const CATALOGUE_PRODUCTS: Product[] = [
   },
   {
     "id": "f-50",
-    "code": "F-50",
+    "code": "F50",
     "name": "25 mm (1\") CPVC MTA (Plain)",
     "category": "fittings",
     "material": "CPVC",
@@ -1910,7 +1910,7 @@ export const CATALOGUE_PRODUCTS: Product[] = [
   },
   {
     "id": "f-51",
-    "code": "F-51",
+    "code": "F51",
     "name": "20 mm (3/4\") CPVC FTA (Plain)",
     "category": "fittings",
     "material": "CPVC",
@@ -1945,7 +1945,7 @@ export const CATALOGUE_PRODUCTS: Product[] = [
   },
   {
     "id": "f-52",
-    "code": "F-52",
+    "code": "F52",
     "name": "25 mm (1\") CPVC FTA (Plain)",
     "category": "fittings",
     "material": "CPVC",
@@ -1980,7 +1980,7 @@ export const CATALOGUE_PRODUCTS: Product[] = [
   },
   {
     "id": "f-53",
-    "code": "F-53",
+    "code": "F53",
     "name": "20 mm (3/4\") CPVC Coupler (Plain)",
     "category": "fittings",
     "material": "CPVC",
@@ -2015,7 +2015,7 @@ export const CATALOGUE_PRODUCTS: Product[] = [
   },
   {
     "id": "f-54",
-    "code": "F-54",
+    "code": "F54",
     "name": "25 mm (1\") CPVC Coupler (Plain)",
     "category": "fittings",
     "material": "CPVC",
@@ -2050,7 +2050,7 @@ export const CATALOGUE_PRODUCTS: Product[] = [
   },
   {
     "id": "f-55",
-    "code": "F-55",
+    "code": "F55",
     "name": "20 mm (3/4\") CPVC End Cap",
     "category": "fittings",
     "material": "CPVC",
@@ -2085,7 +2085,7 @@ export const CATALOGUE_PRODUCTS: Product[] = [
   },
   {
     "id": "f-56",
-    "code": "F-56",
+    "code": "F56",
     "name": "20x15 mm (3/4\" x 1/2\") CPVC Brass Elbow",
     "category": "fittings",
     "material": "CPVC",
@@ -2120,7 +2120,7 @@ export const CATALOGUE_PRODUCTS: Product[] = [
   },
   {
     "id": "f-57",
-    "code": "F-57",
+    "code": "F57",
     "name": "20x15 mm (3/4\" x 1/2\") CPVC Brass Tee",
     "category": "fittings",
     "material": "CPVC",
@@ -2155,7 +2155,7 @@ export const CATALOGUE_PRODUCTS: Product[] = [
   },
   {
     "id": "f-58",
-    "code": "F-58",
+    "code": "F58",
     "name": "20 mm (3/4\") CPVC Nail Clamp",
     "category": "fittings",
     "material": "CPVC",
@@ -2190,7 +2190,7 @@ export const CATALOGUE_PRODUCTS: Product[] = [
   },
   {
     "id": "f-59",
-    "code": "F-59",
+    "code": "F59",
     "name": "25 mm (1\") CPVC Nail Clamp",
     "category": "fittings",
     "material": "CPVC",
@@ -2225,7 +2225,7 @@ export const CATALOGUE_PRODUCTS: Product[] = [
   },
   {
     "id": "f-60",
-    "code": "F-60",
+    "code": "F60",
     "name": "32 mm (1 1/4\") CPVC Nail Clamp",
     "category": "fittings",
     "material": "CPVC",
@@ -2260,7 +2260,7 @@ export const CATALOGUE_PRODUCTS: Product[] = [
   },
   {
     "id": "f-61",
-    "code": "F-61",
+    "code": "F61",
     "name": "40 mm (1 1/2\") CPVC Nail Clamp",
     "category": "fittings",
     "material": "CPVC",
@@ -2295,7 +2295,7 @@ export const CATALOGUE_PRODUCTS: Product[] = [
   },
   {
     "id": "f-62",
-    "code": "F-62",
+    "code": "F62",
     "name": "20 mm (3/4\") CPVC Metal Clamp (Powder Coated-Heavy Duty)",
     "category": "fittings",
     "material": "CPVC",
@@ -2330,7 +2330,7 @@ export const CATALOGUE_PRODUCTS: Product[] = [
   },
   {
     "id": "f-63",
-    "code": "F-63",
+    "code": "F63",
     "name": "25 mm (1\") CPVC Metal Clamp (Powder Coated-Heavy Duty)",
     "category": "fittings",
     "material": "CPVC",
@@ -2365,7 +2365,7 @@ export const CATALOGUE_PRODUCTS: Product[] = [
   },
   {
     "id": "f-64",
-    "code": "F-64",
+    "code": "F64",
     "name": "32 mm (1 1/4\") CPVC Metal Clamp (Powder Coated-Heavy Duty)",
     "category": "fittings",
     "material": "CPVC",
@@ -2400,7 +2400,7 @@ export const CATALOGUE_PRODUCTS: Product[] = [
   },
   {
     "id": "f-65",
-    "code": "F-65",
+    "code": "F65",
     "name": "40 mm (1 1/2\") CPVC Metal Clamp (Powder Coated-Heavy Duty)",
     "category": "fittings",
     "material": "CPVC",
@@ -2435,7 +2435,7 @@ export const CATALOGUE_PRODUCTS: Product[] = [
   },
   {
     "id": "f-66",
-    "code": "F-66",
+    "code": "F66",
     "name": "15 mm (1/2\") uPVC Ball Valve",
     "category": "valves",
     "material": "uPVC",
@@ -2470,7 +2470,7 @@ export const CATALOGUE_PRODUCTS: Product[] = [
   },
   {
     "id": "f-67",
-    "code": "F-67",
+    "code": "F67",
     "name": "20 mm (3/4\") uPVC Ball Valve",
     "category": "valves",
     "material": "uPVC",
@@ -2505,7 +2505,7 @@ export const CATALOGUE_PRODUCTS: Product[] = [
   },
   {
     "id": "f-68",
-    "code": "F-68",
+    "code": "F68",
     "name": "25 mm (1\") uPVC Ball Valve",
     "category": "valves",
     "material": "uPVC",
@@ -2540,7 +2540,7 @@ export const CATALOGUE_PRODUCTS: Product[] = [
   },
   {
     "id": "f-69",
-    "code": "F-69",
+    "code": "F69",
     "name": "32 mm (1 1/4\") uPVC Ball Valve",
     "category": "valves",
     "material": "uPVC",
@@ -2575,7 +2575,7 @@ export const CATALOGUE_PRODUCTS: Product[] = [
   },
   {
     "id": "f-70",
-    "code": "F-70",
+    "code": "F70",
     "name": "40 mm (1 1/2\") uPVC Ball Valve",
     "category": "valves",
     "material": "uPVC",
@@ -2610,7 +2610,7 @@ export const CATALOGUE_PRODUCTS: Product[] = [
   },
   {
     "id": "f-71",
-    "code": "F-71",
+    "code": "F71",
     "name": "50 mm (2\") uPVC Ball Valve",
     "category": "valves",
     "material": "uPVC",
@@ -2645,7 +2645,7 @@ export const CATALOGUE_PRODUCTS: Product[] = [
   },
   {
     "id": "f-72",
-    "code": "F-72",
+    "code": "F72",
     "name": "20 mm (3/4\") CPVC Ball Valve",
     "category": "valves",
     "material": "CPVC",
@@ -2681,7 +2681,7 @@ export const CATALOGUE_PRODUCTS: Product[] = [
   },
   {
     "id": "f-73",
-    "code": "F-73",
+    "code": "F73",
     "name": "25 mm (1\") CPVC Ball Valve",
     "category": "valves",
     "material": "CPVC",
@@ -2717,7 +2717,7 @@ export const CATALOGUE_PRODUCTS: Product[] = [
   },
   {
     "id": "f-74",
-    "code": "F-74",
+    "code": "F74",
     "name": "32 mm (1 1/4\") CPVC Ball Valve",
     "category": "valves",
     "material": "CPVC",
@@ -2753,7 +2753,7 @@ export const CATALOGUE_PRODUCTS: Product[] = [
   },
   {
     "id": "f-75",
-    "code": "F-75",
+    "code": "F75",
     "name": "40 mm (1 1/2\") CPVC Ball Valve",
     "category": "valves",
     "material": "CPVC",
@@ -2789,7 +2789,7 @@ export const CATALOGUE_PRODUCTS: Product[] = [
   },
   {
     "id": "f-76",
-    "code": "F-76",
+    "code": "F76",
     "name": "50 mm (2\") CPVC Ball Valve",
     "category": "valves",
     "material": "CPVC",
@@ -2825,7 +2825,7 @@ export const CATALOGUE_PRODUCTS: Product[] = [
   },
   {
     "id": "f-77",
-    "code": "F-77",
+    "code": "F77",
     "name": "FILTEC CVP Heavy Duty Solvent Cement (10 ml)",
     "category": "solvents",
     "material": "uPVC",
@@ -2860,7 +2860,7 @@ export const CATALOGUE_PRODUCTS: Product[] = [
   },
   {
     "id": "f-78",
-    "code": "F-78",
+    "code": "F78",
     "name": "FILTEC CVP Heavy Duty Solvent Cement (25 ml)",
     "category": "solvents",
     "material": "uPVC",
@@ -2895,7 +2895,7 @@ export const CATALOGUE_PRODUCTS: Product[] = [
   },
   {
     "id": "f-79",
-    "code": "F-79",
+    "code": "F79",
     "name": "FILTEC CVP Heavy Duty Solvent Cement (59 ml)",
     "category": "solvents",
     "material": "uPVC",
@@ -2930,7 +2930,7 @@ export const CATALOGUE_PRODUCTS: Product[] = [
   },
   {
     "id": "f-80",
-    "code": "F-80",
+    "code": "F80",
     "name": "FILTEC CVP Heavy Duty Solvent Cement (118 ml)",
     "category": "solvents",
     "material": "uPVC",
@@ -2965,7 +2965,7 @@ export const CATALOGUE_PRODUCTS: Product[] = [
   },
   {
     "id": "f-81",
-    "code": "F-81",
+    "code": "F81",
     "name": "FILTEC CVP Heavy Duty Solvent Cement (237 ml)",
     "category": "solvents",
     "material": "uPVC",
@@ -3000,7 +3000,7 @@ export const CATALOGUE_PRODUCTS: Product[] = [
   },
   {
     "id": "f-82",
-    "code": "F-82",
+    "code": "F82",
     "name": "FILTEC CVP Heavy Duty Solvent Cement (500 ml)",
     "category": "solvents",
     "material": "uPVC",
@@ -3035,7 +3035,7 @@ export const CATALOGUE_PRODUCTS: Product[] = [
   },
   {
     "id": "f-83",
-    "code": "F-83",
+    "code": "F83",
     "name": "FILTEC CVP Heavy Duty Solvent Cement (1000 ml)",
     "category": "solvents",
     "material": "uPVC",
@@ -3070,7 +3070,7 @@ export const CATALOGUE_PRODUCTS: Product[] = [
   },
   {
     "id": "f-84",
-    "code": "F-84",
+    "code": "F84",
     "name": "FILTEC CVP-U Medium Body Solvent Cement (10 ml)",
     "category": "solvents",
     "material": "uPVC",
@@ -3105,7 +3105,7 @@ export const CATALOGUE_PRODUCTS: Product[] = [
   },
   {
     "id": "f-85",
-    "code": "F-85",
+    "code": "F85",
     "name": "FILTEC CVP-U Medium Body Solvent Cement (25 ml)",
     "category": "solvents",
     "material": "uPVC",
@@ -3140,7 +3140,7 @@ export const CATALOGUE_PRODUCTS: Product[] = [
   },
   {
     "id": "f-86",
-    "code": "F-86",
+    "code": "F86",
     "name": "FILTEC CVP-U Medium Body Solvent Cement (59 ml)",
     "category": "solvents",
     "material": "uPVC",
@@ -3175,7 +3175,7 @@ export const CATALOGUE_PRODUCTS: Product[] = [
   },
   {
     "id": "f-87",
-    "code": "F-87",
+    "code": "F87",
     "name": "FILTEC CVP-U Medium Body Solvent Cement (118 ml)",
     "category": "solvents",
     "material": "uPVC",
@@ -3210,7 +3210,7 @@ export const CATALOGUE_PRODUCTS: Product[] = [
   },
   {
     "id": "f-88",
-    "code": "F-88",
+    "code": "F88",
     "name": "FILTEC CVP-U Medium Body Solvent Cement (237 ml)",
     "category": "solvents",
     "material": "uPVC",
@@ -3245,7 +3245,7 @@ export const CATALOGUE_PRODUCTS: Product[] = [
   },
   {
     "id": "f-89",
-    "code": "F-89",
+    "code": "F89",
     "name": "FILTEC CVP-U Medium Body Solvent Cement (500 ml)",
     "category": "solvents",
     "material": "uPVC",
@@ -3280,7 +3280,7 @@ export const CATALOGUE_PRODUCTS: Product[] = [
   },
   {
     "id": "f-90",
-    "code": "F-90",
+    "code": "F90",
     "name": "FILTEC CVP-U Medium Body Solvent Cement (1000 ml)",
     "category": "solvents",
     "material": "uPVC",
@@ -3315,7 +3315,7 @@ export const CATALOGUE_PRODUCTS: Product[] = [
   },
   {
     "id": "f-91",
-    "code": "F-91",
+    "code": "F91",
     "name": "FILTEC CVP-C High Temp CPVC Solvent Cement (10 ml)",
     "category": "solvents",
     "material": "CPVC",
@@ -3351,7 +3351,7 @@ export const CATALOGUE_PRODUCTS: Product[] = [
   },
   {
     "id": "f-92",
-    "code": "F-92",
+    "code": "F92",
     "name": "FILTEC CVP-C High Temp CPVC Solvent Cement (25 ml)",
     "category": "solvents",
     "material": "CPVC",
@@ -3387,7 +3387,7 @@ export const CATALOGUE_PRODUCTS: Product[] = [
   },
   {
     "id": "f-93",
-    "code": "F-93",
+    "code": "F93",
     "name": "FILTEC CVP-C High Temp CPVC Solvent Cement (59 ml)",
     "category": "solvents",
     "material": "CPVC",
@@ -3423,7 +3423,7 @@ export const CATALOGUE_PRODUCTS: Product[] = [
   },
   {
     "id": "f-94",
-    "code": "F-94",
+    "code": "F94",
     "name": "FILTEC CVP-C High Temp CPVC Solvent Cement (118 ml)",
     "category": "solvents",
     "material": "CPVC",
@@ -3459,7 +3459,7 @@ export const CATALOGUE_PRODUCTS: Product[] = [
   },
   {
     "id": "f-95",
-    "code": "F-95",
+    "code": "F95",
     "name": "FILTEC CVP-C High Temp CPVC Solvent Cement (237 ml)",
     "category": "solvents",
     "material": "CPVC",
@@ -3495,7 +3495,7 @@ export const CATALOGUE_PRODUCTS: Product[] = [
   },
   {
     "id": "f-96",
-    "code": "F-96",
+    "code": "F96",
     "name": "FILTEC CVP-C High Temp CPVC Solvent Cement (500 ml)",
     "category": "solvents",
     "material": "CPVC",
@@ -3531,7 +3531,7 @@ export const CATALOGUE_PRODUCTS: Product[] = [
   },
   {
     "id": "f-97",
-    "code": "F-97",
+    "code": "F97",
     "name": "FILTEC CVP-C High Temp CPVC Solvent Cement (1000 ml)",
     "category": "solvents",
     "material": "CPVC",
@@ -3567,7 +3567,7 @@ export const CATALOGUE_PRODUCTS: Product[] = [
   },
   {
     "id": "f-98",
-    "code": "F-98",
+    "code": "F98",
     "name": "PTFE Thread Seal Tape (Teflon Tape White) 5 Mtr",
     "category": "tape",
     "material": "PTFE",
@@ -3602,7 +3602,7 @@ export const CATALOGUE_PRODUCTS: Product[] = [
   },
   {
     "id": "f-99",
-    "code": "F-99",
+    "code": "F99",
     "name": "PTFE Thread Seal Tape (Teflon Tape White) 10 Mtr",
     "category": "tape",
     "material": "PTFE",

@@ -80,7 +80,7 @@ export interface ProductVariant {
 
 export interface Product {
   id: string;
-  code: string; // F-1 to F-99
+  code: string; // F1 to F99
   name: string;
   category: ProductCategory;
   material: MaterialType;

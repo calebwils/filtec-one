@@ -198,8 +198,8 @@ export default function AdminSettingsPage() {
                           key={emp.id}
                           className="hover:bg-neutral-50/70 transition-colors"
                         >
-                          <td className="py-3 px-3">
-                            <span className="tech-code font-bold text-xs bg-[#111827] text-white px-2 py-0.5 rounded font-mono">
+                          <td className="py-3 px-3 whitespace-nowrap">
+                            <span className="tech-code font-bold text-xs bg-[#111827] text-white px-2.5 py-0.5 rounded font-mono whitespace-nowrap inline-block">
                               {emp.code}
                             </span>
                           </td>

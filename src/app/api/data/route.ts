@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { sortProductsNaturally } from '@/lib/catalogueUtils';
 
 export async function GET() {
   try {
@@ -18,8 +19,7 @@ export async function GET() {
       users
     ] = await Promise.all([
       prisma.product.findMany({
-        include: { variants: true },
-        orderBy: { code: 'asc' }
+        include: { variants: true }
       }),
       prisma.dealer.findMany({ orderBy: { code: 'asc' } }),
       prisma.employee.findMany({ orderBy: { code: 'asc' } }),
@@ -38,10 +38,12 @@ export async function GET() {
     ]);
 
     // Parse JSON fields into proper JS objects/arrays
-    const parsedProducts = products.map((p) => ({
-      ...p,
-      tags: p.tags ? JSON.parse(p.tags) : []
-    }));
+    const parsedProducts = sortProductsNaturally(
+      products.map((p) => ({
+        ...p,
+        tags: p.tags ? JSON.parse(p.tags) : []
+      }))
+    );
 
     const parsedEmployees = employees.map((e) => ({
       ...e,
@@ -177,6 +179,50 @@ export async function POST(req: Request) {
           }
         });
         return NextResponse.json({ success: true, product: updated });
+      }
+
+      case 'TOGGLE_PRODUCT_STOCK': {
+        const { productId, inStock } = payload;
+        const updated = await prisma.product.update({
+          where: { id: productId },
+          data: { inStock }
+        });
+        await prisma.productVariant.updateMany({
+          where: { productId },
+          data: { inStock }
+        });
+        return NextResponse.json({ success: true, product: updated });
+      }
+
+      case 'CREATE_PRODUCT': {
+        const { variants, tags, ...prodData } = payload;
+        const created = await prisma.product.create({
+          data: {
+            ...prodData,
+            tags: tags ? JSON.stringify(tags) : '[]',
+            variants: variants && variants.length > 0 ? {
+              create: variants.map((v: any) => ({
+                id: v.id,
+                length: v.length || null,
+                size: v.size || null,
+                mrp: v.mrp || 0,
+                packingQty: v.packingQty || 1,
+                packingUnit: v.packingUnit || 'Pcs',
+                inStock: v.inStock !== false
+              }))
+            } : undefined
+          },
+          include: { variants: true }
+        });
+        return NextResponse.json({ success: true, product: created });
+      }
+
+      case 'DELETE_PRODUCT': {
+        const { productId } = payload;
+        await prisma.product.delete({
+          where: { id: productId }
+        });
+        return NextResponse.json({ success: true });
       }
 
       case 'UPDATE_SETTINGS': {

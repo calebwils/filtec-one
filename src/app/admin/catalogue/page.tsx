@@ -1,11 +1,12 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { TopContextBar } from '@/components/navigation/TopContextBar';
 import { DesktopSubNav } from '@/components/navigation/DesktopSubNav';
 import { MobileBottomNav } from '@/components/navigation/MobileBottomNav';
 import { useAppStore, store } from '@/data/store';
-import { Product, ProductCategory } from '@/types';
+import { Product } from '@/types';
+import { sortProductsNaturally, formatProductCode, matchesProductSearch } from '@/lib/catalogueUtils';
 import { AddProductModal } from '@/components/admin/AddProductModal';
 import { EditProductModal } from '@/components/admin/EditProductModal';
 import { ProductImageModal } from '@/components/catalogue/ProductImageModal';
@@ -47,28 +48,19 @@ export default function AdminCataloguePage() {
   const inStockCount = activeProducts.filter((p) => p.inStock !== false).length;
   const outOfStockCount = activeProducts.filter((p) => p.inStock === false).length;
 
-  const filteredProducts = activeProducts.filter((p) => {
-    // Search
-    const matchesSearch =
-      search === '' ||
-      p.code.toLowerCase().includes(search.toLowerCase()) ||
-      p.name.toLowerCase().includes(search.toLowerCase()) ||
-      p.material.toLowerCase().includes(search.toLowerCase()) ||
-      p.standard.toLowerCase().includes(search.toLowerCase()) ||
-      (p.sizeMm && p.sizeMm.toLowerCase().includes(search.toLowerCase())) ||
-      (p.sizeInch && p.sizeInch.toLowerCase().includes(search.toLowerCase()));
+  const filteredProducts = useMemo(() => {
+    const matched = activeProducts.filter((p) => {
+      const matchesSearch = matchesProductSearch(p, search);
+      const matchesCategory = categoryFilter === 'ALL' || p.category === categoryFilter;
+      const matchesStock =
+        stockFilter === 'ALL' ||
+        (stockFilter === 'IN_STOCK' && p.inStock !== false) ||
+        (stockFilter === 'OUT_OF_STOCK' && p.inStock === false);
 
-    // Category filter
-    const matchesCategory = categoryFilter === 'ALL' || p.category === categoryFilter;
-
-    // Stock filter
-    const matchesStock =
-      stockFilter === 'ALL' ||
-      (stockFilter === 'IN_STOCK' && p.inStock !== false) ||
-      (stockFilter === 'OUT_OF_STOCK' && p.inStock === false);
-
-    return matchesSearch && matchesCategory && matchesStock;
-  });
+      return matchesSearch && matchesCategory && matchesStock;
+    });
+    return sortProductsNaturally(matched);
+  }, [activeProducts, search, categoryFilter, stockFilter]);
 
   const handleToggleStock = (p: Product) => {
     const nextState = !(p.inStock !== false);
@@ -147,7 +139,7 @@ export default function AdminCataloguePage() {
           <div className="bg-white p-3.5 rounded-xl border border-[#E5E7EB] shadow-2xs">
             <span className="text-[10px] uppercase font-mono text-[#6B7280] block">Catalogue SKUs</span>
             <div className="text-xl font-bold font-mono text-[#111827] mt-0.5">{activeProducts.length}</div>
-            <span className="text-[10px] text-[#6B7280]">F-1 to F-99+ active items</span>
+            <span className="text-[10px] text-[#6B7280]">F1 to F99 active items</span>
           </div>
 
           <div className="bg-white p-3.5 rounded-xl border border-[#E5E7EB] shadow-2xs">
@@ -254,7 +246,7 @@ export default function AdminCataloguePage() {
                   <th className="py-3 px-4">Code</th>
                   <th className="py-3 px-4">Product Name & Standard</th>
                   <th className="py-3 px-4">Category / Material</th>
-                  <th className="py-3 px-4">Variants / MRP Range</th>
+                  <th className="py-3 px-4">Variants / Packaging</th>
                   <th className="py-3 px-4">Stock Availability</th>
                   <th className="py-3 px-4 text-right">Actions</th>
                 </tr>
@@ -263,12 +255,6 @@ export default function AdminCataloguePage() {
                 {filteredProducts.map((p) => {
                   const isAvailable = p.inStock !== false;
                   const isExpanded = expandedProductId === p.id;
-                  const minPrice = Math.min(...p.variants.map((v) => v.mrp));
-                  const maxPrice = Math.max(...p.variants.map((v) => v.mrp));
-                  const priceStr =
-                    minPrice === maxPrice
-                      ? `₹${minPrice.toFixed(2)}`
-                      : `₹${minPrice.toFixed(2)} - ₹${maxPrice.toFixed(2)}`;
 
                   return (
                     <React.Fragment key={p.id}>
@@ -299,8 +285,8 @@ export default function AdminCataloguePage() {
 
                         {/* Code */}
                         <td className="py-3.5 px-4 font-mono font-bold text-xs">
-                          <span className="bg-[#111827] text-white px-2 py-0.5 rounded">
-                            {p.code}
+                          <span className="bg-[#111827] text-white px-2 py-0.5 rounded whitespace-nowrap">
+                            {formatProductCode(p.code)}
                           </span>
                         </td>
 
@@ -327,9 +313,11 @@ export default function AdminCataloguePage() {
                           )}
                         </td>
 
-                        {/* Variants & MRP */}
+                        {/* Variants & Packaging */}
                         <td className="py-3.5 px-4">
-                          <div className="font-mono font-bold text-[#111827]">{priceStr}</div>
+                          <div className="font-semibold text-xs text-[#111827]">
+                            {p.packingSummary || `${p.variants.length} Size Variant(s)`}
+                          </div>
                           <button
                             type="button"
                             onClick={() => setExpandedProductId(isExpanded ? null : p.id)}
@@ -414,7 +402,7 @@ export default function AdminCataloguePage() {
                                           {v.size || v.length || 'Standard'}
                                         </span>
                                         <span className="font-mono text-[10px] text-neutral-500">
-                                          MRP: ₹{v.mrp.toFixed(2)} ({v.packingQty} {v.packingUnit})
+                                          Standard Packing: {v.packingQty} {v.packingUnit}
                                         </span>
                                       </div>
 

@@ -7,6 +7,7 @@ import { DesktopSubNav } from '@/components/navigation/DesktopSubNav';
 import { MobileBottomNav } from '@/components/navigation/MobileBottomNav';
 import { ProductCard } from '@/components/catalogue/ProductCard';
 import { useAppStore } from '@/data/store';
+import { sortProductsNaturally, matchesProductSearch } from '@/lib/catalogueUtils';
 import {
   Search,
   Download,
@@ -34,7 +35,7 @@ export default function DealerCataloguePage() {
 
   // Filter products
   const filteredProducts = useMemo(() => {
-    return products.filter((product) => {
+    const list = products.filter((product) => {
       if (product.isArchived) return false;
 
       // Category filter
@@ -50,41 +51,10 @@ export default function DealerCataloguePage() {
         return false;
       }
 
-      // Search query
-      if (searchQuery.trim()) {
-        const query = searchQuery.toLowerCase().trim();
-        const matchesCode = product.code.toLowerCase().includes(query);
-        const matchesName = product.name.toLowerCase().includes(query);
-        const matchesCategory = product.category.toLowerCase().includes(query);
-        const matchesMaterial = product.material.toLowerCase().includes(query);
-        const matchesStandard = product.standard.toLowerCase().includes(query);
-        const matchesSizeMm = product.sizeMm?.toLowerCase().includes(query) || false;
-        const matchesSizeInch = product.sizeInch?.toLowerCase().includes(query) || false;
-        const matchesTags = product.tags.some((t) => t.toLowerCase().includes(query));
-
-        // Synonyms
-        const matchesSynonyms =
-          (query.includes('one inch') && (product.sizeInch?.includes('1"') || product.tags.includes('1 inch'))) ||
-          (query.includes('half inch') && (product.sizeInch?.includes('1/2"') || product.tags.includes('1/2 inch'))) ||
-          (query.includes('hot water') && product.material === 'CPVC');
-
-        if (
-          !matchesCode &&
-          !matchesName &&
-          !matchesCategory &&
-          !matchesMaterial &&
-          !matchesStandard &&
-          !matchesSizeMm &&
-          !matchesSizeInch &&
-          !matchesTags &&
-          !matchesSynonyms
-        ) {
-          return false;
-        }
-      }
-
-      return true;
+      return matchesProductSearch(product, searchQuery);
     });
+
+    return sortProductsNaturally(list);
   }, [products, searchQuery, selectedCategory, selectedMaterial, selectedStandard]);
 
   const cartTotalAmount = cart.items.reduce((acc, i) => acc + i.totalAmount, 0);
@@ -139,7 +109,7 @@ export default function DealerCataloguePage() {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search products by code (e.g. F-1, F-42), name, size (25mm, 1 inch), standard (SCH-40, SDR-11)..."
+              placeholder="Search products by code (e.g. F1, F42), name, size (25mm, 1 inch), standard (SCH-40, SDR-11)..."
               className="w-full pl-10 pr-10 py-2.5 rounded-lg border border-[#E5E7EB] text-xs focus:outline-none focus:ring-1 focus:ring-[#DC2626] bg-[#F9FAFB]"
             />
             {searchQuery && (
@@ -264,7 +234,7 @@ export default function DealerCataloguePage() {
                 <div>
                   <div className="text-xs font-semibold">Wholesale Order Draft</div>
                   <div className="text-[11px] text-neutral-400 font-mono">
-                    Total: ₹{cartTotalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    {cart.items.reduce((sum, item) => sum + item.quantity, 0)} Total Units Booked
                   </div>
                 </div>
               </div>
