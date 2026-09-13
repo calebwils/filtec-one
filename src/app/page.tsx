@@ -136,8 +136,8 @@ export default function LoginPage() {
       }).catch(() => {});
     } catch (e) {}
 
-    // 3. Native browser navigation (instant, never gets stuck on mobile)
-    window.location.href = '/dealer';
+    // 3. Instant client routing (avoids heavy full-page cellular bundle reloads on mobile)
+    router.push('/dealer');
   };
 
   // Dealer phone login submission
@@ -165,7 +165,7 @@ export default function LoginPage() {
       }
 
       store.setUser(data.user);
-      window.location.href = '/dealer';
+      router.push('/dealer');
     } catch (err: any) {
       setErrorMessage(err.message || 'Network error occurred. Please try again.');
       setIsLoggingIn(false);
@@ -200,7 +200,8 @@ export default function LoginPage() {
       }).catch(() => {});
     } catch (e) {}
 
-    window.location.href = authenticatedUser.role === 'ADMIN' ? '/admin' : '/employee';
+    const targetUrl = authenticatedUser.role === 'ADMIN' ? '/admin' : '/employee';
+    router.push(targetUrl);
   };
 
   // Admin sign-in (Instant on mobile & laptop)
@@ -225,7 +226,7 @@ export default function LoginPage() {
       }).catch(() => {});
     } catch (e) {}
 
-    window.location.href = '/admin';
+    router.push('/admin');
   };
 
   return (

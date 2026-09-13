@@ -127,6 +127,10 @@ type Listener = () => void;
 let globalState: AppState = getInitialState();
 const listeners = new Set<Listener>();
 
+let hasInitializedFromStorage = false;
+let inFlightSyncPromise: Promise<void> | null = null;
+let lastSyncTimestamp = 0;
+
 const notify = () => {
   if (typeof window !== 'undefined') {
     try {
@@ -150,9 +154,11 @@ export const store = {
     };
   },
 
-  initializeFromStorage() {
+  initializeFromStorage(force = false) {
     if (typeof window === 'undefined') return;
+    if (hasInitializedFromStorage && !force) return;
     try {
+      hasInitializedFromStorage = true;
       const saved = localStorage.getItem(STORAGE_KEY) || localStorage.getItem('filtec_pretech1_state_v3');
       if (saved) {
         const parsed = JSON.parse(saved);
@@ -225,60 +231,72 @@ export const store = {
     }
   },
 
-  async syncWithDatabase() {
+  async syncWithDatabase(force = false): Promise<void> {
     if (typeof window === 'undefined') return;
-    try {
-      const res = await fetch('/api/data');
-      if (res.ok) {
-        const json = await res.json();
-        if (json.success && json.data) {
-          const d = json.data;
-          const syncedProducts: Product[] = sortProductsNaturally<Product>(
-            (d.products?.length ? d.products : globalState.products).map((p: any) => {
-              const seed = CATALOGUE_PRODUCTS.find(
-                (c) => c.code === p.code || c.id === p.id || c.code.replace(/\D/g, '') === (p.code || '').replace(/\D/g, '')
-              );
-              return {
-                ...p,
-                imageUrl: p.imageUrl || seed?.imageUrl || null
-              } as Product;
-            })
-          );
+    if (inFlightSyncPromise) return inFlightSyncPromise;
+    if (!force && Date.now() - lastSyncTimestamp < 30000) return;
 
-          globalState = {
-            ...globalState,
-            products: syncedProducts,
-            dealers: d.dealers?.length ? d.dealers : globalState.dealers,
-            employees: d.employees?.length ? d.employees : globalState.employees,
-            plumbers: d.plumbers?.length ? d.plumbers : globalState.plumbers,
-            orders: d.orders?.length ? d.orders : globalState.orders,
-            leaveRequests: d.leaveRequests?.length ? d.leaveRequests : globalState.leaveRequests,
-            dailyAttendance: d.dailyAttendance?.length ? d.dailyAttendance : globalState.dailyAttendance,
-            rewardLedger: d.rewardLedger?.length ? d.rewardLedger : globalState.rewardLedger,
-            auditLogs: d.auditLogs?.length ? d.auditLogs : globalState.auditLogs,
-            integrationEvents: d.integrationEvents?.length ? d.integrationEvents : globalState.integrationEvents,
-            settings: d.settings?.company
-              ? {
-                  company: d.settings.company,
-                  permissions: d.settings.permissions || globalState.settings.permissions,
-                  policy: d.settings.policy || globalState.settings.policy,
-                  notifications: d.settings.notifications || globalState.settings.notifications
-                }
-              : globalState.settings
-          };
-          try {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(globalState));
-          } catch (e) {}
-          notify();
+    inFlightSyncPromise = (async () => {
+      try {
+        const res = await fetch('/api/data');
+        if (res.ok) {
+          const json = await res.json();
+          if (json.success && json.data) {
+            const d = json.data;
+            const syncedProducts: Product[] = sortProductsNaturally<Product>(
+              (d.products?.length ? d.products : globalState.products).map((p: any) => {
+                const seed = CATALOGUE_PRODUCTS.find(
+                  (c) => c.code === p.code || c.id === p.id || c.code.replace(/\D/g, '') === (p.code || '').replace(/\D/g, '')
+                );
+                return {
+                  ...p,
+                  imageUrl: p.imageUrl || seed?.imageUrl || null
+                } as Product;
+              })
+            );
+
+            globalState = {
+              ...globalState,
+              products: syncedProducts,
+              dealers: d.dealers?.length ? d.dealers : globalState.dealers,
+              employees: d.employees?.length ? d.employees : globalState.employees,
+              plumbers: d.plumbers?.length ? d.plumbers : globalState.plumbers,
+              orders: d.orders?.length ? d.orders : globalState.orders,
+              leaveRequests: d.leaveRequests?.length ? d.leaveRequests : globalState.leaveRequests,
+              dailyAttendance: d.dailyAttendance?.length ? d.dailyAttendance : globalState.dailyAttendance,
+              rewardLedger: d.rewardLedger?.length ? d.rewardLedger : globalState.rewardLedger,
+              auditLogs: d.auditLogs?.length ? d.auditLogs : globalState.auditLogs,
+              integrationEvents: d.integrationEvents?.length ? d.integrationEvents : globalState.integrationEvents,
+              settings: d.settings?.company
+                ? {
+                    company: d.settings.company,
+                    permissions: d.settings.permissions || globalState.settings.permissions,
+                    policy: d.settings.policy || globalState.settings.policy,
+                    notifications: d.settings.notifications || globalState.settings.notifications
+                  }
+                : globalState.settings
+            };
+            try {
+              localStorage.setItem(STORAGE_KEY, JSON.stringify(globalState));
+            } catch (e) {}
+            notify();
+          }
         }
+      } catch (e) {
+        console.warn('Database sync fallback to local cache:', e);
+      } finally {
+        inFlightSyncPromise = null;
+        lastSyncTimestamp = Date.now();
       }
-    } catch (e) {
-      console.warn('Database sync fallback to local cache:', e);
-    }
+    })();
+
+    return inFlightSyncPromise;
   },
 
   resetDemoData() {
     globalState = getInitialState();
+    hasInitializedFromStorage = false;
+    lastSyncTimestamp = 0;
     if (typeof window !== 'undefined') {
       localStorage.removeItem(STORAGE_KEY);
       localStorage.removeItem('filtec_pretech1_state_v3');
