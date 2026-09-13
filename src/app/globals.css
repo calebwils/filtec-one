@@ -64,3 +64,109 @@
 .pb-mobile-nav {
   padding-bottom: 5.5rem;
 }
+
+/* ==========================================================================
+   OFFICIAL B2B PROFORMA INVOICE PRINT SPECIFICATION (A4 PORTRAIT)
+   ========================================================================== */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 8mm 10mm 8mm 10mm;
+  }
+
+  html, body {
+    background: #ffffff !important;
+    background-color: #ffffff !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    overflow: visible !important;
+    color: #111827 !important;
+    font-size: 11px !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
+  }
+
+  /* Isolate proforma: Hide everything else in the body tree */
+  body > *:not(#filtec-proforma-print-portal) {
+    display: none !important;
+    visibility: hidden !important;
+  }
+
+  /* Universal print hidden */
+  .no-print,
+  .print-hidden,
+  nav,
+  header,
+  footer,
+  aside,
+  .top-context-bar,
+  .desktop-subnav,
+  .mobile-bottom-nav {
+    display: none !important;
+  }
+
+  #filtec-proforma-print-portal {
+    position: static !important;
+    display: block !important;
+    width: 100% !important;
+    height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    box-shadow: none !important;
+    border: none !important;
+    overflow: visible !important;
+    z-index: 1 !important;
+  }
+
+  .proforma-modal-card {
+    max-width: 100% !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    border: none !important;
+    border-radius: 0 !important;
+    background: #ffffff !important;
+  }
+
+  #filtec-proforma-document {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+    background: #ffffff !important;
+  }
+
+  /* Force side-by-side 2-column grid in print */
+  .print-grid-2 {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 14px !important;
+  }
+
+  /* Table rules */
+  table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+  }
+
+  thead {
+    display: table-header-group !important;
+  }
+
+  tr {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  .proforma-avoid-break {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+}

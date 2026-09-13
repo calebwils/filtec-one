@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Order, Dealer } from '@/types';
 import { useAppStore } from '@/data/store';
 import {
@@ -83,11 +84,16 @@ function getHsnCode(code: string, category?: string): string {
 
 export function ProformaInvoiceModal({ order, isOpen, onClose }: ProformaInvoiceModalProps) {
   const { dealers, settings } = useAppStore();
+  const [mounted, setMounted] = useState(false);
   const [isSendingEmail, setIsSendingEmail] = useState(false);
   const [emailStatus, setEmailStatus] = useState<string | null>(null);
   const [copiedLink, setCopiedLink] = useState(false);
 
-  if (!isOpen || !order) return null;
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!isOpen || !order || !mounted) return null;
 
   const currentDealer = dealers.find((d) => d.id === order.dealerId) || ({
     id: order.dealerId || 'dealer-demo',
@@ -95,9 +101,9 @@ export function ProformaInvoiceModal({ order, isOpen, onClose }: ProformaInvoice
     code: 'DLR-301',
     ownerName: 'Proprietor',
     phone: order.dealerPhone,
-    address: 'Shop 14-16, Ashoka Chambers, Navrangpura',
-    city: order.dealerCity || 'Bhubaneswar',
-    state: 'Odisha',
+    address: 'Shop 14-16, Ashoka Chambers, Mithakhali Six Roads, Navrangpura',
+    city: order.dealerCity || 'Ahmedabad',
+    state: 'Gujarat',
     gstin: '21AAACF9876K1Z9',
     creditLimit: 500000,
     outstandingBalance: 0,
@@ -108,11 +114,12 @@ export function ProformaInvoiceModal({ order, isOpen, onClose }: ProformaInvoice
   } as unknown as Dealer);
 
   const proformaNumber = order.orderNumber.replace(/^ORD-/, 'PI-');
-  const issueDate = new Date(order.createdAt).toLocaleDateString('en-IN', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric'
-  });
+  
+  const dateObj = new Date(order.createdAt);
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sept', 'Oct', 'Nov', 'Dec'];
+  const issueDate = isNaN(dateObj.getTime())
+    ? '12 Sept 2026'
+    : `${dateObj.getDate()} ${months[dateObj.getMonth()]} ${dateObj.getFullYear()}`;
 
   const subtotal = order.subtotal || order.items.reduce((sum, item) => sum + item.totalAmount, 0);
   const gstAmount = order.gstAmount || subtotal * 0.18;
@@ -169,17 +176,12 @@ export function ProformaInvoiceModal({ order, isOpen, onClose }: ProformaInvoice
     window.open(`https://api.whatsapp.com/send?text=${text}`, '_blank');
   };
 
-  const handleCopyLink = () => {
-    if (typeof window !== 'undefined') {
-      navigator.clipboard.writeText(`${window.location.origin}/dealer/orders`);
-      setCopiedLink(true);
-      setTimeout(() => setCopiedLink(false), 2500);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 overflow-y-auto print:p-0 print:bg-white print:static">
-      <div className="bg-white rounded-2xl max-w-4xl w-full overflow-hidden shadow-2xl border border-neutral-200 my-auto print:border-none print:shadow-none print:max-w-none print:rounded-none">
+  const modalContent = (
+    <div
+      id="filtec-proforma-print-portal"
+      className="proforma-modal-portal fixed inset-0 z-[9999] bg-black/75 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 overflow-y-auto print:p-0 print:m-0 print:bg-white print:static print:inset-auto print:z-0 print:overflow-visible print:block"
+    >
+      <div className="proforma-modal-card bg-white rounded-2xl max-w-4xl w-full overflow-hidden shadow-2xl border border-neutral-200 my-auto print:border-none print:shadow-none print:max-w-none print:w-full print:rounded-none print:m-0 print:p-0">
         
         {/* Top Actions Header (Hidden in Print) */}
         <div className="px-5 py-3.5 bg-neutral-900 text-white flex flex-wrap items-center justify-between gap-3 print:hidden">
@@ -227,7 +229,7 @@ export function ProformaInvoiceModal({ order, isOpen, onClose }: ProformaInvoice
             <button
               type="button"
               onClick={onClose}
-              className="p-1.5 text-neutral-400 hover:text-white rounded-lg hover:bg-white/10 transition-colors"
+              className="p-1.5 text-neutral-400 hover:text-white rounded-lg hover:bg-white/10 transition-colors cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>
@@ -243,16 +245,19 @@ export function ProformaInvoiceModal({ order, isOpen, onClose }: ProformaInvoice
         )}
 
         {/* Printable Proforma Document Paper Area */}
-        <div className="p-6 sm:p-8 bg-white max-h-[82vh] overflow-y-auto print:max-h-none print:overflow-visible print:p-0 text-[#111827]">
+        <div
+          id="filtec-proforma-document"
+          className="proforma-paper-area p-6 sm:p-8 bg-white max-h-[82vh] overflow-y-auto print:max-h-none print:overflow-visible print:p-0 print:m-0 print:w-full text-[#111827]"
+        >
           
           {/* Corporate Header */}
-          <div className="border-b-2 border-neutral-900 pb-4 mb-4">
-            <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
+          <div className="border-b-2 border-neutral-900 pb-4 mb-4 print:pb-3 print:mb-3">
+            <div className="flex flex-col sm:flex-row print:flex-row justify-between items-start gap-4 print:gap-2">
               <div className="flex items-center gap-3">
                 <img
                   src="/brand/filtec-one-logo.png"
                   alt="FILTEC ONE"
-                  className="h-10 w-auto object-contain"
+                  className="h-10 w-auto object-contain print:h-9"
                 />
                 <div>
                   <h1 className="text-base font-black uppercase tracking-wider text-[#111827]">
@@ -264,9 +269,9 @@ export function ProformaInvoiceModal({ order, isOpen, onClose }: ProformaInvoice
                 </div>
               </div>
 
-              <div className="text-right sm:text-right text-[11px] text-neutral-600 font-mono leading-snug">
+              <div className="text-right sm:text-right print:text-right text-[11px] text-neutral-600 font-mono leading-snug">
                 <div>Works & Regd. Office: Plot 12/B, Chandaka Industrial Estate</div>
-                <div>Patia, Bhubaneswar, Odisha - 751024</div>
+                <div>Patia, Bhubaneswar, Odisha – 751024</div>
                 <div>GSTIN: <strong className="text-neutral-900">21AAACF1234F1Z5</strong> | CIN: U25209OR2020PTC034567</div>
                 <div>Email: orders@filtec.in | Phone: +91 94378 60479</div>
               </div>
@@ -274,12 +279,12 @@ export function ProformaInvoiceModal({ order, isOpen, onClose }: ProformaInvoice
           </div>
 
           {/* Title & Metadata Strip */}
-          <div className="bg-neutral-100 rounded-lg p-3 mb-4 flex flex-col sm:flex-row justify-between items-center gap-2 border border-neutral-300">
+          <div className="bg-neutral-100 rounded-lg p-3 mb-4 print:p-2.5 print:mb-3 flex flex-col sm:flex-row print:flex-row justify-between items-center print:items-center gap-2 border border-neutral-300">
             <div>
               <span className="text-[10px] font-mono uppercase font-bold tracking-widest text-[#DC2626] block">
                 COMMERCIAL OFFER / ADVANCE REQUISITION
               </span>
-              <h2 className="text-lg font-black text-neutral-900 tracking-tight">
+              <h2 className="text-xl font-black text-neutral-900 tracking-tight">
                 PROFORMA INVOICE
               </h2>
             </div>
@@ -295,20 +300,20 @@ export function ProformaInvoiceModal({ order, isOpen, onClose }: ProformaInvoice
               </div>
               <div className="border-l border-neutral-300 pl-4">
                 <span className="text-[10px] text-neutral-500 block uppercase">Offer Validity:</span>
-                <strong className="text-emerald-700">15 Days</strong>
+                <strong className="text-emerald-700 font-bold">15 Days</strong>
               </div>
             </div>
           </div>
 
           {/* Buyer & Consignee Details */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-5 text-xs">
-            <div className="p-3.5 rounded-xl border border-neutral-200 bg-neutral-50/60 space-y-1">
+          <div className="grid grid-cols-1 sm:grid-cols-2 print:grid-cols-2 gap-4 print:gap-3 mb-5 print:mb-3 text-xs">
+            <div className="p-3.5 print:p-3 rounded-xl border border-neutral-200 bg-neutral-50/70 space-y-1">
               <span className="text-[10px] font-mono uppercase font-bold text-[#DC2626] block">
                 Bill To / Authorized Dealer
               </span>
               <div className="text-sm font-bold text-neutral-900">{order.dealerName}</div>
               <div className="text-neutral-600 leading-tight">
-                {currentDealer.address || 'Industrial & Sanitary Market Hub'}
+                {currentDealer.address || 'Shop 14-16, Ashoka Chambers, Mithakhali Six Roads, Navrangpura'}
               </div>
               <div className="text-neutral-600">
                 City: <strong>{order.dealerCity || currentDealer.city}</strong> • State: {currentDealer.state || 'Odisha'} (Code: 21)
@@ -321,69 +326,69 @@ export function ProformaInvoiceModal({ order, isOpen, onClose }: ProformaInvoice
               </div>
             </div>
 
-            <div className="p-3.5 rounded-xl border border-neutral-200 bg-neutral-50/60 space-y-1 text-right sm:text-right">
+            <div className="p-3.5 print:p-3 rounded-xl border border-neutral-200 bg-neutral-50/70 space-y-1 text-right sm:text-right print:text-right">
               <span className="text-[10px] font-mono uppercase font-bold text-neutral-500 block">
                 Order Reference & Transport
               </span>
               <div className="font-mono">
                 Order Ref: <strong>{order.orderNumber}</strong>
               </div>
-              <div>Sales Officer: <strong>{order.employeeName || 'Direct Booking'}</strong></div>
+              <div>Sales Officer: <strong>{order.employeeName || 'Purna Chandra Nayak'}</strong></div>
               <div>Dispatch By: <strong>Road Transport / Factory Delivery</strong></div>
-              <div>Destination Hub: <strong>{order.dealerCity} Distribution Hub</strong></div>
+              <div>Destination Hub: <strong>{order.dealerCity || currentDealer.city} Distribution Hub</strong></div>
               <div>Payment Terms: <strong>Advance RTGS / Approved Credit Terms</strong></div>
             </div>
           </div>
 
           {/* Line Items Table */}
-          <div className="border border-neutral-300 rounded-lg overflow-hidden mb-4">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-neutral-900 text-white font-mono uppercase text-[10px]">
+          <div className="border border-neutral-300 rounded-lg overflow-hidden mb-4 print:mb-3">
+            <table className="w-full text-left text-xs print:text-[10px]">
+              <thead className="bg-[#111827] text-white font-mono uppercase text-[10px] print:bg-[#111827] print:text-white">
                 <tr>
-                  <th className="py-2.5 px-3 text-center w-10">S.N.</th>
-                  <th className="py-2.5 px-3">Item Code & Description</th>
-                  <th className="py-2.5 px-3 text-center">HSN</th>
-                  <th className="py-2.5 px-3 text-right">Qty</th>
-                  <th className="py-2.5 px-3 text-right">Unit Rate (₹)</th>
-                  <th className="py-2.5 px-3 text-right">Taxable Amt (₹)</th>
-                  <th className="py-2.5 px-3 text-center w-14">GST</th>
-                  <th className="py-2.5 px-3 text-right">Total (₹)</th>
+                  <th className="py-2.5 px-3 print:py-1.5 print:px-2 text-center w-10">S.N.</th>
+                  <th className="py-2.5 px-3 print:py-1.5 print:px-2">Item Code & Description</th>
+                  <th className="py-2.5 px-3 print:py-1.5 print:px-2 text-center w-20">HSN</th>
+                  <th className="py-2.5 px-3 print:py-1.5 print:px-2 text-right w-20">Qty</th>
+                  <th className="py-2.5 px-3 print:py-1.5 print:px-2 text-right w-24">Unit Rate (₹)</th>
+                  <th className="py-2.5 px-3 print:py-1.5 print:px-2 text-right w-24">Taxable Amt (₹)</th>
+                  <th className="py-2.5 px-3 print:py-1.5 print:px-2 text-center w-14">GST</th>
+                  <th className="py-2.5 px-3 print:py-1.5 print:px-2 text-right w-28">Total (₹)</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-neutral-200 font-mono">
                 {order.items.map((item, idx) => {
                   const hsn = getHsnCode(item.productCode);
-                  const itemTaxable = item.totalAmount;
-                  const itemGst = itemTaxable * 0.18;
-                  const itemGrand = itemTaxable + itemGst;
+                  const itemTaxable = Number(item.totalAmount.toFixed(2));
+                  const itemGst = Number((itemTaxable * 0.18).toFixed(2));
+                  const itemGrand = Number((itemTaxable + itemGst).toFixed(2));
 
                   return (
-                    <tr key={item.id || idx} className="hover:bg-neutral-50">
-                      <td className="py-2.5 px-3 text-center text-neutral-500">{idx + 1}</td>
-                      <td className="py-2.5 px-3 font-sans">
+                    <tr key={item.id || idx} className="hover:bg-neutral-50 print:bg-white">
+                      <td className="py-2 px-3 print:py-1.5 print:px-2 text-center text-neutral-500">{idx + 1}</td>
+                      <td className="py-2 px-3 print:py-1.5 print:px-2 font-sans">
                         <div className="font-bold text-neutral-900 flex items-center gap-1.5">
                           <span className="font-mono bg-neutral-100 text-neutral-800 text-[10px] px-1.5 py-0.5 rounded border border-neutral-300">
                             {item.productCode}
                           </span>
                           <span>{item.productName}</span>
                         </div>
-                        <div className="text-[11px] text-neutral-500 font-mono mt-0.5">
+                        <div className="text-[11px] print:text-[9.5px] text-neutral-500 font-mono mt-0.5">
                           Spec: {item.variantDescription}
                         </div>
                       </td>
-                      <td className="py-2.5 px-3 text-center text-neutral-600">{hsn}</td>
-                      <td className="py-2.5 px-3 text-right font-bold text-neutral-900">
+                      <td className="py-2 px-3 print:py-1.5 print:px-2 text-center text-neutral-600">{hsn}</td>
+                      <td className="py-2 px-3 print:py-1.5 print:px-2 text-right font-bold text-neutral-900">
                         {item.quantity} {item.packingUnit || 'Pcs'}
                       </td>
-                      <td className="py-2.5 px-3 text-right text-neutral-700">
+                      <td className="py-2 px-3 print:py-1.5 print:px-2 text-right text-neutral-700">
                         ₹{item.unitPrice.toFixed(2)}
                       </td>
-                      <td className="py-2.5 px-3 text-right text-neutral-900">
-                        ₹{itemTaxable.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      <td className="py-2 px-3 print:py-1.5 print:px-2 text-right text-neutral-900">
+                        ₹{itemTaxable.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </td>
-                      <td className="py-2.5 px-3 text-center text-neutral-500 text-[11px]">18%</td>
-                      <td className="py-2.5 px-3 text-right font-bold text-neutral-900">
-                        ₹{itemGrand.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      <td className="py-2 px-3 print:py-1.5 print:px-2 text-center text-neutral-500 text-[11px] print:text-[9.5px]">18%</td>
+                      <td className="py-2 px-3 print:py-1.5 print:px-2 text-right font-bold text-neutral-900">
+                        ₹{itemGrand.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </td>
                     </tr>
                   );
@@ -393,14 +398,14 @@ export function ProformaInvoiceModal({ order, isOpen, onClose }: ProformaInvoice
           </div>
 
           {/* Tax Summary & Bank Details Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 print:grid-cols-2 gap-4 print:gap-3 mb-4 print:mb-3">
             {/* Left: Bank Details for Remittance */}
-            <div className="p-3.5 rounded-xl border border-neutral-200 bg-neutral-50/70 text-xs space-y-1">
+            <div className="p-3.5 print:p-3 rounded-xl border border-neutral-200 bg-neutral-50/70 text-xs print:text-[10px] space-y-1">
               <span className="text-[10px] font-mono uppercase font-bold text-neutral-900 block flex items-center gap-1">
                 <Building2 className="w-3.5 h-3.5 text-[#DC2626]" />
-                Bank Details for RTGS / NEFT Remittance
+                BANK DETAILS FOR RTGS / NEFT REMITTANCE
               </span>
-              <div className="font-mono text-[11px] pt-1 leading-relaxed">
+              <div className="font-mono text-[11px] print:text-[9.5px] pt-1 leading-relaxed">
                 <div>Bank Name: <strong>HDFC Bank Limited</strong></div>
                 <div>A/C Name: <strong>FILTEC POLYPLAST PVT LTD</strong></div>
                 <div>Current A/C No: <strong className="text-neutral-900">50200084920194</strong></div>
@@ -410,38 +415,38 @@ export function ProformaInvoiceModal({ order, isOpen, onClose }: ProformaInvoice
             </div>
 
             {/* Right: Financial Totals */}
-            <div className="p-3.5 rounded-xl border border-neutral-200 bg-neutral-50/70 text-xs space-y-1.5 font-mono">
+            <div className="p-3.5 print:p-3 rounded-xl border border-neutral-200 bg-neutral-50/70 text-xs print:text-[10px] space-y-1.5 font-mono">
               <div className="flex justify-between text-neutral-700">
                 <span>Subtotal (Taxable Value):</span>
                 <span className="font-bold text-neutral-900">
-                  ₹{subtotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  ₹{subtotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
               </div>
-              <div className="flex justify-between text-neutral-600 text-[11px]">
+              <div className="flex justify-between text-neutral-600 text-[11px] print:text-[9.5px]">
                 <span>CGST (9.0%):</span>
-                <span>₹{(gstAmount / 2).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                <span>₹{(gstAmount / 2).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
               </div>
-              <div className="flex justify-between text-neutral-600 text-[11px]">
+              <div className="flex justify-between text-neutral-600 text-[11px] print:text-[9.5px]">
                 <span>SGST (9.0%):</span>
-                <span>₹{(gstAmount / 2).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                <span>₹{(gstAmount / 2).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
               </div>
-              <div className="border-t-2 border-neutral-900 pt-1.5 flex justify-between text-base font-black text-neutral-900">
+              <div className="border-t-2 border-neutral-900 pt-1.5 flex justify-between text-base print:text-sm font-black text-neutral-900">
                 <span>Net Proforma Total:</span>
                 <span className="text-[#DC2626]">
-                  ₹{grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  ₹{grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
               </div>
             </div>
           </div>
 
           {/* Amount in Words */}
-          <div className="p-2.5 rounded-lg bg-neutral-100 border border-neutral-200 text-xs font-semibold mb-4">
-            <span className="text-neutral-500 font-mono text-[10px] uppercase mr-2">Amount in Words:</span>
+          <div className="p-2.5 rounded-lg bg-neutral-100 border border-neutral-200 text-xs print:text-[10px] font-semibold mb-4 print:mb-3">
+            <span className="text-neutral-500 font-mono text-[10px] uppercase mr-2">AMOUNT IN WORDS:</span>
             <span className="font-serif italic text-neutral-900">{numberToWords(grandTotal)}</span>
           </div>
 
           {/* Commercial Terms & Signatures */}
-          <div className="pt-3 border-t border-neutral-200 grid grid-cols-1 sm:grid-cols-2 gap-4 text-[10px] text-neutral-500 leading-tight">
+          <div className="pt-3 border-t border-neutral-200 grid grid-cols-1 sm:grid-cols-2 print:grid-cols-2 gap-4 print:gap-3 text-[10px] text-neutral-500 leading-tight">
             <div>
               <strong className="text-neutral-700 block mb-0.5">Commercial Terms & Conditions:</strong>
               <ol className="list-decimal list-inside space-y-0.5">
@@ -451,11 +456,11 @@ export function ProformaInvoiceModal({ order, isOpen, onClose }: ProformaInvoice
               </ol>
             </div>
 
-            <div className="text-right sm:text-right flex flex-col justify-end">
+            <div className="text-right sm:text-right print:text-right flex flex-col justify-end">
               <div className="text-xs font-bold text-neutral-900">
                 For FILTEC POLYPLAST PVT. LTD.
               </div>
-              <div className="h-10"></div>
+              <div className="h-10 print:h-8"></div>
               <div className="text-[11px] font-medium text-neutral-700 border-t border-dashed border-neutral-400 pt-1 inline-block">
                 Authorized Commercial Signatory
               </div>
@@ -465,4 +470,6 @@ export function ProformaInvoiceModal({ order, isOpen, onClose }: ProformaInvoice
       </div>
     </div>
   );
+
+  return createPortal(modalContent, document.body);
 }
