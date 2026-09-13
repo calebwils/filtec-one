@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Edit, Save, CheckCircle2 } from 'lucide-react';
 import { store } from '@/data/store';
 import { Product } from '@/types';
+import { ProductPhotoSelector } from '@/components/catalogue/ProductPhotoSelector';
 
 export function EditProductModal({
   product,
@@ -21,6 +22,7 @@ export function EditProductModal({
   const [moq, setMoq] = useState(1);
   const [packingSummary, setPackingSummary] = useState('');
   const [application, setApplication] = useState('');
+  const [imageUrl, setImageUrl] = useState('');
   const [variants, setVariants] = useState<any[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -31,6 +33,7 @@ export function EditProductModal({
       setMoq(product.moq);
       setPackingSummary(product.packingSummary);
       setApplication(product.application);
+      setImageUrl(product.imageUrl || '');
       setVariants(product.variants.map((v) => ({ ...v })));
     }
   }, [product]);
@@ -54,6 +57,7 @@ export function EditProductModal({
         moq: Number(moq) || 1,
         packingSummary,
         application,
+        imageUrl: imageUrl.trim() || undefined,
         variants
       });
 
@@ -133,6 +137,15 @@ export function EditProductModal({
               className="w-full p-2.5 bg-white border border-[#E5E7EB] rounded-lg"
             />
           </div>
+
+          {/* Product Photo Selector */}
+          <ProductPhotoSelector
+            imageUrl={imageUrl}
+            onChange={setImageUrl}
+            productName={name}
+            category={product.category}
+            material={product.material}
+          />
 
           {/* Variant Price Grid */}
           <div className="pt-2 border-t border-[#F3F4F6]">

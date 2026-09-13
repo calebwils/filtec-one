@@ -10,10 +10,12 @@ import {
   DollarSign,
   Layers,
   Box,
-  Tag
+  Tag,
+  Camera
 } from 'lucide-react';
 import { useAppStore, store } from '@/data/store';
 import { ProductCategory, MaterialType, Product } from '@/types';
+import { ProductPhotoSelector } from '@/components/catalogue/ProductPhotoSelector';
 
 interface VariantDraft {
   id: string;
@@ -35,13 +37,13 @@ export function AddProductModal({
 }) {
   const { products } = useAppStore();
 
-  // Suggest next code F-XX
+  // Suggest next code FXX (natural order without hyphen)
   const nextNum = products.reduce((max, p) => {
-    const match = p.code.match(/F-(\d+)/i);
+    const match = p.code.match(/F[ -]?(\d+)/i);
     return match ? Math.max(max, parseInt(match[1], 10)) : max;
   }, 99) + 1;
 
-  const [code, setCode] = useState(`F-${nextNum}`);
+  const [code, setCode] = useState(`F${nextNum}`);
   const [name, setName] = useState('');
   const [category, setCategory] = useState<ProductCategory>('valves');
   const [material, setMaterial] = useState<MaterialType>('CPVC');
@@ -52,6 +54,7 @@ export function AddProductModal({
   const [moq, setMoq] = useState(20);
   const [packingSummary, setPackingSummary] = useState('Box of 20 pcs / Master Carton 120 pcs');
   const [inStock, setInStock] = useState(true);
+  const [imageUrl, setImageUrl] = useState<string>('/images/products/cpvc-ball-valve.png');
 
   // Dynamic variants
   const [variants, setVariants] = useState<VariantDraft[]>([
@@ -68,6 +71,40 @@ export function AddProductModal({
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   if (!isOpen) return null;
+
+  const handleCategoryChange = (newCat: ProductCategory) => {
+    setCategory(newCat);
+    if (!imageUrl.startsWith('data:')) {
+      if (newCat === 'valves') {
+        setImageUrl(material === 'CPVC' ? '/images/products/cpvc-ball-valve.png' : '/images/products/upvc-ball-valve.png');
+      } else if (newCat === 'pipes') {
+        setImageUrl(material === 'CPVC' ? '/images/products/cpvc-pipe-sdr11.png' : '/images/products/upvc-pipe-sch40.png');
+      } else if (newCat === 'solvents') {
+        setImageUrl(material === 'CPVC' ? '/images/products/solvent-tin-cvpc.png' : '/images/products/solvent-tin-cvpu.png');
+      } else if (newCat === 'tape') {
+        setImageUrl('/images/products/teflon-tape-10m.png');
+      } else {
+        setImageUrl(material === 'CPVC' ? '/images/products/cpvc-elbow.png' : '/images/products/upvc-elbow.png');
+      }
+    }
+  };
+
+  const handleMaterialChange = (newMat: MaterialType) => {
+    setMaterial(newMat);
+    if (!imageUrl.startsWith('data:')) {
+      if (category === 'valves') {
+        setImageUrl(newMat === 'CPVC' ? '/images/products/cpvc-ball-valve.png' : '/images/products/upvc-ball-valve.png');
+      } else if (category === 'pipes') {
+        setImageUrl(newMat === 'CPVC' ? '/images/products/cpvc-pipe-sdr11.png' : '/images/products/upvc-pipe-sch40.png');
+      } else if (category === 'solvents') {
+        setImageUrl(newMat === 'CPVC' ? '/images/products/solvent-tin-cvpc.png' : '/images/products/solvent-tin-cvpu.png');
+      } else if (category === 'tape') {
+        setImageUrl('/images/products/teflon-tape-10m.png');
+      } else {
+        setImageUrl(newMat === 'CPVC' ? '/images/products/cpvc-elbow.png' : '/images/products/upvc-elbow.png');
+      }
+    }
+  };
 
   const handleAddVariant = () => {
     setVariants([
@@ -111,6 +148,7 @@ export function AddProductModal({
         application: application.trim(),
         moq: Number(moq) || 1,
         packingSummary: packingSummary.trim(),
+        imageUrl: imageUrl.trim() || undefined,
         tags: [code, category, material, standard, sizeMm, sizeInch].filter(Boolean),
         inStock,
         stockStatus: inStock ? 'IN_STOCK' : 'OUT_OF_STOCK',
@@ -204,7 +242,7 @@ export function AddProductModal({
                 </label>
                 <select
                   value={category}
-                  onChange={(e) => setCategory(e.target.value as ProductCategory)}
+                  onChange={(e) => handleCategoryChange(e.target.value as ProductCategory)}
                   className="w-full p-2.5 bg-white border border-[#E5E7EB] rounded-lg focus:outline-none focus:ring-1 focus:ring-[#DC2626]"
                 >
                   <option value="pipes">Pipes</option>
@@ -221,7 +259,7 @@ export function AddProductModal({
                 </label>
                 <select
                   value={material}
-                  onChange={(e) => setMaterial(e.target.value as MaterialType)}
+                  onChange={(e) => handleMaterialChange(e.target.value as MaterialType)}
                   className="w-full p-2.5 bg-white border border-[#E5E7EB] rounded-lg focus:outline-none focus:ring-1 focus:ring-[#DC2626]"
                 >
                   <option value="uPVC">uPVC</option>
@@ -298,19 +336,36 @@ export function AddProductModal({
             </div>
           </div>
 
-          {/* 2. Variants & MRP Pricing */}
+          {/* 2. Product Photo */}
+          <div className="space-y-2">
+            <div className="flex items-center gap-1.5 pb-1 border-b border-[#F3F4F6]">
+              <span className="w-2 h-2 rounded-full bg-[#DC2626]"></span>
+              <h4 className="text-xs font-bold uppercase font-mono text-[#111827]">
+                2. Product Photo & Visual Representation
+              </h4>
+            </div>
+            <ProductPhotoSelector
+              imageUrl={imageUrl}
+              onChange={setImageUrl}
+              productName={name}
+              category={category}
+              material={material}
+            />
+          </div>
+
+          {/* 3. Variants & MRP Pricing */}
           <div className="space-y-3">
             <div className="flex items-center justify-between pb-1 border-b border-[#F3F4F6]">
               <div className="flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full bg-[#DC2626]"></span>
                 <h4 className="text-xs font-bold uppercase font-mono text-[#111827]">
-                  2. Sizing Variants & Catalogue MRP (₹)
+                  3. Sizing Variants & Catalogue MRP (₹)
                 </h4>
               </div>
               <button
                 type="button"
                 onClick={handleAddVariant}
-                className="text-xs font-semibold text-[#DC2626] hover:text-[#B91C1C] flex items-center gap-1"
+                className="text-xs font-semibold text-[#DC2626] hover:text-[#B91C1C] flex items-center gap-1 cursor-pointer"
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>Add Variant</span>
@@ -393,12 +448,12 @@ export function AddProductModal({
             </div>
           </div>
 
-          {/* 3. Commercial Packing & MOQ */}
+          {/* 4. Commercial Packing & MOQ */}
           <div className="space-y-3">
             <div className="flex items-center gap-1.5 pb-1 border-b border-[#F3F4F6]">
               <span className="w-2 h-2 rounded-full bg-[#DC2626]"></span>
               <h4 className="text-xs font-bold uppercase font-mono text-[#111827]">
-                3. Commercial Packing & Minimum Order
+                4. Commercial Packing & Minimum Order
               </h4>
             </div>
 
