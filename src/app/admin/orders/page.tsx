@@ -5,16 +5,18 @@ import { TopContextBar } from '@/components/navigation/TopContextBar';
 import { DesktopSubNav } from '@/components/navigation/DesktopSubNav';
 import { MobileBottomNav } from '@/components/navigation/MobileBottomNav';
 import { OrderApprovalModal } from '@/components/orders/OrderApprovalModal';
+import { ProformaInvoiceModal } from '@/components/orders/ProformaInvoiceModal';
 import { OrderStatusBadge } from '@/components/orders/OrderStatusBadge';
 import { useAppStore } from '@/data/store';
 import { Order } from '@/types';
-import { Search, CheckCircle2, Building2, User, Eye } from 'lucide-react';
+import { Search, CheckCircle2, Building2, User, Eye, Receipt, FileText } from 'lucide-react';
 
 export default function AdminOrdersPage() {
   const { orders } = useAppStore();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [selectedProformaOrder, setSelectedProformaOrder] = useState<Order | null>(null);
 
   const filteredOrders = orders.filter((o) => {
     if (statusFilter !== 'ALL' && o.status !== statusFilter) return false;
@@ -120,25 +122,37 @@ export default function AdminOrdersPage() {
                       ₹{order.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                     </td>
                     <td className="py-3 px-4 text-right">
-                      {order.status === 'PENDING_ADMIN_APPROVAL' ? (
+                      <div className="flex items-center justify-end gap-1.5">
                         <button
                           type="button"
-                          onClick={() => setSelectedOrder(order)}
-                          className="bg-[#DC2626] hover:bg-[#B91C1C] text-white text-[11px] font-semibold px-3 py-1.5 rounded transition-all shadow-xs inline-flex items-center gap-1"
+                          onClick={() => setSelectedProformaOrder(order)}
+                          className="border border-neutral-300 hover:bg-neutral-100 text-neutral-800 text-[11px] font-semibold px-2.5 py-1.5 rounded transition-all shadow-2xs inline-flex items-center gap-1 cursor-pointer"
+                          title="View Official Proforma Invoice"
                         >
-                          <CheckCircle2 className="w-3.5 h-3.5" />
-                          <span>Review</span>
+                          <Receipt className="w-3.5 h-3.5 text-neutral-600" />
+                          <span>Proforma</span>
                         </button>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => setSelectedOrder(order)}
-                          className="border border-[#E5E7EB] hover:bg-neutral-100 text-[#111827] text-[11px] font-medium px-2.5 py-1.5 rounded transition-all inline-flex items-center gap-1"
-                        >
-                          <Eye className="w-3.5 h-3.5 text-neutral-400" />
-                          <span>Inspect</span>
-                        </button>
-                      )}
+
+                        {order.status === 'PENDING_ADMIN_APPROVAL' ? (
+                          <button
+                            type="button"
+                            onClick={() => setSelectedOrder(order)}
+                            className="bg-[#DC2626] hover:bg-[#B91C1C] text-white text-[11px] font-semibold px-3 py-1.5 rounded transition-all shadow-xs inline-flex items-center gap-1 cursor-pointer"
+                          >
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            <span>Review</span>
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setSelectedOrder(order)}
+                            className="border border-[#E5E7EB] hover:bg-neutral-100 text-[#111827] text-[11px] font-medium px-2.5 py-1.5 rounded transition-all inline-flex items-center gap-1 cursor-pointer"
+                          >
+                            <Eye className="w-3.5 h-3.5 text-neutral-400" />
+                            <span>Inspect</span>
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -154,6 +168,12 @@ export default function AdminOrdersPage() {
         order={selectedOrder}
         isOpen={Boolean(selectedOrder)}
         onClose={() => setSelectedOrder(null)}
+      />
+
+      <ProformaInvoiceModal
+        order={selectedProformaOrder}
+        isOpen={Boolean(selectedProformaOrder)}
+        onClose={() => setSelectedProformaOrder(null)}
       />
     </div>
   );

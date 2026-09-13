@@ -152,6 +152,8 @@ export function ProductImageModal({ product, isOpen, onClose }: ProductImageModa
                     <tr>
                       <th className="py-2 px-3">Variant / Size</th>
                       <th className="py-2 px-3">Standard Packing</th>
+                      <th className="py-2 px-3 text-right">Catalogue Rate (₹)</th>
+                      <th className="py-2 px-3 text-right">Lot Total (₹)</th>
                       <th className="py-2 px-3 text-right">Availability</th>
                     </tr>
                   </thead>
@@ -163,6 +165,12 @@ export function ProductImageModal({ product, isOpen, onClose }: ProductImageModa
                         </td>
                         <td className="py-2 px-3 font-mono text-neutral-600">
                           {v.packingQty} {v.packingUnit}
+                        </td>
+                        <td className="py-2 px-3 text-right font-mono font-bold text-[#DC2626]">
+                          ₹{v.mrp.toFixed(2)}
+                        </td>
+                        <td className="py-2 px-3 text-right font-mono text-neutral-700">
+                          ₹{(v.mrp * v.packingQty).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                         </td>
                         <td className="py-2 px-3 text-right">
                           <span className={`text-[10px] font-mono font-bold uppercase px-1.5 py-0.5 rounded ${

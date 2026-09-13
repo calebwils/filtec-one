@@ -6,14 +6,16 @@ import { TopContextBar } from '@/components/navigation/TopContextBar';
 import { DesktopSubNav } from '@/components/navigation/DesktopSubNav';
 import { MobileBottomNav } from '@/components/navigation/MobileBottomNav';
 import { OrderStatusBadge } from '@/components/orders/OrderStatusBadge';
+import { ProformaInvoiceModal } from '@/components/orders/ProformaInvoiceModal';
 import { useAppStore } from '@/data/store';
 import { Order, OrderStatus } from '@/types';
-import { PlusCircle, Search, Filter, Clock, Building2, Eye, FileText } from 'lucide-react';
+import { PlusCircle, Search, Filter, Clock, Building2, Eye, FileText, Receipt } from 'lucide-react';
 
 export default function EmployeeOrdersPage() {
   const { orders, currentUser } = useAppStore();
   const [search, setSearch] = useState('');
   const [selectedStatus, setSelectedStatus] = useState<string>('ALL');
+  const [selectedProformaOrder, setSelectedProformaOrder] = useState<Order | null>(null);
 
   const filteredOrders = orders.filter((o) => {
     if (selectedStatus !== 'ALL' && o.status !== selectedStatus) return false;
@@ -111,13 +113,23 @@ export default function EmployeeOrdersPage() {
                     </div>
                   </div>
 
-                  <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-center border-t sm:border-t-0 pt-2 sm:pt-0 border-neutral-100">
+                  <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-center border-t sm:border-t-0 pt-2 sm:pt-0 border-neutral-100 gap-1.5">
                     <div className="font-mono font-bold text-sm text-[#111827]">
                       ₹{order.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                     </div>
-                    <span className="text-[10px] font-mono text-emerald-700">
-                      Est. Reward: +₹{order.rewardEstimated.toFixed(2)}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-mono text-emerald-700">
+                        Est. Reward: +₹{order.rewardEstimated.toFixed(2)}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedProformaOrder(order)}
+                        className="px-2 py-1 bg-white hover:bg-neutral-100 text-[#111827] border border-[#D1D5DB] rounded text-[11px] font-semibold flex items-center gap-1 transition-colors shadow-2xs"
+                      >
+                        <Receipt className="w-3.5 h-3.5 text-[#DC2626]" />
+                        <span>Proforma</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))
@@ -131,6 +143,13 @@ export default function EmployeeOrdersPage() {
       </main>
 
       <MobileBottomNav />
+
+      {/* Proforma Invoice Modal */}
+      <ProformaInvoiceModal
+        order={selectedProformaOrder}
+        isOpen={!!selectedProformaOrder}
+        onClose={() => setSelectedProformaOrder(null)}
+      />
     </div>
   );
 }

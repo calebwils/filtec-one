@@ -50,6 +50,7 @@ export interface Dealer {
   totalPurchases: number;
   availableRewards: number;
   plumbersCount: number;
+  gstin?: string;
 }
 
 export interface Plumber {

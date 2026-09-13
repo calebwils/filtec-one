@@ -3,8 +3,9 @@
 import React, { useState } from 'react';
 import { Order } from '@/types';
 import { OrderStatusBadge } from './OrderStatusBadge';
+import { ProformaInvoiceModal } from './ProformaInvoiceModal';
 import { store } from '@/data/store';
-import { CheckCircle2, XCircle, Clock, Building2, User, Phone, MapPin, X, ArrowRight, ShieldCheck } from 'lucide-react';
+import { CheckCircle2, XCircle, Clock, Building2, User, Phone, MapPin, X, ArrowRight, ShieldCheck, Receipt } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
 export function OrderApprovalModal({
@@ -20,6 +21,7 @@ export function OrderApprovalModal({
   const [rejectionReason, setRejectionReason] = useState('');
   const [isRejecting, setIsRejecting] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [showProforma, setShowProforma] = useState(false);
 
   if (!isOpen || !order) return null;
 
@@ -224,9 +226,19 @@ export function OrderApprovalModal({
         </div>
 
         {/* Footer Actions */}
-        <div className="px-5 py-3.5 border-t border-[#E5E7EB] bg-[#F8F9FA] flex items-center justify-between">
-          <div className="text-xs text-[#6B7280]">
-            Approval triggers automatic ERP Invoice generation & WhatsApp alert.
+        <div className="px-5 py-3.5 border-t border-[#E5E7EB] bg-[#F8F9FA] flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setShowProforma(true)}
+              className="px-3 py-2 rounded-lg text-xs font-semibold bg-white hover:bg-neutral-50 text-[#111827] border border-[#D1D5DB] flex items-center gap-1.5 transition-all shadow-xs"
+            >
+              <Receipt className="w-4 h-4 text-[#DC2626]" />
+              <span>View Proforma</span>
+            </button>
+            <span className="hidden sm:inline text-[11px] text-[#6B7280]">
+              Official B2B Commercial Proforma
+            </span>
           </div>
 
           {order.status === 'PENDING_ADMIN_APPROVAL' ? (
@@ -279,6 +291,13 @@ export function OrderApprovalModal({
           )}
         </div>
       </div>
+
+      {/* Commercial Proforma Invoice Modal */}
+      <ProformaInvoiceModal
+        order={order}
+        isOpen={showProforma}
+        onClose={() => setShowProforma(false)}
+      />
     </div>
   );
 }

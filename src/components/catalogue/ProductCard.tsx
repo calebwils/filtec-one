@@ -179,12 +179,19 @@ export function ProductCard({
                     >
                       <div className="font-medium flex items-center justify-between">
                         <span>{variant.length || variant.size}</span>
-                        {varOutOfStock && (
+                        {varOutOfStock ? (
                           <span className="text-[9px] font-mono text-rose-600 font-bold uppercase">Out</span>
+                        ) : (
+                          <span className="text-[11px] font-mono font-bold text-[#DC2626]">
+                            ₹{variant.mrp.toFixed(2)}
+                          </span>
                         )}
                       </div>
-                      <div className="text-[10px] text-[#6B7280] font-mono">
-                        Packing: {variant.packingQty} {variant.packingUnit}
+                      <div className="text-[10px] text-[#6B7280] font-mono flex items-center justify-between mt-0.5">
+                        <span>Pack: {variant.packingQty} {variant.packingUnit}</span>
+                        <span className="text-neutral-500">
+                          ₹{(variant.mrp * variant.packingQty).toLocaleString('en-IN', { maximumFractionDigits: 0 })}/lot
+                        </span>
                       </div>
                     </button>
                   );
@@ -194,17 +201,19 @@ export function ProductCard({
           )}
         </div>
 
-        {/* Bottom Actions: Packing & Quick Add */}
+        {/* Bottom Actions: Pricing, Packing & Quick Add */}
         <div className="mt-4 pt-3 border-t border-[#F3F4F6] flex items-center justify-between">
           <div>
-            <span className="text-[10px] uppercase font-mono text-[#9CA3AF] block leading-none">
-              Standard Packing
-            </span>
-            <div className="text-sm font-bold text-[#111827] font-mono leading-tight">
-              {selectedVariant?.packingQty || 1} {selectedVariant?.packingUnit || 'Pcs'}
-              <span className="text-[10px] text-[#6B7280] font-normal ml-1 font-sans">
-                / bundle
+            <div className="flex items-baseline gap-1.5">
+              <span className="text-base font-bold text-[#111827] font-mono">
+                ₹{selectedVariant?.mrp?.toFixed(2)}
               </span>
+              <span className="text-[10px] text-[#6B7280]">
+                / {selectedVariant?.packingUnit || 'pc'}
+              </span>
+            </div>
+            <div className="text-[11px] text-[#6B7280] font-mono mt-0.5">
+              {totalQuantity} {selectedVariant?.packingUnit || 'Pcs'} = <strong className="text-[#111827]">₹{totalPrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong>
             </div>
           </div>
 

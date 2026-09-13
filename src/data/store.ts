@@ -327,6 +327,14 @@ export const store = {
     notify();
   },
 
+  setCartNotes(notes: string) {
+    globalState = {
+      ...globalState,
+      cart: { ...globalState.cart, notes }
+    };
+    notify();
+  },
+
   addToCart(item: OrderItem) {
     const existingIndex = globalState.cart.items.findIndex(
       (i) => i.productId === item.productId && i.variantId === item.variantId

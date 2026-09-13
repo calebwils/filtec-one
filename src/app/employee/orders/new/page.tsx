@@ -20,8 +20,10 @@ import {
   MapPin,
   Phone,
   ShieldAlert,
-  Send
+  Send,
+  Receipt
 } from 'lucide-react';
+import { ProformaInvoiceModal } from '@/components/orders/ProformaInvoiceModal';
 import confetti from 'canvas-confetti';
 
 export default function NewOrderPage() {
@@ -31,6 +33,7 @@ export default function NewOrderPage() {
   const [notes, setNotes] = useState(cart.notes || '');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submittedOrder, setSubmittedOrder] = useState<any | null>(null);
+  const [showProformaModal, setShowProformaModal] = useState(false);
 
   const selectedDealer = dealers.find((d) => d.id === cart.dealerId) || dealers[0];
 
@@ -360,6 +363,15 @@ export default function NewOrderPage() {
             <div className="mt-5 space-y-2">
               <button
                 type="button"
+                onClick={() => setShowProformaModal(true)}
+                className="w-full bg-[#DC2626] hover:bg-[#B91C1C] text-white text-xs font-semibold py-2.5 rounded-lg transition-all flex items-center justify-center gap-2 shadow-xs"
+              >
+                <Receipt className="w-4 h-4" />
+                <span>View Generated Proforma Invoice</span>
+              </button>
+
+              <button
+                type="button"
                 onClick={() => {
                   store.switchUser('ADMIN');
                   router.push('/admin/orders');
@@ -382,6 +394,15 @@ export default function NewOrderPage() {
               </button>
             </div>
           </div>
+
+          {/* Proforma Invoice Modal */}
+          {submittedOrder && (
+            <ProformaInvoiceModal
+              order={submittedOrder}
+              isOpen={showProformaModal}
+              onClose={() => setShowProformaModal(false)}
+            />
+          )}
         </div>
       )}
     </div>

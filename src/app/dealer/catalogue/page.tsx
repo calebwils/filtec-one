@@ -6,6 +6,7 @@ import { TopContextBar } from '@/components/navigation/TopContextBar';
 import { DesktopSubNav } from '@/components/navigation/DesktopSubNav';
 import { MobileBottomNav } from '@/components/navigation/MobileBottomNav';
 import { ProductCard } from '@/components/catalogue/ProductCard';
+import { DealerCheckoutModal } from '@/components/orders/DealerCheckoutModal';
 import { useAppStore } from '@/data/store';
 import { sortProductsNaturally, matchesProductSearch } from '@/lib/catalogueUtils';
 import {
@@ -24,6 +25,7 @@ import {
 
 export default function DealerCataloguePage() {
   const { products, cart, dealers, currentUser } = useAppStore();
+  const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
 
   const currentDealer =
     dealers.find((d) => d.id === currentUser.dealerId) || dealers[0];
@@ -238,17 +240,23 @@ export default function DealerCataloguePage() {
                   </div>
                 </div>
               </div>
-              <Link
-                href="/dealer/orders"
-                className="px-4 py-2 rounded-xl bg-white hover:bg-neutral-100 text-[#111827] text-xs font-bold flex items-center gap-1.5 transition-all shadow-xs"
+              <button
+                type="button"
+                onClick={() => setIsCheckoutOpen(true)}
+                className="px-4 py-2 rounded-xl bg-[#DC2626] hover:bg-[#B91C1C] text-white text-xs font-bold flex items-center gap-1.5 transition-all shadow-xs cursor-pointer"
               >
-                <span>Review Order</span>
+                <span>Review & Proforma</span>
                 <ArrowRight className="w-3.5 h-3.5" />
-              </Link>
+              </button>
             </div>
           </div>
         )}
       </main>
+
+      <DealerCheckoutModal
+        isOpen={isCheckoutOpen}
+        onClose={() => setIsCheckoutOpen(false)}
+      />
 
       <MobileBottomNav />
     </div>
