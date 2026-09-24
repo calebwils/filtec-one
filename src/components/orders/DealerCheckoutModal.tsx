@@ -31,8 +31,6 @@ interface DealerCheckoutModalProps {
 
 export function DealerCheckoutModal({ isOpen, onClose }: DealerCheckoutModalProps) {
   const { cart, dealers, currentUser, settings } = useAppStore();
-  const [notes, setNotes] = useState('');
-  const [poNumber, setPoNumber] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submittedOrder, setSubmittedOrder] = useState<Order | null>(null);
   const [copiedWhatsApp, setCopiedWhatsApp] = useState(false);
@@ -62,9 +60,6 @@ export function DealerCheckoutModal({ isOpen, onClose }: DealerCheckoutModalProp
     setIsSubmitting(true);
 
     try {
-      if (notes.trim() || poNumber.trim()) {
-        store.setCartNotes(`${poNumber ? `PO Ref: ${poNumber.trim()} • ` : ''}${notes.trim()}`);
-      }
       const order = store.submitCurrentOrder();
       if (!order) {
         setIsSubmitting(false);
@@ -368,34 +363,6 @@ export function DealerCheckoutModal({ isOpen, onClose }: DealerCheckoutModalProp
                 Your order requisition is empty. Select products from the catalogue.
               </div>
             )}
-          </div>
-
-          {/* Optional PO Reference & Order Notes */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
-            <div>
-              <label className="block text-[11px] font-semibold text-neutral-700 mb-1">
-                Purchase Order / PO Reference (Optional)
-              </label>
-              <input
-                type="text"
-                value={poNumber}
-                onChange={(e) => setPoNumber(e.target.value)}
-                placeholder="e.g. PO-BALAJI-2026-09"
-                className="w-full p-2 bg-white border border-neutral-300 rounded-lg text-xs font-mono"
-              />
-            </div>
-            <div>
-              <label className="block text-[11px] font-semibold text-neutral-700 mb-1">
-                Dispatch Instructions / Transport Notes
-              </label>
-              <input
-                type="text"
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder="e.g. Direct factory vehicle preferred..."
-                className="w-full p-2 bg-white border border-neutral-300 rounded-lg text-xs"
-              />
-            </div>
           </div>
 
           {/* Requisition Order Summary (NO FINANCIALS / ZERO PRICES) */}
