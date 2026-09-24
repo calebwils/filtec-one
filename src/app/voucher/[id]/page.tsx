@@ -237,12 +237,15 @@ export default function VirtualCardPage() {
         >
           {/* Card Top Row */}
           <div className="flex items-center justify-between gap-3 pb-4 border-b border-white/20">
-            <div className="flex items-center gap-2.5">
-              <div className="bg-white px-2.5 py-1 rounded-md shadow-xs">
-                <span className="font-extrabold text-sm text-[#DC2626]">f | </span>
-                <span className="font-black text-sm text-[#111827]">ONE</span>
+            <div className="flex items-center gap-3">
+              <div className="bg-white px-3 py-1.5 rounded-lg shadow-sm flex items-center justify-center">
+                <img
+                  src="/brand/filtec-one-logo.png"
+                  alt="f | ONE"
+                  className="h-6 sm:h-7 w-auto object-contain"
+                />
               </div>
-              <span className="text-[11px] font-bold tracking-wider uppercase text-white/90">
+              <span className="text-[11px] font-bold tracking-wider uppercase text-white/95">
                 FILTEC Polyplast
               </span>
             </div>

@@ -747,10 +747,10 @@ export default function DealerPlumbersPage() {
                   </div>
                   <div>
                     <h3 className="font-bold text-sm text-[#111827]">
-                      {createdPlumberVoucher ? `Plumber Coupon ${createdPlumberVoucher.voucherNumber}` : 'Allocate Reward Points'}
+                      {createdPlumberVoucher ? `Virtual Reward Card • ${createdPlumberVoucher.voucherNumber}` : 'Allocate Reward Points'}
                     </h3>
                     <p className="text-[11px] text-[#6B7280]">
-                      {createdPlumberVoucher ? 'Coupon sent via WhatsApp' : `Beneficiary: ${selectedPlumberForReward.name} (${selectedPlumberForReward.phone})`}
+                      {createdPlumberVoucher ? `Direct dispatch to ${selectedPlumberForReward.name} (${selectedPlumberForReward.phone})` : `Beneficiary: ${selectedPlumberForReward.name} (${selectedPlumberForReward.phone})`}
                     </p>
                   </div>
                 </div>
@@ -767,19 +767,7 @@ export default function DealerPlumbersPage() {
               </div>
 
               {createdPlumberVoucher ? (
-                <div className="space-y-4">
-                  <div className="bg-blue-50 border border-blue-200 text-blue-900 rounded-xl p-3.5 flex items-center gap-2.5">
-                    <CheckCircle2 className="w-5 h-5 text-blue-600 shrink-0" />
-                    <div className="text-xs">
-                      <strong className="font-bold block text-blue-950">
-                        Plumber Coupon {createdPlumberVoucher.voucherNumber} Issued!
-                      </strong>
-                      <span>
-                        ₹{createdPlumberVoucher.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })} allocated to {selectedPlumberForReward.name}. A WhatsApp notification with this voucher has been dispatched!
-                      </span>
-                    </div>
-                  </div>
-
+                <div className="space-y-3">
                   <RewardVoucherCard
                     voucher={createdPlumberVoucher}
                     onClose={() => {

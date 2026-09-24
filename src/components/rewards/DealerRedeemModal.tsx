@@ -92,19 +92,7 @@ export function DealerRedeemModal({ dealer, isOpen, onClose }: DealerRedeemModal
 
         {/* View 1: If Voucher has just been generated */}
         {createdVoucher ? (
-          <div className="space-y-4">
-            <div className="bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-xl p-3.5 flex items-center gap-3">
-              <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
-              <div className="text-xs">
-                <strong className="font-bold block text-emerald-950">
-                  Voucher {createdVoucher.voucherNumber} Issued!
-                </strong>
-                <span>
-                  Your reward balance was debited by ₹{createdVoucher.amount.toLocaleString('en-IN')}. Hand this voucher to your Sales Executive to settle against your credit note.
-                </span>
-              </div>
-            </div>
-
+          <div className="space-y-3">
             {/* The Voucher Card */}
             <RewardVoucherCard voucher={createdVoucher} onClose={handleClose} />
           </div>

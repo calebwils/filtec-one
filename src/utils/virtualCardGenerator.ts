@@ -95,21 +95,48 @@ export async function generateVirtualCardBlob(voucher: RewardVoucher): Promise<B
   ctx.stroke();
   ctx.restore();
 
+  // Load official logo image
+  let logoImage: HTMLImageElement | null = null;
+  if (typeof window !== 'undefined') {
+    try {
+      logoImage = new window.Image();
+      logoImage.crossOrigin = 'anonymous';
+      logoImage.src = '/brand/filtec-one-logo.png';
+      await new Promise<void>((resolve) => {
+        if (logoImage!.complete && logoImage!.naturalWidth > 0) {
+          resolve();
+        } else {
+          logoImage!.onload = () => resolve();
+          logoImage!.onerror = () => resolve();
+          setTimeout(resolve, 300);
+        }
+      });
+    } catch {
+      // ignore
+    }
+  }
+
   // 6. Top Bar
   // Brand Pill
   ctx.save();
   ctx.fillStyle = '#FFFFFF';
   ctx.beginPath();
-  ctx.roundRect(45, 42, 160, 48, 12);
+  ctx.roundRect(45, 38, 175, 54, 12);
   ctx.fill();
 
-  // Draw Logo text inside pill
-  ctx.fillStyle = '#DC2626';
-  ctx.font = 'bold 24px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
-  ctx.fillText('f |', 62, 75);
-  ctx.fillStyle = '#111827';
-  ctx.font = '800 24px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
-  ctx.fillText('ONE', 95, 75);
+  // Draw official Logo image if loaded, with high-quality fallback
+  if (logoImage && logoImage.complete && logoImage.naturalWidth > 0) {
+    const logoW = 150;
+    const logoH = 50;
+    ctx.drawImage(logoImage, 57, 40, logoW, logoH);
+  } else {
+    ctx.fillStyle = '#DC2626';
+    ctx.font = 'bold 24px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+    ctx.fillText('f |', 62, 74);
+    ctx.fillStyle = '#111827';
+    ctx.font = '800 24px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+    ctx.fillText('ONE', 95, 74);
+  }
   ctx.restore();
 
   // Company and Card Title

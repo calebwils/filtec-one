@@ -48,11 +48,16 @@ export async function GET(req: NextRequest) {
                   padding: '8px 18px',
                   borderRadius: '10px',
                   display: 'flex',
-                  alignItems: 'center'
+                  alignItems: 'center',
+                  justifyContent: 'center'
                 }}
               >
-                <span style={{ color: '#DC2626', fontWeight: 900, fontSize: '22px' }}>f | </span>
-                <span style={{ color: '#111827', fontWeight: 900, fontSize: '22px', marginLeft: '4px' }}>ONE</span>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={`${new URL(req.url).origin}/brand/filtec-one-logo.png`}
+                  alt="f | ONE"
+                  style={{ height: '32px', width: '96px', objectFit: 'contain' }}
+                />
               </div>
               <div style={{ display: 'flex', flexDirection: 'column' }}>
                 <span style={{ fontSize: '20px', fontWeight: 800, color: 'white' }}>FILTEC Polyplast Pvt Ltd</span>
