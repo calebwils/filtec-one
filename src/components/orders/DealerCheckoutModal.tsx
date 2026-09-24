@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAppStore, store } from '@/data/store';
 import { Order, OrderItem } from '@/types';
 import {
@@ -35,10 +35,29 @@ export function DealerCheckoutModal({ isOpen, onClose }: DealerCheckoutModalProp
   const [submittedOrder, setSubmittedOrder] = useState<Order | null>(null);
   const [copiedWhatsApp, setCopiedWhatsApp] = useState(false);
 
+  const currentDealer =
+    dealers.find((d) => d.id === currentUser.dealerId || d.code === currentUser.dealerId) ||
+    dealers[0];
+
+  useEffect(() => {
+    if (isOpen) {
+      setSubmittedOrder(null);
+      setIsSubmitting(false);
+      if (currentDealer) {
+        store.setCartDealer(currentDealer.id);
+      }
+    }
+  }, [isOpen, currentDealer]);
+
   if (!isOpen) return null;
 
-  const currentDealer = dealers.find((d) => d.id === currentUser.dealerId) || dealers[0];
   const totalUnits = cart.items.reduce((sum, item) => sum + item.quantity, 0);
+
+  const handleClose = () => {
+    setSubmittedOrder(null);
+    setIsSubmitting(false);
+    onClose();
+  };
 
   const handleUpdateQuantity = (item: OrderItem, delta: number) => {
     const currentQtyMultiplier = Math.max(1, Math.round(item.quantity / (item.packingQty || 1)));
@@ -60,7 +79,11 @@ export function DealerCheckoutModal({ isOpen, onClose }: DealerCheckoutModalProp
     setIsSubmitting(true);
 
     try {
-      const order = store.submitCurrentOrder();
+      const dealerToUse = currentDealer || dealers[0];
+      if (dealerToUse) {
+        store.setCartDealer(dealerToUse.id);
+      }
+      const order = store.submitCurrentOrder(dealerToUse?.id);
       if (!order) {
         setIsSubmitting(false);
         return;
@@ -85,11 +108,13 @@ export function DealerCheckoutModal({ isOpen, onClose }: DealerCheckoutModalProp
       } catch (err) {}
 
       try {
-        confetti({
-          particleCount: 70,
-          spread: 80,
-          origin: { y: 0.6 }
-        });
+        if (typeof confetti === 'function') {
+          confetti({
+            particleCount: 70,
+            spread: 80,
+            origin: { y: 0.6 }
+          });
+        }
       } catch (e) {}
 
       setSubmittedOrder(order);
@@ -261,7 +286,7 @@ export function DealerCheckoutModal({ isOpen, onClose }: DealerCheckoutModalProp
             </div>
           </div>
           <button
-            onClick={onClose}
+            onClick={handleClose}
             className="text-neutral-400 hover:text-neutral-700 p-1.5 rounded-lg hover:bg-neutral-100 transition-colors"
           >
             <X className="w-5 h-5" />
@@ -394,7 +419,7 @@ export function DealerCheckoutModal({ isOpen, onClose }: DealerCheckoutModalProp
         <div className="p-4 border-t border-[#E5E7EB] bg-[#F8F9FA] flex items-center justify-end gap-2">
           <button
             type="button"
-            onClick={onClose}
+            onClick={handleClose}
             className="px-4 py-2 text-xs font-semibold text-neutral-600 hover:bg-neutral-200 rounded-lg transition-colors cursor-pointer"
           >
             Continue Shopping

@@ -592,13 +592,22 @@ export const store = {
   },
 
   // Submit order from cart
-  submitCurrentOrder(): Order | null {
+  submitCurrentOrder(dealerIdOverride?: string): Order | null {
     const { cart, currentUser, dealers, rewardConfig } = globalState;
-    if (!cart.dealerId || cart.items.length === 0) return null;
+    const targetDealerId =
+      dealerIdOverride ||
+      cart.dealerId ||
+      currentUser.dealerId ||
+      (dealers.length > 0 ? dealers[0].id : null);
 
-    const dealer = dealers.find((d) => d.id === cart.dealerId);
+    if (!targetDealerId || cart.items.length === 0) return null;
+
+    const dealer =
+      dealers.find((d) => d.id === targetDealerId || d.code === targetDealerId) ||
+      dealers[0];
     if (!dealer) return null;
 
+    const isDealerUser = currentUser.role === 'DEALER';
     const discountPercent = globalState.settings.company.defaultDiscountPercent ?? 48;
     const grossTotal = cart.items.reduce((acc, i) => acc + (i.quantity * i.unitPrice || i.totalAmount), 0);
     const discountAmount = Number(((grossTotal * discountPercent) / 100).toFixed(2));
@@ -616,8 +625,12 @@ export const store = {
     const newOrder: Order = {
       id: `ord-${Date.now()}`,
       orderNumber,
-      employeeId: currentUser.employeeCode || 'FPPL/OD-002',
-      employeeName: currentUser.name,
+      employeeId: isDealerUser
+        ? (dealer.assignedRepId || 'DEALER-PORTAL')
+        : (currentUser.employeeCode || 'FPPL/OD-002'),
+      employeeName: isDealerUser
+        ? `${dealer.name} (Direct Portal Requisition)`
+        : currentUser.name,
       dealerId: dealer.id,
       dealerName: dealer.name,
       dealerPhone: dealer.phone,
@@ -643,7 +656,9 @@ export const store = {
       action: 'ORDER_SUBMITTED',
       entityType: 'ORDER',
       entityId: newOrder.id,
-      details: `Field rep ${currentUser.name} submitted order ${orderNumber} for ${dealer.name} (${newOrder.items.length} items, ₹${totalAmount})`,
+      details: isDealerUser
+        ? `Dealer ${dealer.name} placed order requisition ${orderNumber} (${newOrder.items.length} items, ₹${totalAmount})`
+        : `Field rep ${currentUser.name} submitted order ${orderNumber} for ${dealer.name} (${newOrder.items.length} items, ₹${totalAmount})`,
       timestamp: new Date().toISOString()
     };
 
