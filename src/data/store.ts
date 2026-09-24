@@ -12,6 +12,7 @@ import {
   Product,
   RewardConfig,
   RewardTransaction,
+  RewardVoucher,
   Role,
   User,
   WhatsAppMessage,
@@ -32,6 +33,7 @@ import {
   INITIAL_PLUMBERS,
   INITIAL_REWARD_CONFIG,
   INITIAL_REWARD_LEDGER,
+  INITIAL_REWARD_VOUCHERS,
   INITIAL_USERS,
   INITIAL_DAILY_ATTENDANCE,
   INITIAL_WEEKLY_ATTENDANCE,
@@ -42,10 +44,11 @@ import {
   ALL_EMPLOYEE_PAGES,
   ALL_DEALER_PAGES
 } from './initialSeed';
+import { calculateDistanceMeters, formatDistanceToFiltec } from '@/utils/distance';
 import { useEffect, useState } from 'react';
 import { sortProductsNaturally } from '@/lib/catalogueUtils';
 
-const STORAGE_KEY = 'filtec_pretech1_state_v5';
+const STORAGE_KEY = 'filtec_pretech1_state_v9';
 
 export interface AppState {
   currentUser: User;
@@ -56,6 +59,7 @@ export interface AppState {
   orders: Order[];
   rewardConfig: RewardConfig;
   rewardLedger: RewardTransaction[];
+  rewardVouchers: RewardVoucher[];
   attendanceRecords: AttendanceRecord[];
   dailyAttendance: DailyAttendanceSummary[];
   weeklyAttendance: WeeklyAttendanceSummary[];
@@ -83,20 +87,8 @@ const getInitialState = (): AppState => {
     orders: INITIAL_ORDERS,
     rewardConfig: INITIAL_REWARD_CONFIG,
     rewardLedger: INITIAL_REWARD_LEDGER,
-    attendanceRecords: [
-      {
-        id: 'att-1',
-        employeeId: 'emp-1',
-        employeeName: 'Purna Chandra Nayak',
-        type: 'CHECK_IN',
-        timestamp: '2026-09-11T09:15:00Z',
-        latitude: 20.2960,
-        longitude: 85.8245,
-        locationName: 'Bhubaneswar Commercial Complex',
-        photoUrl: '/brand/filtec-logo.jpg',
-        verified: true
-      }
-    ],
+    rewardVouchers: INITIAL_REWARD_VOUCHERS,
+    attendanceRecords: [],
     dailyAttendance: INITIAL_DAILY_ATTENDANCE,
     weeklyAttendance: INITIAL_WEEKLY_ATTENDANCE,
     monthlyAttendance: INITIAL_MONTHLY_ATTENDANCE,
@@ -116,7 +108,7 @@ const getInitialState = (): AppState => {
       }
     ],
     cart: {
-      dealerId: 'dlr-1',
+      dealerId: null,
       items: [],
       notes: ''
     }
@@ -135,6 +127,8 @@ const notify = () => {
   if (typeof window !== 'undefined') {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(globalState));
+      const channel = new BroadcastChannel('filtec_channel');
+      channel.postMessage({ type: 'STORE_UPDATED', state: globalState });
     } catch (e) {
       console.warn('Storage error:', e);
     }
@@ -156,10 +150,54 @@ export const store = {
 
   initializeFromStorage(force = false) {
     if (typeof window === 'undefined') return;
+
+    // Attach cross-tab synchronization listeners once
+    if (!(window as any).__filtec_storage_listener_attached) {
+      (window as any).__filtec_storage_listener_attached = true;
+
+      const mergeExternalState = (parsed: any) => {
+        if (!parsed) return;
+        globalState = {
+          ...globalState,
+          orders: Array.isArray(parsed.orders) ? parsed.orders : globalState.orders,
+          dealers: Array.isArray(parsed.dealers) ? parsed.dealers : globalState.dealers,
+          plumbers: Array.isArray(parsed.plumbers) ? parsed.plumbers : globalState.plumbers,
+          rewardLedger: Array.isArray(parsed.rewardLedger) ? parsed.rewardLedger : globalState.rewardLedger,
+          rewardVouchers: Array.isArray(parsed.rewardVouchers) ? parsed.rewardVouchers : globalState.rewardVouchers,
+          dailyAttendance: Array.isArray(parsed.dailyAttendance) ? parsed.dailyAttendance : globalState.dailyAttendance,
+          employees: Array.isArray(parsed.employees) ? parsed.employees : globalState.employees,
+          attendanceRecords: Array.isArray(parsed.attendanceRecords) ? parsed.attendanceRecords : globalState.attendanceRecords
+        };
+        listeners.forEach((l) => l());
+      };
+
+      window.addEventListener('storage', (e) => {
+        if (e.key === STORAGE_KEY && e.newValue) {
+          try {
+            const parsed = JSON.parse(e.newValue);
+            mergeExternalState(parsed);
+          } catch (err) {}
+        }
+      });
+
+      window.addEventListener('filtec:attendance_updated', () => {
+        listeners.forEach((l) => l());
+      });
+
+      try {
+        const channel = new BroadcastChannel('filtec_channel');
+        channel.onmessage = (msg) => {
+          if (msg.data?.type === 'STORE_UPDATED' && msg.data?.state) {
+            mergeExternalState(msg.data.state);
+          }
+        };
+      } catch (err) {}
+    }
+
     if (hasInitializedFromStorage && !force) return;
     try {
       hasInitializedFromStorage = true;
-      const saved = localStorage.getItem(STORAGE_KEY) || localStorage.getItem('filtec_pretech1_state_v3');
+      const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
 
@@ -176,10 +214,18 @@ export const store = {
           }
         }
 
-        // Migrate all employees to have systemRole and allowedPages
+        // Normalize phone numbers to include +91 prefix
+        const normalizePhone = (p: string | undefined | null) => {
+          if (!p || p === '-' || p === '(-)') return p || '(-)';
+          const clean = p.replace(/^\+91[\s-]*/, '').replace(/^91(?=\d{10})/, '').replace(/\s+/g, '').trim();
+          return clean ? `+91 ${clean}` : p;
+        };
+
+        // Migrate all employees to have systemRole, allowedPages, and +91 phone prefix
         existingEmployees = existingEmployees.map((e) => {
-          const isSamir = e.name.toLowerCase() === 'samir' || e.code === 'FPPL/ADM-001';
+          const isSamir = e.name.toLowerCase() === 'samir' || e.code === 'FPPL/ADM-001' || e.id === 'emp-admin-samir';
           const systemRole: Role = e.systemRole || (isSamir ? 'ADMIN' : 'EMPLOYEE');
+          const phone = isSamir ? '+91 9437505814' : normalizePhone(e.phone);
           const allowedPages =
             e.allowedPages && e.allowedPages.length > 0
               ? e.allowedPages
@@ -187,31 +233,89 @@ export const store = {
               ? ALL_ADMIN_PAGES
               : ALL_EMPLOYEE_PAGES;
 
+          const seedMatch = INITIAL_EMPLOYEES.find((s) => s.id === e.id || s.code === e.code);
+          const baseSalary = typeof e.baseSalary === 'number' && e.baseSalary > 0
+            ? e.baseSalary
+            : (seedMatch?.baseSalary || (systemRole === 'ADMIN' ? 55000 : 30000));
+
           return {
             ...e,
+            phone,
             systemRole,
-            allowedPages
+            allowedPages,
+            baseSalary
           };
         });
 
-        // Ensure current user is valid
+        // Ensure current user is valid and has corrected phone
         let currentUser: User = parsed.currentUser || INITIAL_USERS[0];
-        if (currentUser.role === 'ADMIN' && !currentUser.allowedPages) {
-          currentUser = {
-            ...currentUser,
-            allowedPages: ALL_ADMIN_PAGES
-          };
+        const isSamirUser = currentUser.name?.toLowerCase() === 'samir' || currentUser.id === 'user-admin-samir';
+        currentUser = {
+          ...currentUser,
+          phone: isSamirUser ? '+91 9437505814' : normalizePhone(currentUser.phone),
+          allowedPages: currentUser.role === 'ADMIN' && !currentUser.allowedPages ? ALL_ADMIN_PAGES : currentUser.allowedPages
+        };
+
+        const rawDealers: Dealer[] = Array.isArray(parsed.dealers) && parsed.dealers.length > 0
+          ? parsed.dealers
+          : INITIAL_DEALERS;
+
+        const normalizedDealers = rawDealers.map((d: Dealer) => ({
+          ...d,
+          phone: normalizePhone(d.phone),
+          creditLimit: 0,
+          outstandingBalance: 0
+        }));
+
+        for (const initD of INITIAL_DEALERS) {
+          if (!normalizedDealers.some((x: Dealer) => x.id === initD.id || x.code === initD.code)) {
+            normalizedDealers.push(initD);
+          }
         }
+
+        const rawPlumbers: Plumber[] = Array.isArray(parsed.plumbers) && parsed.plumbers.length > 0
+          ? parsed.plumbers
+          : INITIAL_PLUMBERS;
+        const normalizedPlumbers = [...rawPlumbers];
+        for (const initP of INITIAL_PLUMBERS) {
+          if (!normalizedPlumbers.some((p) => p.id === initP.id)) {
+            normalizedPlumbers.push(initP);
+          }
+        }
+
+        const cleanDailyAttendance: DailyAttendanceSummary[] = Array.isArray(parsed.dailyAttendance)
+          ? parsed.dailyAttendance.filter((d: DailyAttendanceSummary) => {
+              const isMock = d.id === 'att-sum-1' || d.id === 'att-sum-2' || d.id === 'att-sum-3' || d.id === 'att-sum-4' || d.id === 'att-sum-5' || d.date === '2026-09-11';
+              return !isMock;
+            })
+          : [];
+
+        const cleanAttendanceRecords = Array.isArray(parsed.attendanceRecords)
+          ? parsed.attendanceRecords.filter((r: any) => {
+              const isMock = r.id === 'att-1' || r.id === 'att-2' || r.id === 'att-3' || r.id === 'att-4' || r.id === 'att-5' || (r.timestamp && r.timestamp.startsWith('2026-09-11'));
+              return !isMock;
+            })
+          : [];
 
         globalState = {
           ...getInitialState(),
           ...parsed,
           currentUser,
+          dealers: normalizedDealers,
           employees: existingEmployees,
+          plumbers: normalizedPlumbers,
           products: CATALOGUE_PRODUCTS,
+          dailyAttendance: cleanDailyAttendance,
+          attendanceRecords: cleanAttendanceRecords,
           settings: {
             ...INITIAL_SETTINGS,
             ...(parsed.settings || {}),
+            company: {
+              ...INITIAL_SETTINGS.company,
+              ...((parsed.settings && parsed.settings.company) || {}),
+              supportWhatsApp: '+91 9437505814',
+              phone: '+91 9437505814'
+            },
             permissions: {
               ...INITIAL_SETTINGS.permissions,
               ...((parsed.settings && parsed.settings.permissions) || {}),
@@ -258,23 +362,75 @@ export const store = {
             globalState = {
               ...globalState,
               products: syncedProducts,
-              dealers: d.dealers?.length ? d.dealers : globalState.dealers,
-              employees: d.employees?.length ? d.employees : globalState.employees,
-              plumbers: d.plumbers?.length ? d.plumbers : globalState.plumbers,
-              orders: d.orders?.length ? d.orders : globalState.orders,
+              dealers: Array.isArray(d.dealers) && d.dealers.length > 0
+                ? (() => {
+                    const normalized = d.dealers.map((dlr: Dealer) => {
+                      const p = (dlr.phone || '').trim();
+                      const clean = p.replace(/^\+91[\s-]*/, '').replace(/^91(?=\d{10})/, '').trim();
+                      return {
+                        ...dlr,
+                        phone: clean && clean !== '-' ? `+91 ${clean}` : (dlr.phone || '-')
+                      };
+                    });
+                    for (const initD of INITIAL_DEALERS) {
+                      if (!normalized.some((x: Dealer) => x.id === initD.id || x.code === initD.code)) {
+                        normalized.push(initD);
+                      }
+                    }
+                    return normalized;
+                  })()
+                : globalState.dealers,
+              employees: d.employees?.length
+                ? d.employees.map((emp: Employee) => {
+                    const isSamir = emp.name.toLowerCase() === 'samir' || emp.code === 'FPPL/ADM-001';
+                    const p = (emp.phone || '').trim();
+                    const clean = p.replace(/^\+91[\s-]*/, '').replace(/^91(?=\d{10})/, '').replace(/\s+/g, '').trim();
+                    return {
+                      ...emp,
+                      phone: isSamir ? '+91 9437505814' : (clean && clean !== '-' && clean !== '(-)' ? `+91 ${clean}` : emp.phone),
+                      checkInStatus: emp.checkInStatus || 'CHECKED_OUT',
+                      lastCheckInTime: emp.lastCheckInTime || null,
+                      lastLocation: emp.lastLocation || null,
+                      baseSalary: emp.baseSalary || 30000
+                    };
+                  })
+                : globalState.employees,
+              plumbers: (() => {
+                const fetched = Array.isArray(d.plumbers) ? d.plumbers : [];
+                const merged = [...fetched];
+                for (const initP of INITIAL_PLUMBERS) {
+                  if (!merged.some((p: Plumber) => p.id === initP.id)) {
+                    merged.push(initP);
+                  }
+                }
+                for (const curP of globalState.plumbers) {
+                  if (!merged.some((p: Plumber) => p.id === curP.id)) {
+                    merged.push(curP);
+                  }
+                }
+                return merged;
+              })(),
+              orders: Array.isArray(d.orders) ? d.orders : [],
               leaveRequests: d.leaveRequests?.length ? d.leaveRequests : globalState.leaveRequests,
-              dailyAttendance: d.dailyAttendance?.length ? d.dailyAttendance : globalState.dailyAttendance,
-              rewardLedger: d.rewardLedger?.length ? d.rewardLedger : globalState.rewardLedger,
-              auditLogs: d.auditLogs?.length ? d.auditLogs : globalState.auditLogs,
-              integrationEvents: d.integrationEvents?.length ? d.integrationEvents : globalState.integrationEvents,
+              dailyAttendance: Array.isArray(d.dailyAttendance) ? d.dailyAttendance : [],
+              attendanceRecords: Array.isArray(d.attendanceRecords) ? d.attendanceRecords : [],
+              rewardLedger: Array.isArray(d.rewardLedger) ? d.rewardLedger : [],
+              auditLogs: Array.isArray(d.auditLogs) ? d.auditLogs : [],
+              integrationEvents: Array.isArray(d.integrationEvents) ? d.integrationEvents : [],
               settings: d.settings?.company
                 ? {
-                    company: d.settings.company,
+                    company: {
+                      ...globalState.settings.company,
+                      ...d.settings.company,
+                      supportWhatsApp: '+91 9437505814',
+                      phone: '+91 9437505814'
+                    },
                     permissions: d.settings.permissions || globalState.settings.permissions,
                     policy: d.settings.policy || globalState.settings.policy,
                     notifications: d.settings.notifications || globalState.settings.notifications
                   }
-                : globalState.settings
+                : globalState.settings,
+              rewardConfig: d.settings?.rewardConfig || globalState.rewardConfig
             };
             try {
               localStorage.setItem(STORAGE_KEY, JSON.stringify(globalState));
@@ -425,12 +581,16 @@ export const store = {
     const dealer = dealers.find((d) => d.id === cart.dealerId);
     if (!dealer) return null;
 
-    const subtotal = cart.items.reduce((acc, i) => acc + i.totalAmount, 0);
-    const gstAmount = Number((subtotal * 0.18).toFixed(2));
-    const totalAmount = Number((subtotal + gstAmount).toFixed(2));
+    const discountPercent = globalState.settings.company.defaultDiscountPercent ?? 48;
+    const grossTotal = cart.items.reduce((acc, i) => acc + (i.quantity * i.unitPrice || i.totalAmount), 0);
+    const discountAmount = Number(((grossTotal * discountPercent) / 100).toFixed(2));
+    const subtotal = Number((grossTotal - discountAmount).toFixed(2));
+    const gstPercent = globalState.settings.company.defaultGstPercent || 18;
+    const gstAmount = Number((subtotal * (gstPercent / 100)).toFixed(2));
+    const totalAmount = Math.round(subtotal + gstAmount);
 
-    // Calculate reward based on configurable rate
-    const totalReward = Number(((subtotal * rewardConfig.ratePercent) / 100).toFixed(2));
+    // Calculate reward based on total order value (1% rule: 75% dealer, 25% plumber)
+    const totalReward = Number(((totalAmount * rewardConfig.ratePercent) / 100).toFixed(2));
     const dealerReward = Number(((totalReward * rewardConfig.dealerSharePercent) / 100).toFixed(2));
     const plumberReward = Number(((totalReward * rewardConfig.plumberSharePercent) / 100).toFixed(2));
 
@@ -448,7 +608,7 @@ export const store = {
       subtotal,
       gstAmount,
       totalAmount,
-      status: 'PENDING_ADMIN_APPROVAL',
+      status: 'SUBMITTED',
       notes: cart.notes,
       rewardEstimated: totalReward,
       rewardDealerShare: dealerReward,
@@ -475,7 +635,7 @@ export const store = {
       recipientPhone: dealer.phone,
       recipientName: dealer.name,
       templateName: 'order_submitted',
-      messageBody: `FILTEC Polyplast: Order ${orderNumber} of ₹${totalAmount.toLocaleString('en-IN')} has been submitted by ${currentUser.name}. Awaiting central approval.`,
+      messageBody: `FILTEC Polyplast: Order ${orderNumber} of ₹${totalAmount.toLocaleString('en-IN')} has been created by ${currentUser.name}.`,
       sentAt: new Date().toISOString(),
       status: 'SENT'
     };
@@ -488,7 +648,202 @@ export const store = {
       cart: { ...cart, items: [], notes: '' }
     };
     notify();
+
+    if (typeof window !== 'undefined') {
+      fetch('/api/data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'CREATE_ORDER', payload: newOrder })
+      }).catch((err) => console.warn('PostgreSQL create order failed:', err));
+    }
+
     return newOrder;
+  },
+
+  // Release order with invoice details and automatic 1% reward calculation
+  releaseOrder(
+    orderId: string,
+    invoiceData?: {
+      invoiceNumber?: string;
+      invoiceDate?: string;
+      invoiceValue?: number;
+      plumberId?: string;
+    }
+  ) {
+    const orderIndex = globalState.orders.findIndex((o) => o.id === orderId);
+    if (orderIndex === -1) return;
+
+    const existingOrder = globalState.orders[orderIndex];
+    const timestamp = new Date().toISOString();
+
+    const invNum = invoiceData?.invoiceNumber || existingOrder.invoiceNumber || `INV-FIL-${new Date().getFullYear()}-${8800 + globalState.orders.length}`;
+    const invDate = invoiceData?.invoiceDate || existingOrder.invoiceDate || new Date().toISOString().split('T')[0];
+    const invVal = typeof invoiceData?.invoiceValue === 'number' && invoiceData.invoiceValue > 0 
+      ? invoiceData.invoiceValue 
+      : existingOrder.totalAmount;
+
+    // Automatically calculate 1% reward based on the invoice value only
+    const ratePercent = globalState.rewardConfig.ratePercent || 1;
+    const totalReward = Number(((invVal * ratePercent) / 100).toFixed(2));
+    const dealerSharePercent = globalState.rewardConfig.dealerSharePercent ?? 75;
+    const plumberSharePercent = globalState.rewardConfig.plumberSharePercent ?? 25;
+    const dealerReward = Number(((totalReward * dealerSharePercent) / 100).toFixed(2));
+    const plumberReward = Number(((totalReward * plumberSharePercent) / 100).toFixed(2));
+
+    const updatedOrder: Order = {
+      ...existingOrder,
+      status: 'COMPLETED',
+      confirmedAt: timestamp,
+      invoicedAt: invDate,
+      invoiceNumber: invNum,
+      invoiceDate: invDate,
+      invoiceValue: invVal,
+      rewardEstimated: totalReward,
+      rewardDealerShare: dealerReward,
+      rewardPlumberShare: plumberReward,
+    };
+
+    const updatedOrders = [...globalState.orders];
+    updatedOrders[orderIndex] = updatedOrder;
+
+    // Check if dealer has registered active plumbers
+    const dealerPlumbers = globalState.plumbers.filter(
+      (p) => (p.dealerId === existingOrder.dealerId || p.dealerName === existingOrder.dealerName) && p.status === 'ACTIVE'
+    );
+    const hasPlumbers = dealerPlumbers.length > 0;
+
+    let selectedPlumber: Plumber | undefined;
+    if (invoiceData?.plumberId) {
+      selectedPlumber = globalState.plumbers.find((p) => p.id === invoiceData.plumberId);
+    } else if (hasPlumbers) {
+      selectedPlumber = dealerPlumbers[0];
+    }
+
+    // Update dealer total purchases, available rewards, and plumber escrow
+    // BUSINESS RULE: If a dealer does NOT have a plumber, the plumber reward stays in escrow
+    // and NEVER goes to the dealer until a new plumber is onboarded.
+    const updatedDealers = globalState.dealers.map((d) => {
+      if (d.id === existingOrder.dealerId || d.code === existingOrder.dealerId || d.name === existingOrder.dealerName) {
+        const currentEscrow = d.pendingPlumberRewards || 0;
+        return {
+          ...d,
+          totalPurchases: Number((d.totalPurchases + invVal).toFixed(2)),
+          availableRewards: Number((d.availableRewards + dealerReward).toFixed(2)),
+          pendingPlumberRewards: Number((currentEscrow + (!hasPlumbers ? plumberReward : 0)).toFixed(2))
+        };
+      }
+      return d;
+    });
+
+    const updatedPlumbers = globalState.plumbers.map((p) => {
+      if (selectedPlumber && p.id === selectedPlumber.id) {
+        return {
+          ...p,
+          totalAllocatedRewards: Number((p.totalAllocatedRewards + plumberReward).toFixed(2)),
+          rewardHistoryCount: p.rewardHistoryCount + 1
+        };
+      }
+      return p;
+    });
+
+    // Reward transactions
+    const newRewardTxns: RewardTransaction[] = [];
+
+    // 1. Dealer reward transaction (Strictly dealer's share)
+    if (dealerReward > 0) {
+      const dealerBal = (updatedDealers.find((d) => d.id === existingOrder.dealerId || d.code === existingOrder.dealerId || d.name === existingOrder.dealerName)?.availableRewards || 0);
+      newRewardTxns.push({
+        id: `rew-${Date.now()}-dlr`,
+        dealerId: existingOrder.dealerId,
+        orderId: existingOrder.id,
+        orderNumber: existingOrder.orderNumber,
+        type: 'CREDIT_ORDER',
+        amount: dealerReward,
+        balanceAfter: dealerBal,
+        description: `1% Reward from Order ${existingOrder.orderNumber} (Invoice #${invNum} • ₹${invVal.toLocaleString('en-IN')} • Dealer ${dealerSharePercent}%)`,
+        createdAt: timestamp
+      });
+    }
+
+    // 2. Plumber reward transaction (Either to registered plumber or held in escrow)
+    if (plumberReward > 0) {
+      if (hasPlumbers && selectedPlumber) {
+        newRewardTxns.push({
+          id: `rew-${Date.now()}-plm`,
+          dealerId: existingOrder.dealerId,
+          orderId: existingOrder.id,
+          orderNumber: existingOrder.orderNumber,
+          plumberId: selectedPlumber.id,
+          plumberName: selectedPlumber.name,
+          type: 'PLUMBER_REWARD',
+          amount: plumberReward,
+          balanceAfter: Number((selectedPlumber.totalAllocatedRewards + plumberReward).toFixed(2)),
+          description: `1% Reward from Order ${existingOrder.orderNumber} (Invoice #${invNum} • Plumber ${plumberSharePercent}% • ${selectedPlumber.name})`,
+          createdAt: timestamp
+        });
+      } else {
+        // Dealer has NO plumbers: reward stays in escrow and NEVER goes to the dealer!
+        const escrowBal = updatedDealers.find((d) => d.id === existingOrder.dealerId || d.code === existingOrder.dealerId || d.name === existingOrder.dealerName)?.pendingPlumberRewards || plumberReward;
+        newRewardTxns.push({
+          id: `rew-${Date.now()}-plm-esc`,
+          dealerId: existingOrder.dealerId,
+          orderId: existingOrder.id,
+          orderNumber: existingOrder.orderNumber,
+          type: 'PLUMBER_REWARD_ESCROW',
+          amount: plumberReward,
+          balanceAfter: escrowBal,
+          description: `Plumber Reward (${plumberSharePercent}%) held in escrow — dealer has no registered plumbers. Stays in pool until a new plumber is onboarded. (Invoice #${invNum})`,
+          createdAt: timestamp
+        });
+      }
+    }
+
+    // Create audit log
+    const audit: AuditLog = {
+      id: `aud-${Date.now()}`,
+      userId: globalState.currentUser.id,
+      userName: globalState.currentUser.name,
+      role: 'ADMIN',
+      action: 'ORDER_APPROVED',
+      entityType: 'ORDER',
+      entityId: existingOrder.id,
+      details: `Order ${existingOrder.orderNumber} released. Invoice #${invNum} (₹${invVal.toLocaleString('en-IN')}) with 1% reward: Dealer ₹${dealerReward}, Plumber ₹${plumberReward}.`,
+      timestamp
+    };
+
+    globalState = {
+      ...globalState,
+      orders: updatedOrders,
+      dealers: updatedDealers,
+      plumbers: updatedPlumbers,
+      rewardLedger: [...newRewardTxns, ...globalState.rewardLedger],
+      auditLogs: [audit, ...globalState.auditLogs]
+    };
+    notify();
+
+    if (typeof window !== 'undefined') {
+      fetch('/api/data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'RELEASE_ORDER',
+          payload: {
+            orderId: existingOrder.id,
+            invoiceNumber: invNum,
+            invoiceDate: invDate,
+            invoiceValue: invVal,
+            dealerReward,
+            plumberReward,
+            plumberId: selectedPlumber?.id,
+            dealerId: existingOrder.dealerId
+          }
+        })
+      })
+        .then(() => {
+          this.syncWithDatabase(true);
+        })
+        .catch((err) => console.warn('PostgreSQL release order failed:', err));
+    }
   },
 
   // Admin approves order
@@ -511,21 +866,38 @@ export const store = {
       adminNotes
     };
 
-    // Update dealer purchases and available rewards
+    const dealerPlumbers = globalState.plumbers.filter((p) => p.dealerId === existingOrder.dealerId && p.status === 'ACTIVE');
+    const hasPlumbers = dealerPlumbers.length > 0;
+    const plumberReward = existingOrder.rewardPlumberShare || 0;
+
+    // Update dealer purchases, available rewards, and plumber escrow
     const updatedDealers = globalState.dealers.map((d) => {
       if (d.id === existingOrder.dealerId) {
+        const currentEscrow = d.pendingPlumberRewards || 0;
         return {
           ...d,
           totalPurchases: d.totalPurchases + existingOrder.subtotal,
-          availableRewards: d.availableRewards + existingOrder.rewardDealerShare
+          availableRewards: d.availableRewards + existingOrder.rewardDealerShare,
+          pendingPlumberRewards: Number((currentEscrow + (!hasPlumbers ? plumberReward : 0)).toFixed(2))
         };
       }
       return d;
     });
 
-    // Create reward ledger entry
+    const updatedPlumbers = globalState.plumbers.map((p) => {
+      if (hasPlumbers && p.id === dealerPlumbers[0].id && plumberReward > 0) {
+        return {
+          ...p,
+          totalAllocatedRewards: Number((p.totalAllocatedRewards + plumberReward).toFixed(2)),
+          rewardHistoryCount: p.rewardHistoryCount + 1
+        };
+      }
+      return p;
+    });
+
+    // Create dealer reward ledger entry
     const rewardTx: RewardTransaction = {
-      id: `rew-${Date.now()}`,
+      id: `rew-${Date.now()}-dlr`,
       dealerId: existingOrder.dealerId,
       orderId: existingOrder.id,
       orderNumber: existingOrder.orderNumber,
@@ -536,6 +908,40 @@ export const store = {
       description: `${globalState.rewardConfig.ratePercent}% Reward from Order ${existingOrder.orderNumber} (Dealer 75% Share)`,
       createdAt: timestamp
     };
+
+    const newTxns: RewardTransaction[] = [rewardTx];
+
+    // Plumber reward entry
+    if (plumberReward > 0) {
+      if (hasPlumbers) {
+        newTxns.push({
+          id: `rew-${Date.now()}-plm`,
+          dealerId: existingOrder.dealerId,
+          orderId: existingOrder.id,
+          orderNumber: existingOrder.orderNumber,
+          plumberId: dealerPlumbers[0].id,
+          plumberName: dealerPlumbers[0].name,
+          type: 'PLUMBER_REWARD',
+          amount: plumberReward,
+          balanceAfter: Number((dealerPlumbers[0].totalAllocatedRewards + plumberReward).toFixed(2)),
+          description: `Plumber Reward from Order ${existingOrder.orderNumber} (Plumber 25% Share • ${dealerPlumbers[0].name})`,
+          createdAt: timestamp
+        });
+      } else {
+        const escrowBal = updatedDealers.find((d) => d.id === existingOrder.dealerId)?.pendingPlumberRewards || plumberReward;
+        newTxns.push({
+          id: `rew-${Date.now()}-plm-esc`,
+          dealerId: existingOrder.dealerId,
+          orderId: existingOrder.id,
+          orderNumber: existingOrder.orderNumber,
+          type: 'PLUMBER_REWARD_ESCROW',
+          amount: plumberReward,
+          balanceAfter: escrowBal,
+          description: `Plumber Reward held in escrow — dealer has no registered plumbers. Stays in pool until plumber is onboarded.`,
+          createdAt: timestamp
+        });
+      }
+    }
 
     // Create audit log
     const audit: AuditLog = {
@@ -580,12 +986,33 @@ export const store = {
       ...globalState,
       orders: updatedOrders,
       dealers: updatedDealers,
-      rewardLedger: [rewardTx, ...globalState.rewardLedger],
+      plumbers: updatedPlumbers,
+      rewardLedger: [...newTxns, ...globalState.rewardLedger],
       auditLogs: [audit, ...globalState.auditLogs],
       integrationEvents: [erpEvent, ...globalState.integrationEvents],
       whatsappMessages: [waMsg, ...globalState.whatsappMessages]
     };
     notify();
+
+    if (typeof window !== 'undefined') {
+      fetch('/api/data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'APPROVE_ORDER',
+          payload: {
+            orderId: existingOrder.id,
+            adminNotes,
+            invoiceNumber,
+            approvedAt: timestamp,
+            confirmedAt: timestamp,
+            dealerId: existingOrder.dealerId,
+            rewardDealerShare: existingOrder.rewardDealerShare,
+            subtotal: existingOrder.subtotal
+          }
+        })
+      }).catch((err) => console.warn('PostgreSQL approve order failed:', err));
+    }
   },
 
   // Admin rejects order
@@ -634,42 +1061,201 @@ export const store = {
       whatsappMessages: [waMsg, ...globalState.whatsappMessages]
     };
     notify();
+
+    if (typeof window !== 'undefined') {
+      fetch('/api/data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'REJECT_ORDER',
+          payload: {
+            orderId: existingOrder.id,
+            rejectionReason: reason
+          }
+        })
+      }).catch((err) => console.warn('PostgreSQL reject order failed:', err));
+    }
   },
 
-  // Dealer allocates reward to plumber
-  allocateRewardToPlumber(dealerId: string, plumberId: string, points: number) {
-    const dealer = globalState.dealers.find((d) => d.id === dealerId);
-    const plumber = globalState.plumbers.find((p) => p.id === plumberId);
-    if (!dealer || !plumber || dealer.availableRewards < points) return false;
+  // Dealer allocates reward to plumber (Generates Plumber Voucher P-001, P-002...)
+  allocateRewardToPlumber(
+    dealerId: string,
+    plumberOrId: string | Plumber,
+    points: number,
+    source: 'PLUMBER_POOL' | 'DEALER_ACCOUNT' | 'ESCROW' = 'PLUMBER_POOL'
+  ): RewardVoucher | null {
+    // Robust plumber lookup
+    let plumber: Plumber | undefined;
+    if (plumberOrId && typeof plumberOrId === 'object') {
+      plumber = plumberOrId;
+    } else if (typeof plumberOrId === 'string') {
+      plumber = globalState.plumbers.find((p) => p.id === plumberOrId)
+        || globalState.plumbers.find((p) => p.name?.toLowerCase() === plumberOrId?.toLowerCase())
+        || INITIAL_PLUMBERS.find((p) => p.id === plumberOrId || p.name?.toLowerCase() === plumberOrId?.toLowerCase());
+    }
+
+    if (!plumber && globalState.plumbers.length > 0) {
+      plumber = globalState.plumbers[0];
+    }
+    if (!plumber && INITIAL_PLUMBERS.length > 0) {
+      plumber = INITIAL_PLUMBERS[0];
+    }
+    if (!plumber) {
+      console.error('allocateRewardToPlumber: Plumber not found', plumberOrId);
+      return null;
+    }
+
+    // Ensure plumber exists in globalState.plumbers
+    if (!globalState.plumbers.some((p) => p.id === plumber!.id)) {
+      globalState.plumbers = [plumber, ...globalState.plumbers];
+    }
+
+    // Robust dealer lookup: by id, code, name, plumber's dealerId, or fallback
+    const dealer = globalState.dealers.find((d) => d.id === dealerId || d.code === dealerId || d.name?.toLowerCase() === dealerId?.toLowerCase())
+      || globalState.dealers.find((d) => d.id === plumber?.dealerId || d.name === plumber?.dealerName)
+      || INITIAL_DEALERS.find((d) => d.id === dealerId || d.code === dealerId || d.id === plumber?.dealerId)
+      || globalState.dealers.find((d) => d.id === 'dlr-012')
+      || INITIAL_DEALERS.find((d) => d.id === 'dlr-012')
+      || globalState.dealers[0]
+      || INITIAL_DEALERS[0];
+
+    if (!dealer || points <= 0) {
+      console.error('allocateRewardToPlumber: Dealer not found or invalid points', { dealerId, points });
+      return null;
+    }
+
+    if (!globalState.dealers.some((d) => d.id === dealer.id)) {
+      globalState.dealers = [dealer, ...globalState.dealers];
+    }
+
+    // Calculate plumber's existing vouchers safely
+    const issuedTotal = (globalState.rewardVouchers || [])
+      .filter((v) => v.plumberId === plumber.id && v.type === 'PLUMBER')
+      .reduce((s, v) => s + (v.amount || 0), 0);
+    const plumberAvailable = Math.max(0, Number((plumber.totalAllocatedRewards - issuedTotal).toFixed(2)));
+
+    // Verify balance availability depending on source (with auto-fallback if source has insufficient)
+    if (source === 'DEALER_ACCOUNT' && dealer.availableRewards < points) {
+      if (plumberAvailable >= points) {
+        source = 'PLUMBER_POOL';
+      } else {
+        return null;
+      }
+    }
+    if (source === 'ESCROW' && (dealer.pendingPlumberRewards || 0) < points) {
+      if (plumberAvailable >= points) {
+        source = 'PLUMBER_POOL';
+      } else {
+        return null;
+      }
+    }
+    if (source === 'PLUMBER_POOL' && plumberAvailable < points) {
+      if (dealer.availableRewards >= points) {
+        source = 'DEALER_ACCOUNT';
+      } else if ((dealer.pendingPlumberRewards || 0) >= points) {
+        source = 'ESCROW';
+      } else if (plumberAvailable <= 0) {
+        return null;
+      }
+    }
 
     const timestamp = new Date().toISOString();
-    const updatedBalance = dealer.availableRewards - points;
+    const seqP = (globalState.rewardVouchers || []).filter((v) => v.type === 'PLUMBER').length + 1;
+    const voucherNumber = `P-${String(seqP).padStart(3, '0')}`;
+    const now = new Date();
+    const dateRedeemed = `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()}`;
 
-    const updatedDealers = globalState.dealers.map((d) =>
-      d.id === dealerId ? { ...d, availableRewards: updatedBalance } : d
-    );
-
-    const updatedPlumbers = globalState.plumbers.map((p) =>
-      p.id === plumberId
-        ? {
-            ...p,
-            totalAllocatedRewards: p.totalAllocatedRewards + points,
-            rewardHistoryCount: p.rewardHistoryCount + 1
-          }
-        : p
-    );
-
-    const tx: RewardTransaction = {
-      id: `rew-${Date.now()}`,
-      dealerId,
-      plumberId,
+    const voucher: RewardVoucher = {
+      id: `vouch-p-${Date.now()}`,
+      voucherNumber,
+      type: 'PLUMBER',
+      dealerId: dealer.id,
+      dealerName: dealer.name,
+      dealerCode: dealer.code,
+      plumberId: plumber.id,
       plumberName: plumber.name,
-      type: 'DEBIT_PLUMBER_ALLOCATION',
-      amount: -points,
-      balanceAfter: updatedBalance,
-      description: `Reward points transfer to Plumber ${plumber.name}`,
-      createdAt: timestamp
+      plumberPhone: plumber.phone,
+      points,
+      amount: points,
+      status: 'ISSUED',
+      dateRedeemed,
+      createdAt: timestamp,
+      contactNumber: '+91 94378 60479',
+      instructions: `Present coupon ${voucherNumber} or contact FILTEC Head Office (+91 94378 60479) / your dealer to redeem.`
     };
+
+    let updatedDealers = globalState.dealers;
+    let updatedPlumbers = globalState.plumbers;
+    let tx: RewardTransaction;
+
+    if (source === 'DEALER_ACCOUNT') {
+      const updatedBalance = Number((dealer.availableRewards - points).toFixed(2));
+      updatedDealers = globalState.dealers.map((d) =>
+        d.id === dealer.id ? { ...d, availableRewards: updatedBalance } : d
+      );
+      updatedPlumbers = globalState.plumbers.map((p) =>
+        p.id === plumber.id
+          ? {
+              ...p,
+              totalAllocatedRewards: Number((p.totalAllocatedRewards + points).toFixed(2)),
+              rewardHistoryCount: p.rewardHistoryCount + 1
+            }
+          : p
+      );
+      tx = {
+        id: `rew-${Date.now()}`,
+        dealerId: dealer.id,
+        plumberId: plumber.id,
+        plumberName: plumber.name,
+        type: 'DEBIT_PLUMBER_ALLOCATION',
+        amount: -points,
+        balanceAfter: updatedBalance,
+        voucherNumber,
+        description: `Reward points transfer from Dealer Account to Plumber ${plumber.name} (Voucher ${voucherNumber})`,
+        createdAt: timestamp
+      };
+    } else if (source === 'ESCROW') {
+      const updatedEscrow = Math.max(0, Number(((dealer.pendingPlumberRewards || 0) - points).toFixed(2)));
+      updatedDealers = globalState.dealers.map((d) =>
+        d.id === dealer.id ? { ...d, pendingPlumberRewards: updatedEscrow } : d
+      );
+      updatedPlumbers = globalState.plumbers.map((p) =>
+        p.id === plumber.id
+          ? {
+              ...p,
+              totalAllocatedRewards: Number((p.totalAllocatedRewards + points).toFixed(2)),
+              rewardHistoryCount: p.rewardHistoryCount + 1
+            }
+          : p
+      );
+      tx = {
+        id: `rew-${Date.now()}`,
+        dealerId: dealer.id,
+        plumberId: plumber.id,
+        plumberName: plumber.name,
+        type: 'ESCROW_RELEASE',
+        amount: points,
+        balanceAfter: updatedEscrow,
+        voucherNumber,
+        description: `Released ₹${points} from Escrow to Plumber ${plumber.name} (Voucher ${voucherNumber})`,
+        createdAt: timestamp
+      };
+    } else {
+      // PLUMBER_POOL: Issued directly from plumber's earned 25% order reward share
+      const remainingPlumberBalance = Math.max(0, Number((plumberAvailable - points).toFixed(2)));
+      tx = {
+        id: `rew-${Date.now()}`,
+        dealerId: dealer.id,
+        plumberId: plumber.id,
+        plumberName: plumber.name,
+        type: 'PLUMBER_REDEEM_VOUCHER',
+        amount: -points,
+        balanceAfter: remainingPlumberBalance,
+        voucherNumber,
+        description: `Issued Plumber Reward Coupon ${voucherNumber} for ₹${points} to ${plumber.name}`,
+        createdAt: timestamp
+      };
+    }
 
     const audit: AuditLog = {
       id: `aud-${Date.now()}`,
@@ -679,7 +1265,7 @@ export const store = {
       action: 'PLUMBER_REWARD_ALLOCATED',
       entityType: 'REWARD',
       entityId: tx.id,
-      details: `Dealer ${dealer.name} transferred ₹${points} reward points to Plumber ${plumber.name}`,
+      details: `Dealer ${dealer.name} issued Plumber Coupon ${voucherNumber} (₹${points}) to ${plumber.name} via ${source}`,
       timestamp
     };
 
@@ -688,7 +1274,7 @@ export const store = {
       recipientPhone: plumber.phone,
       recipientName: plumber.name,
       templateName: 'plumber_reward_received',
-      messageBody: `FILTEC Plumber Rewards: You have received ₹${points} reward points from ${dealer.name}! Total earned: ₹${plumber.totalAllocatedRewards + points}.`,
+      messageBody: `FILTEC Plumber Reward Voucher: ${voucherNumber}\nBeneficiary: ${plumber.name}\nValue: ₹${points}\nIssued by: ${dealer.name}\nDate: ${dateRedeemed}\n\nTo redeem, please contact FILTEC Head Office at +91 94378 60479 or present to your dealer.`,
       sentAt: timestamp,
       status: 'DELIVERED'
     };
@@ -697,18 +1283,135 @@ export const store = {
       ...globalState,
       dealers: updatedDealers,
       plumbers: updatedPlumbers,
-      rewardLedger: [tx, ...globalState.rewardLedger],
-      auditLogs: [audit, ...globalState.auditLogs],
-      whatsappMessages: [waMsg, ...globalState.whatsappMessages]
+      rewardVouchers: [voucher, ...(globalState.rewardVouchers || [])],
+      rewardLedger: [tx, ...(globalState.rewardLedger || [])],
+      auditLogs: [audit, ...(globalState.auditLogs || [])],
+      whatsappMessages: [waMsg, ...(globalState.whatsappMessages || [])]
     };
     notify();
-    return true;
+
+    if (typeof window !== 'undefined') {
+      fetch('/api/data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'ALLOCATE_PLUMBER_REWARD',
+          payload: { dealerId: dealer.id, plumberId: plumber.id, points, source, voucher }
+        })
+      }).catch((err) => console.warn('PostgreSQL allocate plumber reward failed:', err));
+    }
+
+    return voucher;
+  },
+
+  // Dealer redeems their own reward balance (Generates Dealer Voucher D-001, D-002...)
+  redeemDealerReward(dealerId: string, points: number): RewardVoucher | null {
+    const dealer = globalState.dealers.find((d) => d.id === dealerId || d.code === dealerId);
+    if (!dealer || points <= 0 || dealer.availableRewards < points) return null;
+
+    const timestamp = new Date().toISOString();
+    const updatedBalance = Number((dealer.availableRewards - points).toFixed(2));
+    const seqD = (globalState.rewardVouchers || []).filter((v) => v.type === 'DEALER').length + 1;
+    const voucherNumber = `D-${String(seqD).padStart(3, '0')}`;
+    const now = new Date();
+    const dateRedeemed = `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()}`;
+
+    const voucher: RewardVoucher = {
+      id: `vouch-d-${Date.now()}`,
+      voucherNumber,
+      type: 'DEALER',
+      dealerId: dealer.id,
+      dealerName: dealer.name,
+      dealerCode: dealer.code,
+      points,
+      amount: points,
+      status: 'ISSUED',
+      dateRedeemed,
+      createdAt: timestamp,
+      contactNumber: '+91 94378 60479',
+      instructions: `Present this voucher to your FILTEC Area Sales Executive or contact Head Office (+91 94378 60479) to settle as Credit Note.`
+    };
+
+    const tx: RewardTransaction = {
+      id: `rew-${Date.now()}`,
+      dealerId: dealer.id,
+      type: 'DEALER_REDEEM_VOUCHER',
+      amount: -points,
+      balanceAfter: updatedBalance,
+      voucherNumber,
+      description: `Redeemed Voucher ${voucherNumber} for Credit Note Settlement`,
+      createdAt: timestamp
+    };
+
+    const audit: AuditLog = {
+      id: `aud-${Date.now()}`,
+      userId: dealer.id,
+      userName: dealer.name,
+      role: 'DEALER',
+      action: 'DEALER_REWARD_REDEEMED',
+      entityType: 'REWARD',
+      entityId: voucher.id,
+      details: `Dealer ${dealer.name} redeemed ₹${points} (Voucher ${voucherNumber}) for Credit Note settlement`,
+      timestamp
+    };
+
+    const updatedDealers = globalState.dealers.map((d) =>
+      d.id === dealer.id ? { ...d, availableRewards: updatedBalance } : d
+    );
+
+    globalState = {
+      ...globalState,
+      dealers: updatedDealers,
+      rewardVouchers: [voucher, ...(globalState.rewardVouchers || [])],
+      rewardLedger: [tx, ...globalState.rewardLedger],
+      auditLogs: [audit, ...globalState.auditLogs]
+    };
+    notify();
+
+    if (typeof window !== 'undefined') {
+      fetch('/api/data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'DEALER_REDEEM_REWARD',
+          payload: { dealerId: dealer.id, points, voucherNumber, voucher }
+        })
+      }).catch((err) => console.warn('PostgreSQL dealer redeem reward failed:', err));
+    }
+
+    return voucher;
+  },
+
+  // Settle voucher by Admin / Finance with Credit Note
+  settleVoucher(voucherId: string, creditNoteNumber?: string) {
+    const timestamp = new Date().toISOString();
+    const updatedVouchers = (globalState.rewardVouchers || []).map((v) =>
+      v.id === voucherId
+        ? {
+            ...v,
+            status: 'SETTLED' as const,
+            settledAt: timestamp,
+            creditNoteNumber: creditNoteNumber || `CN-2026-${Math.floor(100 + Math.random() * 900)}`
+          }
+        : v
+    );
+
+    globalState = {
+      ...globalState,
+      rewardVouchers: updatedVouchers
+    };
+    notify();
   },
 
   // Add new plumber by dealer
+  // BUSINESS RULE: If the dealer had plumber rewards held in escrow (because they had no plumbers),
+  // that accumulated reward is now unlocked and transferred directly to this newly onboarded plumber!
   addPlumber(dealerId: string, name: string, phone: string) {
     const dealer = globalState.dealers.find((d) => d.id === dealerId);
     if (!dealer) return;
+
+    const escrowBalance = Number((dealer.pendingPlumberRewards || 0).toFixed(2));
+    const timestamp = new Date().toISOString();
 
     const newPlumber: Plumber = {
       id: `plumb-${Date.now()}`,
@@ -717,14 +1420,36 @@ export const store = {
       name,
       phone,
       status: 'ACTIVE',
-      totalAllocatedRewards: 0,
-      rewardHistoryCount: 0,
-      dateAdded: new Date().toISOString().split('T')[0]
+      // Release held escrow points directly to this new plumber
+      totalAllocatedRewards: escrowBalance,
+      rewardHistoryCount: escrowBalance > 0 ? 1 : 0,
+      dateAdded: timestamp.split('T')[0]
     };
 
     const updatedDealers = globalState.dealers.map((d) =>
-      d.id === dealerId ? { ...d, plumbersCount: d.plumbersCount + 1 } : d
+      d.id === dealerId
+        ? {
+            ...d,
+            plumbersCount: d.plumbersCount + 1,
+            pendingPlumberRewards: 0 // Reset escrow now that plumber has been onboarded!
+          }
+        : d
     );
+
+    const newTxns: RewardTransaction[] = [];
+    if (escrowBalance > 0) {
+      newTxns.push({
+        id: `rew-${Date.now()}-unlocked`,
+        dealerId,
+        plumberId: newPlumber.id,
+        plumberName: newPlumber.name,
+        type: 'ESCROW_RELEASE',
+        amount: escrowBalance,
+        balanceAfter: escrowBalance,
+        description: `Escrow Released: ₹${escrowBalance.toLocaleString('en-IN')} in held plumber rewards unlocked and awarded to newly onboarded plumber ${newPlumber.name}`,
+        createdAt: timestamp
+      });
+    }
 
     const audit: AuditLog = {
       id: `aud-${Date.now()}`,
@@ -734,15 +1459,31 @@ export const store = {
       action: 'PLUMBER_ONBOARDED',
       entityType: 'PLUMBER',
       entityId: newPlumber.id,
-      details: `Dealer ${dealer.name} registered new plumber: ${name} (${phone})`,
-      timestamp: new Date().toISOString()
+      details: escrowBalance > 0
+        ? `Dealer ${dealer.name} registered new plumber: ${name} (${phone}). Released ₹${escrowBalance.toLocaleString('en-IN')} in held plumber escrow rewards directly to ${name}.`
+        : `Dealer ${dealer.name} registered new plumber: ${name} (${phone})`,
+      timestamp
+    };
+
+    const waMsg: WhatsAppMessage = {
+      id: `wa-${Date.now()}`,
+      recipientPhone: phone,
+      recipientName: name,
+      templateName: 'plumber_onboarded',
+      messageBody: escrowBalance > 0
+        ? `FILTEC Plumber Rewards: Welcome ${name}! You have been registered by ${dealer.name}. ₹${escrowBalance.toLocaleString('en-IN')} in accumulated plumber rewards have been unlocked from escrow and credited to your account!`
+        : `FILTEC Plumber Rewards: Welcome ${name}! You have been registered by ${dealer.name} to earn reward points on every FILTEC plumbing installation.`,
+      sentAt: timestamp,
+      status: 'DELIVERED'
     };
 
     globalState = {
       ...globalState,
       dealers: updatedDealers,
       plumbers: [newPlumber, ...globalState.plumbers],
-      auditLogs: [audit, ...globalState.auditLogs]
+      rewardLedger: [...newTxns, ...globalState.rewardLedger],
+      auditLogs: [audit, ...globalState.auditLogs],
+      whatsappMessages: [waMsg, ...globalState.whatsappMessages]
     };
     notify();
 
@@ -753,7 +1494,11 @@ export const store = {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'CREATE_PLUMBER',
-          payload: newPlumber
+          payload: {
+            ...newPlumber,
+            dealerId,
+            unlockedEscrow: escrowBalance
+          }
         })
       }).catch((err) => console.warn('PostgreSQL create plumber failed:', err));
     }
@@ -808,27 +1553,76 @@ export const store = {
   },
 
   // Update reward rate configuration
-  updateRewardConfig(config: RewardConfig) {
+  async updateRewardConfig(config: RewardConfig): Promise<RewardConfig> {
     globalState = {
       ...globalState,
       rewardConfig: config
     };
     notify();
+
+    if (typeof window !== 'undefined') {
+      try {
+        const res = await fetch('/api/data', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'UPDATE_SETTINGS',
+            payload: { key: 'rewardConfig', value: config }
+          })
+        });
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.error || 'Failed to persist reward config');
+        }
+      } catch (err) {
+        console.warn('PostgreSQL update rewardConfig failed:', err);
+      }
+    }
+    return config;
   },
 
   // Record Attendance
   recordAttendance(record: Omit<AttendanceRecord, 'id'>) {
+    const distanceFromOffice =
+      record.distanceFromOffice !== undefined
+        ? record.distanceFromOffice
+        : calculateDistanceMeters(record.latitude, record.longitude);
+
     const newRecord: AttendanceRecord = {
       ...record,
+      distanceFromOffice,
       id: `att-${Date.now()}`
     };
 
     const currentTimeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     const todayDateStr = new Date().toISOString().split('T')[0];
 
-    // Update employee status
+    // 1. Resolve target employee reliably (handling code, id, user-id prefix, or name)
+    const rawId = record.employeeId || '';
+    const cleanId = rawId.replace(/^user-/, '');
+    const matchedEmp = globalState.employees.find(
+      (e) =>
+        e.code === rawId ||
+        e.id === rawId ||
+        e.id === cleanId ||
+        e.code.toLowerCase() === rawId.toLowerCase() ||
+        (record.employeeName && e.name.toLowerCase() === record.employeeName.toLowerCase())
+    );
+
+    const empId = matchedEmp?.id || cleanId || rawId;
+    const empCode = matchedEmp?.code || rawId;
+    const empName = matchedEmp?.name || record.employeeName;
+    const empTerritory = matchedEmp?.territory || 'Central Operations';
+    const empPhone = matchedEmp?.phone || '+91 9437860619';
+
+    // 2. Update employee check-in status in staff directory
     const updatedEmployees = globalState.employees.map((e) => {
-      if (e.code === record.employeeId || e.id === record.employeeId) {
+      if (
+        e.id === empId ||
+        e.code === empCode ||
+        (matchedEmp && e.id === matchedEmp.id) ||
+        (record.employeeName && e.name.toLowerCase() === record.employeeName.toLowerCase())
+      ) {
         return {
           ...e,
           checkInStatus: (record.type === 'CHECK_IN' ? 'CHECKED_IN' : 'CHECKED_OUT') as 'CHECKED_IN' | 'CHECKED_OUT',
@@ -839,10 +1633,15 @@ export const store = {
       return e;
     });
 
-    // Synchronize to dailyAttendance for Admin visibility
+    // 3. Synchronize to dailyAttendance for Admin visibility (matched strictly on today's date)
     let updatedDaily = [...globalState.dailyAttendance];
     const dailyIndex = updatedDaily.findIndex(
-      (d) => d.employeeCode === record.employeeId || d.employeeId === record.employeeId
+      (d) =>
+        d.date === todayDateStr &&
+        (d.employeeId === empId ||
+          d.employeeCode === empCode ||
+          (matchedEmp && (d.employeeId === matchedEmp.id || d.employeeCode === matchedEmp.code)) ||
+          (empName && d.employeeName.toLowerCase() === empName.toLowerCase()))
     );
 
     const verificationPoint = {
@@ -852,45 +1651,63 @@ export const store = {
       longitude: record.longitude,
       locationName: record.locationName,
       photoUrl: record.photoUrl,
-      verified: true
+      verified: true,
+      accuracy: record.accuracy || 14.5,
+      accuracyBand: record.accuracyBand || ((record.accuracy || 14.5) <= 15 ? 'OPTIMAL' : (record.accuracy || 14.5) <= 25 ? 'ACCEPTABLE' : 'LOW'),
+      distanceFromOffice
     };
+
+    const stableId = dailyIndex >= 0 && updatedDaily[dailyIndex].id
+      ? updatedDaily[dailyIndex].id
+      : `att-sum-${empId}-${todayDateStr}`;
+
+    let summaryRecord: DailyAttendanceSummary;
 
     if (dailyIndex >= 0) {
       const current = updatedDaily[dailyIndex];
-      updatedDaily[dailyIndex] = {
+      summaryRecord = {
         ...current,
+        id: current.id || stableId,
+        date: todayDateStr,
+        employeeId: empId,
+        employeeCode: empCode,
+        employeeName: empName,
+        territory: empTerritory,
+        phone: empPhone,
         status: record.type === 'CHECK_IN' ? 'ACTIVE_ON_FIELD' : 'CHECKED_OUT',
         ...(record.type === 'CHECK_IN'
           ? { checkIn: verificationPoint }
-          : { checkOut: verificationPoint, hoursWorked: current.hoursWorked || 8.2 })
+          : { checkOut: verificationPoint, hoursWorked: current.hoursWorked || 8.0 })
       };
+      updatedDaily[dailyIndex] = summaryRecord;
     } else {
-      const emp = globalState.employees.find((e) => e.code === record.employeeId || e.id === record.employeeId);
-      updatedDaily.unshift({
-        id: `att-sum-${Date.now()}`,
+      summaryRecord = {
+        id: stableId,
         date: todayDateStr,
-        employeeId: emp?.id || record.employeeId,
-        employeeCode: emp?.code || record.employeeId,
-        employeeName: record.employeeName,
-        territory: emp?.territory || 'Field Territory',
-        phone: emp?.phone || '+91 94280 44556',
+        employeeId: empId,
+        employeeCode: empCode,
+        employeeName: empName,
+        territory: empTerritory,
+        phone: empPhone,
         status: record.type === 'CHECK_IN' ? 'ACTIVE_ON_FIELD' : 'CHECKED_OUT',
         ...(record.type === 'CHECK_IN' ? { checkIn: verificationPoint } : { checkOut: verificationPoint }),
         hoursWorked: record.type === 'CHECK_OUT' ? 8.0 : 0,
         dealerVisitsCount: 1,
         ordersCount: 0
-      });
+      };
+      updatedDaily.unshift(summaryRecord);
     }
 
+    const distLabel = formatDistanceToFiltec(distanceFromOffice);
     const audit: AuditLog = {
       id: `aud-${Date.now()}`,
-      userId: record.employeeId,
-      userName: record.employeeName,
+      userId: empId,
+      userName: empName,
       role: 'EMPLOYEE',
       action: `ATTENDANCE_${record.type}`,
       entityType: 'ATTENDANCE',
       entityId: newRecord.id,
-      details: `${record.employeeName} recorded ${record.type} at ${record.locationName}`,
+      details: `${empName} recorded ${record.type} at ${record.locationName} (${distLabel} | GPS Accuracy: ±${record.accuracy || 14.5}m)`,
       timestamp: new Date().toISOString()
     };
 
@@ -902,6 +1719,35 @@ export const store = {
       auditLogs: [audit, ...globalState.auditLogs]
     };
     notify();
+
+    if (typeof window !== 'undefined') {
+      try {
+        window.dispatchEvent(
+          new CustomEvent('filtec:attendance_updated', {
+            detail: { record: newRecord, summary: summaryRecord }
+          })
+        );
+        const channel = new BroadcastChannel('filtec_attendance_channel');
+        channel.postMessage({ type: 'ATTENDANCE_PUNCH', state: globalState });
+        channel.close();
+      } catch (e) {}
+
+      fetch('/api/data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'RECORD_ATTENDANCE',
+          payload: {
+            record: newRecord,
+            employeeId: empId,
+            checkInStatus: record.type === 'CHECK_IN' ? 'CHECKED_IN' : 'CHECKED_OUT',
+            lastCheckInTime: `${currentTimeStr} Today`,
+            lastLocation: record.locationName,
+            summary: summaryRecord
+          }
+        })
+      }).catch((err) => console.warn('PostgreSQL record attendance failed:', err));
+    }
   },
 
   // 1-Click WhatsApp attendance reminder
@@ -989,6 +1835,15 @@ export const store = {
       whatsappMessages: [waMsg, ...globalState.whatsappMessages]
     };
     notify();
+
+    if (typeof window !== 'undefined') {
+      fetch('/api/data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'CREATE_LEAVE_REQUEST', payload: newLeave })
+      }).catch((err) => console.warn('PostgreSQL create leave request failed:', err));
+    }
+
     return newLeave;
   },
 
@@ -1033,6 +1888,14 @@ export const store = {
       whatsappMessages: [waMsg, ...globalState.whatsappMessages]
     };
     notify();
+
+    if (typeof window !== 'undefined') {
+      fetch('/api/data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'UPDATE_LEAVE_REQUEST', payload: { id: requestId, status: 'APPROVED' } })
+      }).catch((err) => console.warn('PostgreSQL approve leave request failed:', err));
+    }
   },
 
   rejectLeaveRequest(requestId: string, reason?: string) {
@@ -1082,6 +1945,14 @@ export const store = {
       whatsappMessages: [waMsg, ...globalState.whatsappMessages]
     };
     notify();
+
+    if (typeof window !== 'undefined') {
+      fetch('/api/data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'UPDATE_LEAVE_REQUEST', payload: { id: requestId, status: 'REJECTED', rejectionReason } })
+      }).catch((err) => console.warn('PostgreSQL reject leave request failed:', err));
+    }
   },
 
   updateEmployee(employeeId: string, data: Partial<Employee>): Employee | null {
@@ -1089,6 +1960,16 @@ export const store = {
     if (empIndex === -1) return null;
 
     const current = globalState.employees[empIndex];
+    if (data.phone) {
+      const p = data.phone.trim();
+      const isSamir = current.name.toLowerCase() === 'samir' || current.code === 'FPPL/ADM-001';
+      if (isSamir) {
+        data.phone = '+91 9437505814';
+      } else if (p && p !== '-' && p !== '(-)') {
+        const clean = p.replace(/^\+91[\s-]*/, '').replace(/^91(?=\d{10})/, '').replace(/\s+/g, '').trim();
+        data.phone = clean ? `+91 ${clean}` : p;
+      }
+    }
     const updatedEmployee: Employee = {
       ...current,
       ...data
@@ -1150,8 +2031,22 @@ export const store = {
       latencyMs: 110
     };
 
+    let updatedDealers = globalState.dealers;
+    if (data.assignedDealerIds !== undefined) {
+      const newAssignedSet = new Set(data.assignedDealerIds);
+      updatedDealers = globalState.dealers.map((dlr) => {
+        if (newAssignedSet.has(dlr.id) || newAssignedSet.has(dlr.code)) {
+          return { ...dlr, assignedRepId: updatedEmployee.id };
+        } else if (dlr.assignedRepId === updatedEmployee.id || dlr.assignedRepId === updatedEmployee.code) {
+          return { ...dlr, assignedRepId: undefined };
+        }
+        return dlr;
+      });
+    }
+
     globalState = {
       ...globalState,
+      dealers: updatedDealers,
       employees: updatedEmployees,
       currentUser: updatedCurrentUser,
       dailyAttendance: updatedDailyAttendance,
@@ -1180,13 +2075,41 @@ export const store = {
     if (dIndex === -1) return null;
 
     const current = globalState.dealers[dIndex];
+    let phone = data.phone !== undefined ? (data.phone || '').trim() : current.phone;
+    if (phone && phone !== '-') {
+      const clean = phone.replace(/^\+91[\s-]*/, '').replace(/^91(?=\d{10})/, '').trim();
+      phone = clean ? `+91 ${clean}` : phone;
+    }
+
     const updatedDealer: Dealer = {
       ...current,
-      ...data
+      ...data,
+      phone,
+      creditLimit: data.creditLimit !== undefined ? Number(data.creditLimit) : 0,
+      outstandingBalance: data.outstandingBalance !== undefined ? Number(data.outstandingBalance) : 0,
+      assignedRepId: data.assignedRepId !== undefined ? (data.assignedRepId || undefined) : current.assignedRepId
     };
 
     const updatedDealers = [...globalState.dealers];
     updatedDealers[dIndex] = updatedDealer;
+
+    // Sync employee's assignedDealerIds if assignedRepId changed
+    let updatedEmployees = globalState.employees;
+    if (data.assignedRepId !== undefined) {
+      const newRepId = data.assignedRepId;
+      const oldRepId = current.assignedRepId;
+      if (newRepId !== oldRepId) {
+        updatedEmployees = globalState.employees.map((emp) => {
+          let ids = Array.isArray(emp.assignedDealerIds) ? [...emp.assignedDealerIds] : [];
+          if (emp.id === newRepId || emp.code === newRepId) {
+            if (!ids.includes(current.id)) ids.push(current.id);
+          } else if (emp.id === oldRepId || emp.code === oldRepId) {
+            ids = ids.filter((id) => id !== current.id);
+          }
+          return { ...emp, assignedDealerIds: ids };
+        });
+      }
+    }
 
     const timestamp = new Date().toISOString();
 
@@ -1198,7 +2121,7 @@ export const store = {
       action: 'DEALER_UPDATED',
       entityType: 'DEALER',
       entityId: current.id,
-      details: `Updated dealer account for ${updatedDealer.name} (${updatedDealer.code}): Credit Limit: ₹${updatedDealer.creditLimit.toLocaleString('en-IN')}, Phone: ${updatedDealer.phone}, City: ${updatedDealer.city}, Tier: ${updatedDealer.tier}`,
+      details: `Updated dealer account for ${updatedDealer.name} (${updatedDealer.code}): Phone: ${updatedDealer.phone}, City: ${updatedDealer.city}, Assigned Rep: ${updatedDealer.assignedRepId || 'Unassigned'}`,
       timestamp
     };
 
@@ -1208,7 +2131,7 @@ export const store = {
       title: `Sync Dealer Master: ${updatedDealer.code}`,
       targetId: updatedDealer.code,
       status: 'SUCCESS',
-      payloadSummary: `Updated ERP Commercial Master for ${updatedDealer.name} (${updatedDealer.code}). Credit Limit: ₹${updatedDealer.creditLimit.toLocaleString('en-IN')}, Tier: ${updatedDealer.tier}`,
+      payloadSummary: `Updated ERP Commercial Master for ${updatedDealer.name} (${updatedDealer.code}). Tier: ${updatedDealer.tier}`,
       timestamp,
       latencyMs: 125
     };
@@ -1216,10 +2139,20 @@ export const store = {
     globalState = {
       ...globalState,
       dealers: updatedDealers,
+      employees: updatedEmployees,
       auditLogs: [audit, ...globalState.auditLogs],
       integrationEvents: [erpEvent, ...globalState.integrationEvents]
     };
     notify();
+
+    if (typeof window !== 'undefined') {
+      fetch('/api/data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'UPDATE_DEALER', payload: updatedDealer })
+      }).catch((err) => console.warn('PostgreSQL update dealer failed:', err));
+    }
+
     return updatedDealer;
   },
 
@@ -1227,12 +2160,16 @@ export const store = {
     name: string;
     ownerName: string;
     phone: string;
+    email?: string;
     city: string;
     state?: string;
     address: string;
+    pincode?: string;
+    gstin?: string;
     creditLimit?: number;
     tier?: 'Platinum' | 'Gold' | 'Silver';
     code?: string;
+    assignedRepId?: string;
   }): Dealer {
     const timestamp = new Date().toISOString();
     const newId = `dlr-${Date.now()}`;
@@ -1246,22 +2183,44 @@ export const store = {
       dealerCode = `DLR-${maxNum + 1}`;
     }
 
+    let phone = (data.phone || '').trim();
+    if (phone && phone !== '-') {
+      const clean = phone.replace(/^\+91[\s-]*/, '').replace(/^91(?=\d{10})/, '').trim();
+      phone = clean ? `+91 ${clean}` : phone;
+    }
+
     const newDealer: Dealer = {
       id: newId,
       code: dealerCode,
       name: data.name,
       ownerName: data.ownerName,
-      phone: data.phone,
+      phone,
+      email: data.email,
       city: data.city,
       state: data.state || 'Odisha',
       address: data.address,
-      creditLimit: Number(data.creditLimit) || 300000,
+      pincode: data.pincode,
+      gstin: data.gstin,
+      creditLimit: Number(data.creditLimit) || 0,
       outstandingBalance: 0,
       tier: data.tier || 'Silver',
       totalPurchases: 0,
       availableRewards: 0,
-      plumbersCount: 0
+      plumbersCount: 0,
+      assignedRepId: data.assignedRepId || undefined
     };
+
+    let updatedEmployees = globalState.employees;
+    if (newDealer.assignedRepId) {
+      updatedEmployees = globalState.employees.map((emp) => {
+        if (emp.id === newDealer.assignedRepId || emp.code === newDealer.assignedRepId) {
+          const ids = Array.isArray(emp.assignedDealerIds) ? [...emp.assignedDealerIds] : [];
+          if (!ids.includes(newId)) ids.push(newId);
+          return { ...emp, assignedDealerIds: ids };
+        }
+        return emp;
+      });
+    }
 
     const audit: AuditLog = {
       id: `aud-${Date.now()}`,
@@ -1281,7 +2240,7 @@ export const store = {
       title: `Sync New Dealer: ${dealerCode}`,
       targetId: dealerCode,
       status: 'SUCCESS',
-      payloadSummary: `Created ERP Customer Account for ${data.name} (${dealerCode}). Credit Limit: ₹${newDealer.creditLimit}`,
+      payloadSummary: `Created ERP Customer Account for ${data.name} (${dealerCode}). Tier: ${newDealer.tier}`,
       timestamp,
       latencyMs: 130
     };
@@ -1289,14 +2248,24 @@ export const store = {
     globalState = {
       ...globalState,
       dealers: [newDealer, ...globalState.dealers],
+      employees: updatedEmployees,
       auditLogs: [audit, ...globalState.auditLogs],
       integrationEvents: [erpEvent, ...globalState.integrationEvents]
     };
     notify();
+
+    if (typeof window !== 'undefined') {
+      fetch('/api/data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'CREATE_DEALER', payload: newDealer })
+      }).catch((err) => console.warn('PostgreSQL create dealer failed:', err));
+    }
+
     return newDealer;
   },
 
-  updateSettings(data: Partial<AppSettings>): AppSettings {
+  async updateSettings(data: Partial<AppSettings>): Promise<AppSettings> {
     const updatedSettings: AppSettings = {
       ...globalState.settings,
       ...data,
@@ -1336,6 +2305,27 @@ export const store = {
       auditLogs: [audit, ...globalState.auditLogs]
     };
     notify();
+
+    if (typeof window !== 'undefined') {
+      try {
+        const res = await fetch('/api/data', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'UPDATE_SETTINGS',
+            payload: { settings: updatedSettings }
+          })
+        });
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.error || 'Failed to save settings to database');
+        }
+      } catch (err) {
+        console.warn('PostgreSQL update settings failed:', err);
+        throw err;
+      }
+    }
+
     return updatedSettings;
   },
 
@@ -1483,6 +2473,15 @@ export const store = {
       auditLogs: [audit, ...globalState.auditLogs]
     };
     notify();
+
+    if (typeof window !== 'undefined') {
+      fetch('/api/data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'CREATE_EMPLOYEE', payload: newEmployee })
+      }).catch((err) => console.warn('PostgreSQL create employee failed:', err));
+    }
+
     return newEmployee;
   },
 
@@ -1572,6 +2571,18 @@ export const store = {
       products: updatedProducts
     };
     notify();
+
+    if (typeof window !== 'undefined') {
+      const targetVariant = updatedVariants.find((v) => v.id === variantId);
+      fetch('/api/data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'UPDATE_VARIANT_STOCK',
+          payload: { productId, variantId, inStock: targetVariant?.inStock ?? false }
+        })
+      }).catch((err) => console.warn('PostgreSQL update variant stock failed:', err));
+    }
   },
 
   // Add New Product

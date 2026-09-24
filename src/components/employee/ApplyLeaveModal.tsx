@@ -35,7 +35,7 @@ export function ApplyLeaveModal({
     endDate: todayStr,
     isHalfDay: false,
     reason: '',
-    contactNumber: currentUser.phone || '9437860619'
+    contactNumber: currentUser.phone || '+91 9437860619'
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);

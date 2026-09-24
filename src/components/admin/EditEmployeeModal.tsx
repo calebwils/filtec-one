@@ -82,7 +82,8 @@ export function EditEmployeeModal({
     remarks: '',
     checkInStatus: 'CHECKED_OUT' as 'CHECKED_IN' | 'CHECKED_OUT',
     systemRole: 'EMPLOYEE' as Role,
-    allowedPages: [] as string[]
+    allowedPages: [] as string[],
+    assignedDealerIds: [] as string[]
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -95,7 +96,7 @@ export function EditEmployeeModal({
       const isCustomDesignation =
         employee.designation && !DESIGNATIONS.includes(employee.designation);
 
-      const isSamir = employee.name.toLowerCase() === 'samir';
+      const isSamir = (employee.name || '').toLowerCase() === 'samir' || employee.code === 'FPPL/ADM-001';
       const role: Role = employee.systemRole || (isSamir ? 'ADMIN' : 'EMPLOYEE');
       const pages =
         employee.allowedPages && employee.allowedPages.length > 0
@@ -104,9 +105,15 @@ export function EditEmployeeModal({
           ? ALL_ADMIN_PAGES
           : ALL_EMPLOYEE_PAGES;
 
+      const rawPhone = isSamir ? '+91 9437505814' : (employee.phone || '');
+      const clean = rawPhone.replace(/^\+91[\s-]*/, '').replace(/^91(?=\d{10})/, '').replace(/\s+/g, '').trim();
+      const formattedPhone = isSamir
+        ? '+91 9437505814'
+        : (clean && clean !== '-' && clean !== '(-)' ? `+91 ${clean}` : rawPhone);
+
       setFormData({
         name: employee.name || '',
-        phone: employee.phone || '',
+        phone: formattedPhone,
         email: employee.email && employee.email !== '(-)' ? employee.email : '',
         designation: isCustomDesignation
           ? 'CUSTOM'
@@ -121,7 +128,8 @@ export function EditEmployeeModal({
         remarks: employee.remarks && employee.remarks !== '(-)' ? employee.remarks : '',
         checkInStatus: employee.checkInStatus || 'CHECKED_OUT',
         systemRole: role,
-        allowedPages: pages
+        allowedPages: pages,
+        assignedDealerIds: employee.assignedDealerIds || []
       });
       setSuccessMessage('');
     }
@@ -140,6 +148,7 @@ export function EditEmployeeModal({
       : formData.designation || (formData.systemRole === 'ADMIN' ? 'Operations Admin' : 'Sr. Marketing Executive');
 
   const cleanPhone = formData.phone.replace(/[^0-9]/g, '');
+  const waTargetPhone = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone;
 
   const grantedAdminPages = ADMIN_PAGE_OPTIONS.filter((p) => formData.allowedPages.includes(p.path));
   const grantedFieldPages = EMPLOYEE_PAGE_OPTIONS.filter((p) => formData.allowedPages.includes(p.path));
@@ -234,9 +243,15 @@ export function EditEmployeeModal({
     setIsSubmitting(true);
 
     setTimeout(() => {
+      const isSamir = (employee.name || '').toLowerCase() === 'samir' || employee.code === 'FPPL/ADM-001';
+      const cleanVal = formData.phone.trim().replace(/^\+91[\s-]*/, '').replace(/^91(?=\d{10})/, '').replace(/\s+/g, '').trim();
+      const finalPhone = isSamir
+        ? '+91 9437505814'
+        : (cleanVal && cleanVal !== '-' ? `+91 ${cleanVal}` : formData.phone.trim());
+
       const updated = store.updateEmployee(employee.id, {
         name: formData.name.trim(),
-        phone: formData.phone.trim(),
+        phone: finalPhone,
         email: formData.email.trim() ? formData.email.trim() : '(-)',
         designation: resolvedDesignation,
         territory: resolvedTerritory,
@@ -245,7 +260,8 @@ export function EditEmployeeModal({
         remarks: formData.remarks.trim() ? formData.remarks.trim() : '(-)',
         checkInStatus: formData.checkInStatus,
         systemRole: formData.systemRole,
-        allowedPages: formData.allowedPages
+        allowedPages: formData.allowedPages,
+        assignedDealerIds: formData.assignedDealerIds
       });
 
       setIsSubmitting(false);
@@ -623,7 +639,7 @@ export function EditEmployeeModal({
                 </label>
                 {cleanPhone.length >= 10 && (
                   <a
-                    href={`https://wa.me/${cleanPhone}`}
+                    href={`https://wa.me/${waTargetPhone}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-[10px] text-emerald-700 hover:underline flex items-center gap-1 font-mono font-medium"
@@ -708,52 +724,159 @@ export function EditEmployeeModal({
                 className="w-full px-3 py-2 text-xs rounded-lg border border-[#E5E7EB] bg-white focus:outline-none focus:ring-1 focus:ring-[#DC2626]"
               >
                 <option value="CHECKED_OUT">Offline / Checked Out</option>
-                <option value="CHECKED_IN">Active on Field / Operations</option>
               </select>
             </div>
+          </div>
 
-            {/* Monthly Target */}
-            <div>
-              <label className="block text-xs font-semibold text-[#374151] mb-1">
-                Monthly Target (₹ INR)
-              </label>
-              <div className="relative">
-                <span className="font-mono text-xs text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2">
+          {/* COMPENSATION & SALARY SETTINGS */}
+          <div className="p-4 rounded-xl border border-emerald-200 bg-emerald-50/20 space-y-3">
+            <div className="flex items-center justify-between pb-2 border-b border-emerald-100">
+              <div className="flex items-center gap-2">
+                <div className="w-6 h-6 rounded-md bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold text-xs">
                   ₹
-                </span>
-                <input
-                  type="number"
-                  min="0"
-                  step="10000"
-                  value={formData.targetMonthly}
-                  onChange={(e) =>
-                    setFormData({ ...formData, targetMonthly: Number(e.target.value) })
-                  }
-                  className="w-full pl-8 pr-3 py-2 text-xs rounded-lg border border-[#E5E7EB] bg-white focus:outline-none focus:ring-1 focus:ring-[#DC2626] font-mono"
-                />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-[#111827]">
+                    Compensation & Remuneration
+                  </label>
+                  <p className="text-[11px] text-[#6B7280]">
+                    Monthly base salary used for attendance-linked payroll & official payslips
+                  </p>
+                </div>
               </div>
             </div>
 
-            {/* Base Salary */}
-            <div>
-              <label className="block text-xs font-semibold text-[#374151] mb-1">
-                Base Monthly Salary (₹ INR)
-              </label>
-              <div className="relative">
-                <span className="font-mono text-xs text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2">
-                  ₹
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-semibold text-[#374151] mb-1">
+                  Monthly Base Salary (₹)
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400 font-mono text-xs font-bold">
+                    ₹
+                  </span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="500"
+                    value={formData.baseSalary || ''}
+                    onChange={(e) =>
+                      setFormData({ ...formData, baseSalary: Number(e.target.value) || 0 })
+                    }
+                    placeholder="e.g. 25000"
+                    className="w-full pl-7 pr-3 py-2 text-xs rounded-lg border border-[#E5E7EB] bg-white font-mono focus:outline-none focus:ring-1 focus:ring-emerald-600"
+                  />
+                </div>
+                <span className="text-[10px] text-neutral-500 mt-1 block">
+                  Base rate pro-rated on Mon–Sat verified attendance days
                 </span>
-                <input
-                  type="number"
-                  min="0"
-                  step="1000"
-                  value={formData.baseSalary}
-                  onChange={(e) =>
-                    setFormData({ ...formData, baseSalary: Number(e.target.value) })
-                  }
-                  className="w-full pl-8 pr-3 py-2 text-xs rounded-lg border border-[#E5E7EB] bg-white focus:outline-none focus:ring-1 focus:ring-[#DC2626] font-mono"
-                />
               </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-[#374151] mb-1">
+                  Monthly Sales Target (₹) <span className="text-[10px] text-neutral-400 font-normal">(Optional)</span>
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400 font-mono text-xs font-bold">
+                    ₹
+                  </span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="1000"
+                    value={formData.targetMonthly || ''}
+                    onChange={(e) =>
+                      setFormData({ ...formData, targetMonthly: Number(e.target.value) || 0 })
+                    }
+                    placeholder="e.g. 500000"
+                    className="w-full pl-7 pr-3 py-2 text-xs rounded-lg border border-[#E5E7EB] bg-white font-mono focus:outline-none focus:ring-1 focus:ring-emerald-600"
+                  />
+                </div>
+                <span className="text-[10px] text-neutral-500 mt-1 block">
+                  Monthly secondary sales order booking target
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* SECTION 4: ASSIGNED DEALER PORTFOLIO */}
+          <div className="p-4 rounded-xl border border-neutral-200 bg-[#F9FAFB] space-y-3">
+            <div className="flex items-center justify-between pb-2 border-b border-neutral-200">
+              <div className="flex items-center gap-2">
+                <Building2 className="w-4 h-4 text-neutral-600" />
+                <div>
+                  <label className="block text-xs font-bold text-[#111827]">
+                    Assigned Dealer Portfolio ({formData.assignedDealerIds.length} of {dealers.length} Assigned)
+                  </label>
+                  <p className="text-[11px] text-[#6B7280]">
+                    Assign commercial dealer accounts to this field representative for territory coverage
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFormData({
+                      ...formData,
+                      assignedDealerIds: dealers.map((d) => d.id)
+                    });
+                  }}
+                  className="text-[11px] text-[#DC2626] hover:underline font-semibold cursor-pointer"
+                >
+                  Select All
+                </button>
+                <span className="text-neutral-300">•</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFormData({
+                      ...formData,
+                      assignedDealerIds: []
+                    });
+                  }}
+                  className="text-[11px] text-[#6B7280] hover:underline cursor-pointer"
+                >
+                  Clear All
+                </button>
+              </div>
+            </div>
+
+            <div className="max-h-48 overflow-y-auto space-y-1 pr-1">
+              {dealers.map((dealer) => {
+                const isAssigned = formData.assignedDealerIds.includes(dealer.id);
+                return (
+                  <label
+                    key={dealer.id}
+                    className={`flex items-center justify-between p-2 rounded-lg border text-xs cursor-pointer transition-all ${
+                      isAssigned
+                        ? 'border-[#111827] bg-white shadow-2xs font-semibold'
+                        : 'border-neutral-200 bg-white/60 hover:bg-white text-neutral-600'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={isAssigned}
+                        onChange={() => {
+                          const newIds = isAssigned
+                            ? formData.assignedDealerIds.filter((id) => id !== dealer.id)
+                            : [...formData.assignedDealerIds, dealer.id];
+                          setFormData({ ...formData, assignedDealerIds: newIds });
+                        }}
+                        className="rounded border-neutral-300 text-[#DC2626] focus:ring-[#DC2626] w-4 h-4 cursor-pointer"
+                      />
+                      <span className="font-mono text-[10px] bg-neutral-100 text-neutral-700 px-1.5 py-0.5 rounded border border-neutral-200">
+                        {dealer.code}
+                      </span>
+                      <span className="text-[#111827]">{dealer.name}</span>
+                    </div>
+                    <span className="text-[10px] text-neutral-400 font-mono">
+                      {dealer.city}
+                    </span>
+                  </label>
+                );
+              })}
             </div>
           </div>
 

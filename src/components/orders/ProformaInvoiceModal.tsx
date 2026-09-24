@@ -7,18 +7,9 @@ import { useAppStore } from '@/data/store';
 import {
   X,
   Printer,
-  Download,
   Share2,
   Mail,
-  CheckCircle2,
-  Building2,
-  FileText,
-  Phone,
-  MapPin,
-  ShieldCheck,
-  Send,
-  Copy,
-  ExternalLink
+  CheckCircle2
 } from 'lucide-react';
 
 interface ProformaInvoiceModalProps {
@@ -27,25 +18,27 @@ interface ProformaInvoiceModalProps {
   onClose: () => void;
 }
 
-// Convert amount to Indian Rupees Words
-function numberToWords(amount: number): string {
+// Convert amount to exact Indian Rupees Words matching client specification
+function numberToEstimateWords(amount: number): string {
   const rounded = Math.round(amount);
-  if (rounded === 0) return 'Zero Rupees Only';
+  if (rounded === 0) return 'Zero Rupees only';
 
-  const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine',
-    'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+  const ones = [
+    '', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine',
+    'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'
+  ];
   const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
 
-  function convertTwoDigits(num: number): string {
+  function convertBelowHundred(num: number): string {
     if (num < 20) return ones[num];
     return tens[Math.floor(num / 10)] + (num % 10 !== 0 ? ' ' + ones[num % 10] : '');
   }
 
-  function convertThreeDigits(num: number): string {
+  function convertChunk(num: number): string {
     if (num >= 100) {
-      return ones[Math.floor(num / 100)] + ' Hundred' + (num % 100 !== 0 ? ' and ' + convertTwoDigits(num % 100) : '');
+      return ones[Math.floor(num / 100)] + ' Hundred' + (num % 100 !== 0 ? ' and ' + convertBelowHundred(num % 100) : '');
     }
-    return convertTwoDigits(num);
+    return convertBelowHundred(num);
   }
 
   let words = '';
@@ -53,33 +46,33 @@ function numberToWords(amount: number): string {
 
   const crore = Math.floor(n / 10000000);
   n %= 10000000;
-  if (crore > 0) words += convertThreeDigits(crore) + ' Crore ';
+  if (crore > 0) words += convertChunk(crore) + ' Crore ';
 
   const lakh = Math.floor(n / 100000);
   n %= 100000;
-  if (lakh > 0) words += convertThreeDigits(lakh) + ' Lakh ';
+  if (lakh > 0) words += convertChunk(lakh) + ' Lakh ';
 
   const thousand = Math.floor(n / 1000);
   n %= 1000;
-  if (thousand > 0) words += convertThreeDigits(thousand) + ' Thousand ';
+  if (thousand > 0) words += convertChunk(thousand) + ' Thousand ';
 
-  if (n > 0) words += convertThreeDigits(n);
+  if (n > 0) {
+    if (n >= 100) {
+      words += convertChunk(n);
+    } else {
+      words += (words.length > 0 ? 'and ' : '') + convertBelowHundred(n);
+    }
+  }
 
-  return 'Rupees ' + words.trim() + ' Only';
+  return words.trim() + ' Rupees only';
 }
 
 function getHsnCode(code: string, category?: string): string {
   const c = (code || '').toUpperCase();
-  if (c.includes('VALVE') || category === 'valves' || (parseInt(c.replace(/\D/g, ''), 10) >= 66 && parseInt(c.replace(/\D/g, ''), 10) <= 76)) {
-    return '84818090'; // Taps, cocks, valves
-  }
-  if (category === 'solvents' || (parseInt(c.replace(/\D/g, ''), 10) >= 77 && parseInt(c.replace(/\D/g, ''), 10) <= 97)) {
-    return '35069190'; // Adhesives & Solvents
-  }
-  if (category === 'tape' || c.includes('98') || c.includes('99')) {
-    return '39191000'; // PTFE tape
-  }
-  return '39172190'; // Tubes, pipes and fittings of plastics
+  if (c.includes('VALVE') || category === 'valves') return '84818090';
+  if (category === 'solvents') return '35069190';
+  if (category === 'tape') return '39191000';
+  return '39171010'; // Standard PVC/uPVC/CPVC pipes & fittings HSN code from estimate
 }
 
 export function ProformaInvoiceModal({ order, isOpen, onClose }: ProformaInvoiceModalProps) {
@@ -87,7 +80,6 @@ export function ProformaInvoiceModal({ order, isOpen, onClose }: ProformaInvoice
   const [mounted, setMounted] = useState(false);
   const [isSendingEmail, setIsSendingEmail] = useState(false);
   const [emailStatus, setEmailStatus] = useState<string | null>(null);
-  const [copiedLink, setCopiedLink] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -95,35 +87,153 @@ export function ProformaInvoiceModal({ order, isOpen, onClose }: ProformaInvoice
 
   if (!isOpen || !order || !mounted) return null;
 
-  const currentDealer = dealers.find((d) => d.id === order.dealerId) || ({
-    id: order.dealerId || 'dealer-demo',
-    name: order.dealerName,
-    code: 'DLR-301',
-    ownerName: 'Proprietor',
-    phone: order.dealerPhone,
-    address: 'Shop 14-16, Ashoka Chambers, Mithakhali Six Roads, Navrangpura',
-    city: order.dealerCity || 'Ahmedabad',
-    state: 'Gujarat',
-    gstin: '21AAACF9876K1Z9',
-    creditLimit: 500000,
-    outstandingBalance: 0,
-    tier: 'Gold',
-    totalPurchases: 1200000,
-    availableRewards: 15000,
-    plumbersCount: 8
-  } as unknown as Dealer);
+  const currentDealer =
+    dealers.find((d) => d.id === order.dealerId) ||
+    dealers.find((d) => d.name?.toLowerCase() === order.dealerName?.toLowerCase()) ||
+    dealers[0] ||
+    ({
+      id: order.dealerId || 'dealer-demo',
+      name: order.dealerName || 'Dealer Partner',
+      code: 'DLR-300',
+      ownerName: 'Authorized Signatory',
+      phone: order.dealerPhone || '',
+      address: '',
+      city: order.dealerCity || '',
+      state: '21-Odisha',
+      gstin: undefined,
+      creditLimit: 0,
+      outstandingBalance: 0,
+      tier: 'Silver',
+      totalPurchases: 0,
+      availableRewards: 0,
+      plumbersCount: 0
+    } as unknown as Dealer);
 
-  const proformaNumber = order.orderNumber.replace(/^ORD-/, 'PI-');
-  
-  const dateObj = new Date(order.createdAt);
-  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sept', 'Oct', 'Nov', 'Dec'];
-  const issueDate = isNaN(dateObj.getTime())
-    ? '12 Sept 2026'
-    : `${dateObj.getDate()} ${months[dateObj.getMonth()]} ${dateObj.getFullYear()}`;
+  // Dynamic Discount Rate configured from Settings
+  const discountPercent = Number(settings.company?.defaultDiscountPercent ?? 48.0);
+  const gstPercent = Number(settings.company?.defaultGstPercent ?? 18.0);
+  const cgstRate = gstPercent / 2;
+  const sgstRate = gstPercent / 2;
 
-  const subtotal = order.subtotal || order.items.reduce((sum, item) => sum + item.totalAmount, 0);
-  const gstAmount = order.gstAmount || subtotal * 0.18;
-  const grandTotal = order.totalAmount || subtotal + gstAmount;
+  // Format Date as DD-MM-YYYY matching the reference estimate
+  const dateObj = new Date(order.createdAt || Date.now());
+  const formattedDay = String(dateObj.getDate()).padStart(2, '0');
+  const formattedMonth = String(dateObj.getMonth() + 1).padStart(2, '0');
+  const formattedYear = dateObj.getFullYear();
+  const estimateDate = `${formattedDay}-${formattedMonth}-${formattedYear}`;
+
+  // Estimate Number format e.g. 2026-27/3
+  const rawNum = order.orderNumber.replace(/\D/g, '') || '3';
+  const estimateNo = `2026-27/${parseInt(rawNum, 10) % 100 || 3}`;
+
+  // Line Item Calculations with Discount
+  const lineItems = (order.items && order.items.length > 0 ? order.items : [
+    {
+      id: 'demo-1',
+      productId: 'p-1',
+      productCode: 'CPVC-ELB-1',
+      productName: 'CPVC ELBOW 1" (PLAIN)',
+      variantId: 'v-1',
+      variantDescription: '1" (25 mm)',
+      unitPrice: 29.53,
+      quantity: 50,
+      packingQty: 50,
+      packingUnit: 'Pcs',
+      totalAmount: 1476.50
+    },
+    {
+      id: 'demo-2',
+      productId: 'p-2',
+      productCode: 'CPVC-ELB-34',
+      productName: 'CPVC ELBOW 3/4" (PLAIN)',
+      variantId: 'v-2',
+      variantDescription: '3/4" (20 mm)',
+      unitPrice: 17.58,
+      quantity: 100,
+      packingQty: 100,
+      packingUnit: 'Pcs',
+      totalAmount: 1758.00
+    },
+    {
+      id: 'demo-3',
+      productId: 'p-3',
+      productCode: 'CPVC-TEE-34',
+      productName: 'CPVC TEE 3/4" (PLAIN)',
+      variantId: 'v-3',
+      variantDescription: '3/4" (20 mm)',
+      unitPrice: 21.82,
+      quantity: 100,
+      packingQty: 100,
+      packingUnit: 'Pcs',
+      totalAmount: 2182.00
+    },
+    {
+      id: 'demo-4',
+      productId: 'p-4',
+      productCode: 'CPVC-CPL-34',
+      productName: 'CPVC COUPLER 3/4"',
+      variantId: 'v-4',
+      variantDescription: '3/4" (20 mm)',
+      unitPrice: 12.67,
+      quantity: 100,
+      packingQty: 100,
+      packingUnit: 'Pcs',
+      totalAmount: 1267.00
+    }
+  ]).map((item, idx) => {
+    const qty = item.quantity || 1;
+    const unitPrice = item.unitPrice || 0;
+    const grossAmount = qty * unitPrice;
+    const discountAmount = Number(((grossAmount * discountPercent) / 100).toFixed(2));
+    const taxableAmount = Number((grossAmount - discountAmount).toFixed(2));
+    const itemGst = Number(((taxableAmount * gstPercent) / 100).toFixed(2));
+    const netAmount = Number((taxableAmount + itemGst).toFixed(2));
+    const hsn = getHsnCode(item.productCode);
+
+    return {
+      index: idx + 1,
+      name: item.productName.toUpperCase(),
+      variantDescription: item.variantDescription,
+      hsn,
+      quantity: qty,
+      unit: item.packingUnit || 'Pcs',
+      unitPrice,
+      discountAmount,
+      discountPercent,
+      taxableAmount,
+      gstAmount: itemGst,
+      netAmount
+    };
+  });
+
+  const totalQuantity = lineItems.reduce((sum, i) => sum + i.quantity, 0);
+  const totalDiscount = Number(lineItems.reduce((sum, i) => sum + i.discountAmount, 0).toFixed(2));
+  const totalTaxable = Number(lineItems.reduce((sum, i) => sum + i.taxableAmount, 0).toFixed(2));
+  const totalGst = Number(lineItems.reduce((sum, i) => sum + i.gstAmount, 0).toFixed(2));
+  const subTotal = Number(lineItems.reduce((sum, i) => sum + i.netAmount, 0).toFixed(2));
+  const finalPayableTotal = Math.round(subTotal);
+  const roundOff = Number((finalPayableTotal - subTotal).toFixed(2));
+  // Total savings includes trade discount plus saved tax
+  const youSaved = Math.round(totalDiscount * (1 + gstPercent / 100));
+
+  // HSN Tax Breakdown
+  const hsnGroups = lineItems.reduce((acc, it) => {
+    const code = it.hsn || '39171010';
+    if (!acc[code]) {
+      acc[code] = {
+        hsn: code,
+        taxable: 0,
+        cgst: 0,
+        sgst: 0,
+        totalTax: 0
+      };
+    }
+    acc[code].taxable += it.taxableAmount;
+    acc[code].cgst += it.gstAmount / 2;
+    acc[code].sgst += it.gstAmount / 2;
+    acc[code].totalTax += it.gstAmount;
+    return acc;
+  }, {} as Record<string, any>);
 
   const handlePrint = () => {
     window.print();
@@ -139,24 +249,24 @@ export function ProformaInvoiceModal({ order, isOpen, onClose }: ProformaInvoice
         body: JSON.stringify({
           orderId: order.id,
           orderNumber: order.orderNumber,
-          proformaNumber,
+          estimateNo,
           dealerName: order.dealerName,
           dealerCity: order.dealerCity,
           dealerPhone: order.dealerPhone,
-          totalAmount: grandTotal,
-          itemsCount: order.items.length,
-          items: order.items,
+          totalAmount: finalPayableTotal,
+          itemsCount: lineItems.length,
+          discountPercent,
           timestamp: new Date().toISOString()
         })
       });
 
       if (res.ok) {
-        setEmailStatus('Proforma dispatched to Admin & recorded in audit stream!');
+        setEmailStatus('Estimate dispatched to Admin queue & recorded in audit stream!');
       } else {
-        setEmailStatus('Proforma notification logged in admin queue.');
+        setEmailStatus('Estimate notification recorded in central queue.');
       }
     } catch (e) {
-      setEmailStatus('Proforma notification logged in admin queue.');
+      setEmailStatus('Estimate notification recorded in central queue.');
     } finally {
       setIsSendingEmail(false);
       setTimeout(() => setEmailStatus(null), 4000);
@@ -165,32 +275,56 @@ export function ProformaInvoiceModal({ order, isOpen, onClose }: ProformaInvoice
 
   const handleShareWhatsApp = () => {
     const text = encodeURIComponent(
-      `*FILTEC POLYPLAST PVT LTD — PROFORMA INVOICE*\n` +
-      `Proforma No: ${proformaNumber}\n` +
-      `Dealer: ${order.dealerName} (${order.dealerCity})\n` +
-      `Date: ${issueDate}\n` +
-      `Total Line Items: ${order.items.length}\n` +
-      `*Grand Total (Incl. GST 18%): ₹${grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}*\n\n` +
-      `View official digital copy at: ${typeof window !== 'undefined' ? window.location.origin : ''}/dealer/orders`
+      `*FILTEC POLYPLAST PVT LTD — ESTIMATE / PROFORMA*\n` +
+      `Estimate No: ${estimateNo}\n` +
+      `Date: ${estimateDate}\n` +
+      `Party: ${order.dealerName || currentDealer.name}\n` +
+      `Items: ${lineItems.length} (${totalQuantity} Pcs)\n` +
+      `Trade Discount Applied: ${discountPercent.toFixed(1)}%\n` +
+      `Subtotal: ₹${subTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}\n` +
+      `*Net Payable Total: ₹${finalPayableTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}*\n` +
+      `Total Savings: ₹${youSaved.toLocaleString('en-IN')}\n\n` +
+      `Bank: ${settings.company?.bankName || 'CANARA BANK'} | A/C: ${settings.company?.accountNumber || '120036945389'} | IFSC: ${settings.company?.ifscCode || 'CNRB0005928'}`
     );
     window.open(`https://api.whatsapp.com/send?text=${text}`, '_blank');
   };
 
+  const company = settings.company || {};
+  const companyLegalName = company.legalName || 'Filtec Polyplast Pvt Ltd';
+  const plantAddress = company.plantAddress || 'Phulnakhara, Bhubaneswar, Odisha';
+  const companyPhone = company.phone || '+91 9437505814';
+  const companyEmail = company.supportEmail || 'care@filtec.in';
+  const companyGstin = company.gstin || '21AAGCF5549N1ZC';
+  const companyState = company.state || '21-Odisha';
+  const placeOfSupply = company.placeOfSupply || '21-Odisha';
+
+  const bankName = company.bankName || 'CANARA BANK';
+  const bankAccNo = company.accountNumber || '120036945389';
+  const bankIfsc = company.ifscCode || 'CNRB0005928';
+  const bankAccHolder = company.accountHolderName || 'FILTEC POLYPLAST PRIVATE LIMITED';
+  const companyTerms = Array.isArray(company.termsAndConditions) && company.termsAndConditions.length > 0
+    ? company.termsAndConditions
+    : [
+        '*All disputes shall be under jurisdiction of Bhubaneswar, Odisha',
+        '*Once goods sold may not be returned unless it is mutually agreed.',
+        '*Payment must be paid within the due date of invoice or else 10% interest may applied as per company policy.'
+      ];
+
   const modalContent = (
     <div
-      id="filtec-proforma-print-portal"
-      className="proforma-modal-portal fixed inset-0 z-[9999] bg-black/75 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 overflow-y-auto print:p-0 print:m-0 print:bg-white print:static print:inset-auto print:z-0 print:overflow-visible print:block"
+      id="filtec-estimate-print-portal"
+      className="fixed inset-0 z-[9999] bg-black/75 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 overflow-y-auto print:p-0 print:m-0 print:bg-white print:static print:inset-auto print:z-0 print:overflow-visible print:block"
     >
-      <div className="proforma-modal-card bg-white rounded-2xl max-w-4xl w-full overflow-hidden shadow-2xl border border-neutral-200 my-auto print:border-none print:shadow-none print:max-w-none print:w-full print:rounded-none print:m-0 print:p-0">
+      <div className="bg-white rounded-xl max-w-4xl w-full overflow-hidden shadow-2xl border border-neutral-300 my-auto print:border-none print:shadow-none print:max-w-none print:w-full print:rounded-none print:m-0 print:p-0">
         
-        {/* Top Actions Header (Hidden in Print) */}
-        <div className="px-5 py-3.5 bg-neutral-900 text-white flex flex-wrap items-center justify-between gap-3 print:hidden">
+        {/* Top Control Bar (Hidden in Print) */}
+        <div className="px-5 py-3 bg-neutral-900 text-white flex flex-wrap items-center justify-between gap-3 print:hidden">
           <div className="flex items-center gap-2">
             <span className="bg-[#DC2626] text-white font-mono font-bold text-xs px-2.5 py-1 rounded">
-              {proformaNumber}
+              {estimateNo}
             </span>
             <span className="font-semibold text-xs text-neutral-200">
-              Commercial Proforma Invoice
+              Estimate / Commercial Proforma (Discount: {discountPercent}%)
             </span>
           </div>
 
@@ -210,17 +344,15 @@ export function ProformaInvoiceModal({ order, isOpen, onClose }: ProformaInvoice
               onClick={handleSendToAdmin}
               disabled={isSendingEmail}
               className="bg-[#DC2626] hover:bg-[#B91C1C] text-white text-xs font-semibold px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all shadow-xs cursor-pointer disabled:opacity-50"
-              title="Dispatch to Admin Email & Notifications"
             >
               <Mail className="w-3.5 h-3.5" />
-              <span>{isSendingEmail ? 'Sending...' : 'Send to Admin'}</span>
+              <span>{isSendingEmail ? 'Sending...' : 'Notify Admin'}</span>
             </button>
 
             <button
               type="button"
               onClick={handleShareWhatsApp}
               className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all cursor-pointer"
-              title="Share Proforma via WhatsApp"
             >
               <Share2 className="w-3.5 h-3.5" />
               <span>WhatsApp</span>
@@ -236,7 +368,7 @@ export function ProformaInvoiceModal({ order, isOpen, onClose }: ProformaInvoice
           </div>
         </div>
 
-        {/* Status Notification banner if email sent */}
+        {/* Status Alert if notified */}
         {emailStatus && (
           <div className="bg-emerald-50 border-b border-emerald-200 px-5 py-2 text-xs font-semibold text-emerald-800 flex items-center gap-2 print:hidden">
             <CheckCircle2 className="w-4 h-4 text-emerald-600" />
@@ -244,230 +376,277 @@ export function ProformaInvoiceModal({ order, isOpen, onClose }: ProformaInvoice
           </div>
         )}
 
-        {/* Printable Proforma Document Paper Area */}
+        {/* ============================================================== */}
+        {/* PRINTABLE ESTIMATE DOCUMENT PAPER CANVAS                      */}
+        {/* ============================================================== */}
         <div
-          id="filtec-proforma-document"
-          className="proforma-paper-area p-6 sm:p-8 bg-white max-h-[82vh] overflow-y-auto print:max-h-none print:overflow-visible print:p-0 print:m-0 print:w-full text-[#111827]"
+          id="filtec-estimate-canvas"
+          className="p-4 sm:p-8 bg-white max-h-[85vh] overflow-y-auto print:max-h-none print:overflow-visible print:p-0 print:m-0 print:w-full text-black font-sans leading-tight"
         >
-          
-          {/* Corporate Header */}
-          <div className="border-b-2 border-neutral-900 pb-4 mb-4 print:pb-3 print:mb-3">
-            <div className="flex flex-col sm:flex-row print:flex-row justify-between items-start gap-4 print:gap-2">
-              <div className="flex items-center gap-3">
-                <img
-                  src="/brand/filtec-one-logo.png"
-                  alt="FILTEC ONE"
-                  className="h-10 w-auto object-contain print:h-9"
-                />
+          {/* Main Title */}
+          <div className="text-center pb-2">
+            <h1 className="text-xl font-bold text-black tracking-tight">Estimate</h1>
+          </div>
+
+          {/* MAIN DOCUMENT OUTLINE TABLE CONTAINER */}
+          <div className="border border-black text-[11px] print:text-[10px]">
+            
+            {/* ROW 1: COMPANY INFO & ESTIMATE METADATA */}
+            <div className="grid grid-cols-1 sm:grid-cols-12 border-b border-black">
+              {/* Company Profile (Left, 7 cols) */}
+              <div className="sm:col-span-7 p-3 flex items-start gap-3 border-b sm:border-b-0 border-black">
+                {/* Official Filtec Logo (from "Filtec proforma Logo") */}
+                <div className="shrink-0 flex items-center justify-center">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src="/filtec-logo.svg"
+                    alt="filtec"
+                    className="h-10 w-auto object-contain"
+                  />
+                </div>
+
                 <div>
-                  <h1 className="text-base font-black uppercase tracking-wider text-[#111827]">
-                    FILTEC POLYPLAST PVT. LTD.
-                  </h1>
-                  <p className="text-[11px] text-neutral-600 font-medium">
-                    Manufacturers of High-Grade PVC, uPVC & CPVC Piping Systems
-                  </p>
+                  <h2 className="text-sm font-bold text-black">{companyLegalName}</h2>
+                  <div className="text-neutral-700">{plantAddress}</div>
+                  <div className="text-neutral-700">Phone no.: {companyPhone}</div>
+                  <div className="text-neutral-700">Email: {companyEmail}</div>
+                  <div className="text-neutral-700">GSTIN: {companyGstin}</div>
+                  <div className="text-neutral-700">State: {companyState}</div>
                 </div>
               </div>
 
-              <div className="text-right sm:text-right print:text-right text-[11px] text-neutral-600 font-mono leading-snug">
-                <div>Works & Regd. Office: Plot 12/B, Chandaka Industrial Estate</div>
-                <div>Patia, Bhubaneswar, Odisha – 751024</div>
-                <div>GSTIN: <strong className="text-neutral-900">21AAACF1234F1Z5</strong> | CIN: U25209OR2020PTC034567</div>
-                <div>Email: orders@filtec.in | Phone: +91 94378 60479</div>
-              </div>
-            </div>
-          </div>
-
-          {/* Title & Metadata Strip */}
-          <div className="bg-neutral-100 rounded-lg p-3 mb-4 print:p-2.5 print:mb-3 flex flex-col sm:flex-row print:flex-row justify-between items-center print:items-center gap-2 border border-neutral-300">
-            <div>
-              <span className="text-[10px] font-mono uppercase font-bold tracking-widest text-[#DC2626] block">
-                COMMERCIAL OFFER / ADVANCE REQUISITION
-              </span>
-              <h2 className="text-xl font-black text-neutral-900 tracking-tight">
-                PROFORMA INVOICE
-              </h2>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-4 text-xs font-mono">
-              <div>
-                <span className="text-[10px] text-neutral-500 block uppercase">Proforma No:</span>
-                <strong className="text-neutral-900 text-sm font-bold">{proformaNumber}</strong>
-              </div>
-              <div className="border-l border-neutral-300 pl-4">
-                <span className="text-[10px] text-neutral-500 block uppercase">Date of Issue:</span>
-                <strong className="text-neutral-900">{issueDate}</strong>
-              </div>
-              <div className="border-l border-neutral-300 pl-4">
-                <span className="text-[10px] text-neutral-500 block uppercase">Offer Validity:</span>
-                <strong className="text-emerald-700 font-bold">15 Days</strong>
-              </div>
-            </div>
-          </div>
-
-          {/* Buyer & Consignee Details */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 print:grid-cols-2 gap-4 print:gap-3 mb-5 print:mb-3 text-xs">
-            <div className="p-3.5 print:p-3 rounded-xl border border-neutral-200 bg-neutral-50/70 space-y-1">
-              <span className="text-[10px] font-mono uppercase font-bold text-[#DC2626] block">
-                Bill To / Authorized Dealer
-              </span>
-              <div className="text-sm font-bold text-neutral-900">{order.dealerName}</div>
-              <div className="text-neutral-600 leading-tight">
-                {currentDealer.address || 'Shop 14-16, Ashoka Chambers, Mithakhali Six Roads, Navrangpura'}
-              </div>
-              <div className="text-neutral-600">
-                City: <strong>{order.dealerCity || currentDealer.city}</strong> • State: {currentDealer.state || 'Odisha'} (Code: 21)
-              </div>
-              <div className="font-mono text-neutral-700 pt-0.5">
-                GSTIN: <strong className="text-neutral-900">{currentDealer.gstin || '21AAACF9876K1Z9'}</strong>
-              </div>
-              <div className="font-mono text-neutral-700">
-                Phone: {order.dealerPhone || currentDealer.phone}
+              {/* Estimate Meta Grid (Right, 5 cols) */}
+              <div className="sm:col-span-5 sm:border-l border-black flex flex-col justify-between">
+                <div className="grid grid-cols-2 border-b border-black h-full">
+                  <div className="p-2 border-r border-black">
+                    <div className="text-neutral-600 text-[10px]">Estimate No.</div>
+                    <div className="font-bold text-black mt-0.5">{estimateNo}</div>
+                  </div>
+                  <div className="p-2">
+                    <div className="text-neutral-600 text-[10px]">Date</div>
+                    <div className="font-bold text-black mt-0.5">{estimateDate}</div>
+                  </div>
+                </div>
+                <div className="p-2">
+                  <div className="text-neutral-600 text-[10px]">Place of Supply</div>
+                  <div className="font-bold text-black mt-0.5">{placeOfSupply}</div>
+                </div>
               </div>
             </div>
 
-            <div className="p-3.5 print:p-3 rounded-xl border border-neutral-200 bg-neutral-50/70 space-y-1 text-right sm:text-right print:text-right">
-              <span className="text-[10px] font-mono uppercase font-bold text-neutral-500 block">
-                Order Reference & Transport
-              </span>
-              <div className="font-mono">
-                Order Ref: <strong>{order.orderNumber}</strong>
+            {/* ROW 2: ESTIMATE FOR (CLIENT DETAILS) */}
+            <div className="p-3 border-b border-black bg-white space-y-0.5">
+              <div className="text-neutral-600 text-[10px]">Estimate For</div>
+              <div className="font-bold text-xs text-black">{currentDealer.name || order.dealerName}</div>
+              <div className="text-neutral-700">
+                {currentDealer.address || `${currentDealer.city ? currentDealer.city + ', ' : ''}${currentDealer.state || ''}`}
               </div>
-              <div>Sales Officer: <strong>{order.employeeName || 'Purna Chandra Nayak'}</strong></div>
-              <div>Dispatch By: <strong>Road Transport / Factory Delivery</strong></div>
-              <div>Destination Hub: <strong>{order.dealerCity || currentDealer.city} Distribution Hub</strong></div>
-              <div>Payment Terms: <strong>Advance RTGS / Approved Credit Terms</strong></div>
+              <div className="text-neutral-700">Contact No.: {currentDealer.phone || order.dealerPhone || '—'}</div>
+              <div className="text-neutral-700">GSTIN Number: {currentDealer.gstin || 'URP / Unregistered'}</div>
+              <div className="text-neutral-700">State: {currentDealer.state || '21-Odisha'}</div>
             </div>
-          </div>
 
-          {/* Line Items Table */}
-          <div className="border border-neutral-300 rounded-lg overflow-hidden mb-4 print:mb-3">
-            <table className="w-full text-left text-xs print:text-[10px]">
-              <thead className="bg-[#111827] text-white font-mono uppercase text-[10px] print:bg-[#111827] print:text-white">
-                <tr>
-                  <th className="py-2.5 px-3 print:py-1.5 print:px-2 text-center w-10">S.N.</th>
-                  <th className="py-2.5 px-3 print:py-1.5 print:px-2">Item Code & Description</th>
-                  <th className="py-2.5 px-3 print:py-1.5 print:px-2 text-center w-20">HSN</th>
-                  <th className="py-2.5 px-3 print:py-1.5 print:px-2 text-right w-20">Qty</th>
-                  <th className="py-2.5 px-3 print:py-1.5 print:px-2 text-right w-24">Unit Rate (₹)</th>
-                  <th className="py-2.5 px-3 print:py-1.5 print:px-2 text-right w-24">Taxable Amt (₹)</th>
-                  <th className="py-2.5 px-3 print:py-1.5 print:px-2 text-center w-14">GST</th>
-                  <th className="py-2.5 px-3 print:py-1.5 print:px-2 text-right w-28">Total (₹)</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-neutral-200 font-mono">
-                {order.items.map((item, idx) => {
-                  const hsn = getHsnCode(item.productCode);
-                  const itemTaxable = Number(item.totalAmount.toFixed(2));
-                  const itemGst = Number((itemTaxable * 0.18).toFixed(2));
-                  const itemGrand = Number((itemTaxable + itemGst).toFixed(2));
-
-                  return (
-                    <tr key={item.id || idx} className="hover:bg-neutral-50 print:bg-white">
-                      <td className="py-2 px-3 print:py-1.5 print:px-2 text-center text-neutral-500">{idx + 1}</td>
-                      <td className="py-2 px-3 print:py-1.5 print:px-2 font-sans">
-                        <div className="font-bold text-neutral-900 flex items-center gap-1.5">
-                          <span className="font-mono bg-neutral-100 text-neutral-800 text-[10px] px-1.5 py-0.5 rounded border border-neutral-300">
-                            {item.productCode}
-                          </span>
-                          <span>{item.productName}</span>
-                        </div>
-                        <div className="text-[11px] print:text-[9.5px] text-neutral-500 font-mono mt-0.5">
-                          Spec: {item.variantDescription}
-                        </div>
+            {/* ROW 3: LINE ITEMS TABLE */}
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-black bg-neutral-50 text-[11px] print:text-[10px] font-bold">
+                    <th className="py-2 px-2 border-r border-black text-center w-8">#</th>
+                    <th className="py-2 px-2.5 border-r border-black">Item name</th>
+                    <th className="py-2 px-2 border-r border-black text-center w-20">HSN/ SAC</th>
+                    <th className="py-2 px-2 border-r border-black text-right w-16">Quantity</th>
+                    <th className="py-2 px-2 border-r border-black text-center w-12">Unit</th>
+                    <th className="py-2 px-2 border-r border-black text-right w-20">Price/ Unit</th>
+                    <th className="py-2 px-2 border-r border-black text-right w-28">Discount</th>
+                    <th className="py-2 px-2 border-r border-black text-right w-28">GST</th>
+                    <th className="py-2 px-2.5 text-right w-24">Amount</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-black/30">
+                  {lineItems.map((it) => (
+                    <tr key={it.index} className="hover:bg-neutral-50/50 print:bg-white text-[11px] print:text-[10px]">
+                      <td className="py-1.5 px-2 border-r border-black text-center text-neutral-700">{it.index}</td>
+                      <td className="py-1.5 px-2.5 border-r border-black font-semibold text-black">
+                        <div>{it.name}</div>
+                        {it.variantDescription && (
+                          <div className="text-[9.5px] text-neutral-500 font-normal font-mono">{it.variantDescription}</div>
+                        )}
                       </td>
-                      <td className="py-2 px-3 print:py-1.5 print:px-2 text-center text-neutral-600">{hsn}</td>
-                      <td className="py-2 px-3 print:py-1.5 print:px-2 text-right font-bold text-neutral-900">
-                        {item.quantity} {item.packingUnit || 'Pcs'}
+                      <td className="py-1.5 px-2 border-r border-black text-center font-mono text-neutral-700">{it.hsn}</td>
+                      <td className="py-1.5 px-2 border-r border-black text-right font-mono text-black">{it.quantity}</td>
+                      <td className="py-1.5 px-2 border-r border-black text-center text-neutral-700">{it.unit}</td>
+                      <td className="py-1.5 px-2 border-r border-black text-right font-mono text-neutral-800">
+                        ₹ {it.unitPrice.toFixed(2)}
                       </td>
-                      <td className="py-2 px-3 print:py-1.5 print:px-2 text-right text-neutral-700">
-                        ₹{item.unitPrice.toFixed(2)}
+                      <td className="py-1.5 px-2 border-r border-black text-right font-mono text-neutral-800">
+                        ₹ {it.discountAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })} ({it.discountPercent.toFixed(1)}%)
                       </td>
-                      <td className="py-2 px-3 print:py-1.5 print:px-2 text-right text-neutral-900">
-                        ₹{itemTaxable.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      <td className="py-1.5 px-2 border-r border-black text-right font-mono text-neutral-800">
+                        ₹ {it.gstAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })} ({gstPercent.toFixed(1)}%)
                       </td>
-                      <td className="py-2 px-3 print:py-1.5 print:px-2 text-center text-neutral-500 text-[11px] print:text-[9.5px]">18%</td>
-                      <td className="py-2 px-3 print:py-1.5 print:px-2 text-right font-bold text-neutral-900">
-                        ₹{itemGrand.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      <td className="py-1.5 px-2.5 text-right font-mono font-bold text-black">
+                        ₹ {it.netAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                       </td>
                     </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr className="border-t border-black bg-neutral-50/50 font-bold text-[11px] print:text-[10px]">
+                    <td colSpan={3} className="py-1.5 px-2 border-r border-black text-left">Total</td>
+                    <td className="py-1.5 px-2 border-r border-black text-right font-mono">{totalQuantity}</td>
+                    <td colSpan={2} className="py-1.5 px-2 border-r border-black"></td>
+                    <td className="py-1.5 px-2 border-r border-black text-right font-mono">
+                      ₹ {totalDiscount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    </td>
+                    <td className="py-1.5 px-2 border-r border-black text-right font-mono">
+                      ₹ {totalGst.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    </td>
+                    <td className="py-1.5 px-2.5 text-right font-mono font-bold">
+                      ₹ {subTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
 
-          {/* Tax Summary & Bank Details Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 print:grid-cols-2 gap-4 print:gap-3 mb-4 print:mb-3">
-            {/* Left: Bank Details for Remittance */}
-            <div className="p-3.5 print:p-3 rounded-xl border border-neutral-200 bg-neutral-50/70 text-xs print:text-[10px] space-y-1">
-              <span className="text-[10px] font-mono uppercase font-bold text-neutral-900 block flex items-center gap-1">
-                <Building2 className="w-3.5 h-3.5 text-[#DC2626]" />
-                BANK DETAILS FOR RTGS / NEFT REMITTANCE
-              </span>
-              <div className="font-mono text-[11px] print:text-[9.5px] pt-1 leading-relaxed">
-                <div>Bank Name: <strong>HDFC Bank Limited</strong></div>
-                <div>A/C Name: <strong>FILTEC POLYPLAST PVT LTD</strong></div>
-                <div>Current A/C No: <strong className="text-neutral-900">50200084920194</strong></div>
-                <div>IFSC Code: <strong className="text-neutral-900">HDFC0001234</strong></div>
-                <div>Branch: <strong>Bhubaneswar Industrial Finance Branch</strong></div>
+            {/* ROW 4: AMOUNT IN WORDS & AMOUNTS SUMMARY */}
+            <div className="grid grid-cols-1 sm:grid-cols-12 border-t border-black">
+              {/* Left: Estimate Amount in Words (7 cols) */}
+              <div className="sm:col-span-7 p-3 flex flex-col justify-start border-b sm:border-b-0 border-black">
+                <div className="text-neutral-600 text-[10px]">Estimate Amount In Words</div>
+                <div className="font-bold text-xs text-black mt-1">
+                  {numberToEstimateWords(finalPayableTotal)}
+                </div>
+              </div>
+
+              {/* Right: Amounts Summary Grid (5 cols) */}
+              <div className="sm:col-span-5 sm:border-l border-black">
+                <div className="px-3 py-1.5 border-b border-black font-bold text-neutral-800 bg-neutral-50/60">
+                  Amounts
+                </div>
+                <div className="divide-y divide-black/30 font-mono text-[11px] print:text-[10px]">
+                  <div className="flex justify-between px-3 py-1 text-neutral-800">
+                    <span className="font-sans">Sub Total</span>
+                    <span>₹ {subTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                  </div>
+                  <div className="flex justify-between px-3 py-1 text-neutral-800">
+                    <span className="font-sans">Round off</span>
+                    <span>₹ {roundOff >= 0 ? roundOff.toFixed(2) : `(${Math.abs(roundOff).toFixed(2)})`}</span>
+                  </div>
+                  <div className="flex justify-between px-3 py-1.5 font-bold text-black text-xs border-t border-black">
+                    <span className="font-sans">Total</span>
+                    <span>₹ {finalPayableTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                  </div>
+                  <div className="flex justify-between px-3 py-1.5 font-bold text-neutral-900 bg-neutral-50">
+                    <span className="font-sans">You Saved</span>
+                    <span className="text-[#DC2626]">₹ {youSaved.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                  </div>
+                </div>
               </div>
             </div>
 
-            {/* Right: Financial Totals */}
-            <div className="p-3.5 print:p-3 rounded-xl border border-neutral-200 bg-neutral-50/70 text-xs print:text-[10px] space-y-1.5 font-mono">
-              <div className="flex justify-between text-neutral-700">
-                <span>Subtotal (Taxable Value):</span>
-                <span className="font-bold text-neutral-900">
-                  ₹{subtotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </span>
+            {/* ROW 5: TAX SUMMARY TABLE BY HSN/SAC */}
+            <div className="border-t border-black overflow-x-auto">
+              <table className="w-full text-left border-collapse text-[11px] print:text-[10px]">
+                <thead>
+                  <tr className="border-b border-black bg-neutral-50 font-bold">
+                    <th rowSpan={2} className="py-1.5 px-3 border-r border-black text-center w-24">HSN/ SAC</th>
+                    <th rowSpan={2} className="py-1.5 px-3 border-r border-black text-right">Taxable amount</th>
+                    <th colSpan={2} className="py-1 px-2 border-r border-black text-center border-b border-black">CGST</th>
+                    <th colSpan={2} className="py-1 px-2 border-r border-black text-center border-b border-black">SGST</th>
+                    <th rowSpan={2} className="py-1.5 px-3 text-right">Total Tax Amount</th>
+                  </tr>
+                  <tr className="border-b border-black bg-neutral-50 font-bold text-[10px]">
+                    <th className="py-1 px-2 border-r border-black text-center w-16">Rate</th>
+                    <th className="py-1 px-2 border-r border-black text-right w-24">Amount</th>
+                    <th className="py-1 px-2 border-r border-black text-center w-16">Rate</th>
+                    <th className="py-1 px-2 border-r border-black text-right w-24">Amount</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-black/30 font-mono">
+                  {Object.values(hsnGroups).map((g: any, idx: number) => (
+                    <tr key={idx}>
+                      <td className="py-1.5 px-3 border-r border-black text-center">{g.hsn}</td>
+                      <td className="py-1.5 px-3 border-r border-black text-right">
+                        ₹ {g.taxable.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      </td>
+                      <td className="py-1.5 px-2 border-r border-black text-center">{cgstRate.toFixed(1)}%</td>
+                      <td className="py-1.5 px-2 border-r border-black text-right">
+                        ₹ {g.cgst.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      </td>
+                      <td className="py-1.5 px-2 border-r border-black text-center">{sgstRate.toFixed(1)}%</td>
+                      <td className="py-1.5 px-2 border-r border-black text-right">
+                        ₹ {g.sgst.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      </td>
+                      <td className="py-1.5 px-3 text-right font-bold">
+                        ₹ {g.totalTax.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr className="border-t border-black bg-neutral-50/50 font-bold font-mono">
+                    <td className="py-1.5 px-3 border-r border-black text-center font-sans">Total</td>
+                    <td className="py-1.5 px-3 border-r border-black text-right">
+                      ₹ {totalTaxable.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    </td>
+                    <td className="py-1.5 px-2 border-r border-black"></td>
+                    <td className="py-1.5 px-2 border-r border-black text-right">
+                      ₹ {(totalGst / 2).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    </td>
+                    <td className="py-1.5 px-2 border-r border-black"></td>
+                    <td className="py-1.5 px-2 border-r border-black text-right">
+                      ₹ {(totalGst / 2).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    </td>
+                    <td className="py-1.5 px-3 text-right font-bold">
+                      ₹ {totalGst.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+
+            {/* ROW 6: FOOTER (BANK DETAILS, TERMS, SIGNATORY) */}
+            <div className="grid grid-cols-1 sm:grid-cols-12 border-t border-black">
+              {/* Col 1: Bank Details (4 cols) */}
+              <div className="sm:col-span-4 p-3 border-b sm:border-b-0 border-black space-y-1.5">
+                <div className="font-bold text-xs text-black">Bank Details</div>
+                
+                {/* Bank Account Details */}
+                <div className="text-[10px] space-y-0.5 text-neutral-800 pt-0.5">
+                  <div>Name: <strong className="text-black">{bankName}</strong></div>
+                  <div>Account No.: <strong className="text-black font-mono">{bankAccNo}</strong></div>
+                  <div>IFSC code: <strong className="text-black font-mono">{bankIfsc}</strong></div>
+                  <div>Account Holder&apos;s Name: <strong className="text-black">{bankAccHolder}</strong></div>
+                </div>
               </div>
-              <div className="flex justify-between text-neutral-600 text-[11px] print:text-[9.5px]">
-                <span>CGST (9.0%):</span>
-                <span>₹{(gstAmount / 2).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+
+              {/* Col 2: Terms and Conditions (4.5 cols) */}
+              <div className="sm:col-span-4 p-3 border-b sm:border-b-0 sm:border-l border-black text-[10px] space-y-1">
+                <div className="font-bold text-xs text-black">Terms and conditions</div>
+                <div className="text-neutral-700 leading-snug space-y-0.5 pt-0.5">
+                  {companyTerms.map((term, idx) => (
+                    <div key={idx}>{term}</div>
+                  ))}
+                </div>
               </div>
-              <div className="flex justify-between text-neutral-600 text-[11px] print:text-[9.5px]">
-                <span>SGST (9.0%):</span>
-                <span>₹{(gstAmount / 2).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-              </div>
-              <div className="border-t-2 border-neutral-900 pt-1.5 flex justify-between text-base print:text-sm font-black text-neutral-900">
-                <span>Net Proforma Total:</span>
-                <span className="text-[#DC2626]">
-                  ₹{grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </span>
+
+              {/* Col 3: Authorized Signatory (4 cols) */}
+              <div className="sm:col-span-4 p-3 sm:border-l border-black flex flex-col justify-between text-center sm:text-right min-h-[95px]">
+                <div className="text-[11px] font-bold text-black">
+                  For: {companyLegalName}
+                </div>
+
+                <div className="text-[10px] font-bold text-black text-center sm:text-right pt-10">
+                  Authorized Signatory
+                </div>
               </div>
             </div>
-          </div>
 
-          {/* Amount in Words */}
-          <div className="p-2.5 rounded-lg bg-neutral-100 border border-neutral-200 text-xs print:text-[10px] font-semibold mb-4 print:mb-3">
-            <span className="text-neutral-500 font-mono text-[10px] uppercase mr-2">AMOUNT IN WORDS:</span>
-            <span className="font-serif italic text-neutral-900">{numberToWords(grandTotal)}</span>
-          </div>
-
-          {/* Commercial Terms & Signatures */}
-          <div className="pt-3 border-t border-neutral-200 grid grid-cols-1 sm:grid-cols-2 print:grid-cols-2 gap-4 print:gap-3 text-[10px] text-neutral-500 leading-tight">
-            <div>
-              <strong className="text-neutral-700 block mb-0.5">Commercial Terms & Conditions:</strong>
-              <ol className="list-decimal list-inside space-y-0.5">
-                <li>This Proforma Invoice is issued based on the official price list dated 01.07.2026.</li>
-                <li>Material dispatch will be initiated upon receipt of advance payment or approved credit terms.</li>
-                <li>All disputes are subject to Bhubaneswar, Odisha jurisdiction.</li>
-              </ol>
-            </div>
-
-            <div className="text-right sm:text-right print:text-right flex flex-col justify-end">
-              <div className="text-xs font-bold text-neutral-900">
-                For FILTEC POLYPLAST PVT. LTD.
-              </div>
-              <div className="h-10 print:h-8"></div>
-              <div className="text-[11px] font-medium text-neutral-700 border-t border-dashed border-neutral-400 pt-1 inline-block">
-                Authorized Commercial Signatory
-              </div>
-            </div>
           </div>
         </div>
       </div>
+
     </div>
   );
 

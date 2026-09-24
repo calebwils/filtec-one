@@ -54,16 +54,11 @@ export default function DealerInvoicesPage() {
 
                   <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-center border-t sm:border-t-0 pt-2 sm:pt-0 border-neutral-100">
                     <div className="font-mono font-bold text-sm text-[#111827]">
-                      ₹{order.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      {order.items?.reduce((s, i) => s + (i.quantity || 0), 0) || 0} Units Booked
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => alert(`Downloading Invoice PDF: ${order.invoiceNumber || 'INV-FIL-2026-8821'}`)}
-                      className="text-[11px] text-[#DC2626] hover:underline font-semibold flex items-center gap-1 mt-0.5"
-                    >
-                      <Download className="w-3 h-3" />
-                      <span>Download PDF</span>
-                    </button>
+                    <span className="text-[11px] text-neutral-500 font-mono">
+                      {order.items?.length || 0} Products
+                    </span>
                   </div>
                 </div>
               ))

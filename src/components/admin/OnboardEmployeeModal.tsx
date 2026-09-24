@@ -612,33 +612,76 @@ export function OnboardEmployeeModal({
                   ))}
                 </select>
               </div>
+            </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-neutral-700 mb-1">
-                  Monthly Target (₹ INR)
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  step="10000"
-                  value={formData.targetMonthly}
-                  onChange={(e) => setFormData({ ...formData, targetMonthly: Number(e.target.value) })}
-                  className="w-full text-xs p-2.5 rounded-lg border border-neutral-200 font-mono focus:outline-none focus:ring-1 focus:ring-[#DC2626]"
-                />
+            {/* COMPENSATION & SALARY SETTINGS */}
+            <div className="p-4 rounded-xl border border-emerald-200 bg-emerald-50/20 space-y-3">
+              <div className="flex items-center justify-between pb-2 border-b border-emerald-100">
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded-md bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold text-xs">
+                    ₹
+                  </div>
+                  <div>
+                    <span className="text-xs font-bold text-neutral-900 block">
+                      Compensation & Remuneration
+                    </span>
+                    <span className="text-[10px] text-neutral-500">
+                      Attendance-linked base remuneration used for monthly payroll & payslip generation
+                    </span>
+                  </div>
+                </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-neutral-700 mb-1">
-                  Base Salary (₹ INR)
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  step="1000"
-                  value={formData.baseSalary}
-                  onChange={(e) => setFormData({ ...formData, baseSalary: Number(e.target.value) })}
-                  className="w-full text-xs p-2.5 rounded-lg border border-neutral-200 font-mono focus:outline-none focus:ring-1 focus:ring-[#DC2626]"
-                />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-neutral-700 mb-1">
+                    Monthly Base Salary (₹)
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400 font-mono text-xs font-bold">
+                      ₹
+                    </span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="500"
+                      value={formData.baseSalary || ''}
+                      onChange={(e) =>
+                        setFormData({ ...formData, baseSalary: Number(e.target.value) || 0 })
+                      }
+                      placeholder="e.g. 25000"
+                      className="w-full text-xs pl-7 p-2.5 rounded-lg border border-neutral-200 font-mono focus:outline-none focus:ring-1 focus:ring-emerald-600 bg-white"
+                    />
+                  </div>
+                  <span className="text-[10px] text-neutral-500 mt-1 block">
+                    Base monthly wage pro-rated on Mon–Sat verified attendance days
+                  </span>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-neutral-700 mb-1">
+                    Monthly Sales Target (₹) <span className="text-[10px] text-neutral-400 font-normal">(Optional)</span>
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400 font-mono text-xs font-bold">
+                      ₹
+                    </span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="1000"
+                      value={formData.targetMonthly || ''}
+                      onChange={(e) =>
+                        setFormData({ ...formData, targetMonthly: Number(e.target.value) || 0 })
+                      }
+                      placeholder="e.g. 500000"
+                      className="w-full text-xs pl-7 p-2.5 rounded-lg border border-neutral-200 font-mono focus:outline-none focus:ring-1 focus:ring-emerald-600 bg-white"
+                    />
+                  </div>
+                  <span className="text-[10px] text-neutral-500 mt-1 block">
+                    Monthly dealer booking sales target
+                  </span>
+                </div>
               </div>
             </div>
 

@@ -19,18 +19,19 @@ import {
   ShieldCheck,
   CheckCircle2,
   BookOpen,
-  Download
+  Download,
+  Lock
 } from 'lucide-react';
 
 export default function DealerHomePage() {
   const { currentUser, dealers, orders, rewardLedger, plumbers } = useAppStore();
 
   const currentDealer =
-    dealers.find((d) => d.id === currentUser.dealerId) || dealers[0];
+    dealers.find((d) => d.id === currentUser.dealerId || d.code === currentUser.dealerId) || dealers[0];
 
-  const dealerOrders = orders.filter((o) => o.dealerId === currentDealer.id);
-  const awaitingConfirmationCount = dealerOrders.filter((o) => o.status === 'PENDING_ADMIN_APPROVAL').length;
-  const dealerPlumbers = plumbers.filter((p) => p.dealerId === currentDealer.id);
+  const dealerOrders = orders.filter((o) => o.dealerId === currentDealer.id || o.dealerId === currentDealer.code || o.dealerName === currentDealer.name);
+  const awaitingConfirmationCount = dealerOrders.filter((o) => o.status === 'SUBMITTED' || o.status === 'PENDING_ADMIN_APPROVAL').length;
+  const dealerPlumbers = plumbers.filter((p) => p.dealerId === currentDealer.id || p.dealerName === currentDealer.name);
 
   return (
     <div className="min-h-screen bg-[#F8F9FA] pb-mobile-nav">
@@ -84,6 +85,32 @@ export default function DealerHomePage() {
             </div>
           </div>
 
+          {/* Plumber Escrow Notice Banner */}
+          {(currentDealer.pendingPlumberRewards || 0) > 0 && (
+            <div className="mt-4 p-3.5 bg-amber-50/90 border border-amber-200 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+              <div className="flex items-start sm:items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-amber-100 border border-amber-300 flex items-center justify-center shrink-0">
+                  <Lock className="w-4 h-4 text-amber-800" />
+                </div>
+                <div>
+                  <div className="font-bold text-amber-950">
+                    ₹{(currentDealer.pendingPlumberRewards || 0).toLocaleString('en-IN')} in Plumber Rewards Waiting in Escrow
+                  </div>
+                  <div className="text-[11px] text-amber-800">
+                    Under company policy, plumber rewards stay in escrow and never go to the dealer. Onboard a plumber to release these points!
+                  </div>
+                </div>
+              </div>
+              <Link
+                href="/dealer/plumbers"
+                className="inline-flex items-center gap-1.5 bg-amber-800 hover:bg-amber-900 text-white font-semibold px-3 py-1.5 rounded-lg text-xs transition-colors shrink-0 self-start sm:self-auto"
+              >
+                <span>Onboard Plumber Now</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
+            </div>
+          )}
+
           {/* Contextual Metric Cards */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-4">
             <div className="bg-[#F9FAFB] p-3 rounded-lg border border-[#E5E7EB]">
@@ -95,29 +122,33 @@ export default function DealerHomePage() {
             </div>
 
             <div className="bg-[#F9FAFB] p-3 rounded-lg border border-[#E5E7EB]">
-              <span className="text-[10px] uppercase font-mono text-[#6B7280] block">Available Rewards</span>
+              <span className="text-[10px] uppercase font-mono text-[#6B7280] block">Dealer Rewards</span>
               <div className="text-lg font-bold font-mono text-emerald-700 mt-0.5">
                 ₹{currentDealer.availableRewards.toLocaleString('en-IN')}
               </div>
-              <span className="text-[10px] text-emerald-800 font-medium">Ready for allocation</span>
+              <span className="text-[10px] text-emerald-800 font-medium">Dealer 75% Share</span>
             </div>
 
             <div className="bg-[#F9FAFB] p-3 rounded-lg border border-[#E5E7EB]">
-              <span className="text-[10px] uppercase font-mono text-[#6B7280] block">Pending Approval</span>
-              <div className="text-lg font-bold font-mono text-amber-700 mt-0.5">
+              <span className="text-[10px] uppercase font-mono text-[#6B7280] block">
+                {(currentDealer.pendingPlumberRewards || 0) > 0 ? 'Plumber Escrow (Held)' : 'Plumber Network'}
+              </span>
+              <div className={`text-lg font-bold font-mono mt-0.5 ${(currentDealer.pendingPlumberRewards || 0) > 0 ? 'text-amber-800' : 'text-[#111827]'}`}>
+                {(currentDealer.pendingPlumberRewards || 0) > 0
+                  ? `₹${(currentDealer.pendingPlumberRewards || 0).toLocaleString('en-IN')}`
+                  : `${currentDealer.plumbersCount || 0} Plumbers`}
+              </div>
+              <span className={`text-[10px] font-medium ${(currentDealer.pendingPlumberRewards || 0) > 0 ? 'text-amber-700' : 'text-blue-700'}`}>
+                {(currentDealer.pendingPlumberRewards || 0) > 0 ? 'Pending plumber onboarding' : 'Active network'}
+              </span>
+            </div>
+
+            <div className="bg-[#F9FAFB] p-3 rounded-lg border border-[#E5E7EB]">
+              <span className="text-[10px] uppercase font-mono text-[#6B7280] block">Active Orders</span>
+              <div className="text-lg font-bold font-mono text-blue-700 mt-0.5">
                 {awaitingConfirmationCount}
               </div>
-              <span className="text-[10px] text-amber-800">Awaiting central review</span>
-            </div>
-
-            <div className="bg-[#F9FAFB] p-3 rounded-lg border border-[#E5E7EB]">
-              <span className="text-[10px] uppercase font-mono text-[#6B7280] block">Credit Limit</span>
-              <div className="text-lg font-bold font-mono text-[#111827] mt-0.5">
-                ₹{currentDealer.creditLimit.toLocaleString('en-IN')}
-              </div>
-              <span className="text-[10px] text-[#6B7280]">
-                Bal: ₹{currentDealer.outstandingBalance.toLocaleString('en-IN')}
-              </span>
+              <span className="text-[10px] text-blue-800">Orders in pipeline</span>
             </div>
           </div>
         </div>
@@ -131,7 +162,7 @@ export default function DealerHomePage() {
             <div>
               <div className="text-sm font-bold text-[#111827]">FILTEC Product Catalogue</div>
               <p className="text-xs text-[#6B7280] mt-0.5">
-                Official specifications, size variants, and wholesale price list
+                Official specifications, size variants, and packaging directory
               </p>
             </div>
           </div>
@@ -161,7 +192,7 @@ export default function DealerHomePage() {
               <h3 className="text-sm font-bold text-[#111827] uppercase font-mono tracking-tight">
                 Current Orders
               </h3>
-              <p className="text-xs text-[#6B7280]">Real-time status updates and delivery invoices</p>
+              <p className="text-xs text-[#6B7280]">Real-time status updates and order requisitions</p>
             </div>
             <Link
               href="/dealer/orders"
@@ -193,10 +224,10 @@ export default function DealerHomePage() {
 
                   <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-center border-t sm:border-t-0 pt-2 sm:pt-0 border-neutral-100">
                     <div className="font-mono font-bold text-sm text-[#111827]">
-                      ₹{order.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      {order.items.reduce((s, i) => s + (i.quantity || 0), 0)} Units Booked
                     </div>
-                    <span className="text-[10px] text-emerald-700 font-mono">
-                      +₹{order.rewardDealerShare.toFixed(2)} Dealer Reward
+                    <span className="text-[10px] text-emerald-700 font-medium">
+                      WhatsApp Requisition
                     </span>
                   </div>
                 </div>

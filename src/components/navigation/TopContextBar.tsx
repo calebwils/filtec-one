@@ -15,6 +15,7 @@ import {
   Users,
   Building2,
   Shield,
+  Search,
   X
 } from 'lucide-react';
 import { useRouter, usePathname } from 'next/navigation';
@@ -26,16 +27,19 @@ export function TopContextBar({ title, subtitle }: { title?: string; subtitle?: 
 
   const [isEmployeeModalOpen, setIsEmployeeModalOpen] = useState(false);
   const [isDealerModalOpen, setIsDealerModalOpen] = useState(false);
+  const [dealerSearch, setDealerSearch] = useState('');
 
-  const pendingApprovalsCount = orders.filter((o) => o.status === 'PENDING_ADMIN_APPROVAL').length;
+  const pendingApprovalsCount = orders.filter((o) => o.status === 'SUBMITTED' || o.status === 'PENDING_ADMIN_APPROVAL').length;
   const allowedAdminPages = (currentUser.allowedPages || []).filter((p) => p.startsWith('/admin'));
 
   const handleAdminSwitch = () => {
+    store.syncWithDatabase(true);
     store.switchUser('ADMIN');
     router.push('/admin');
   };
 
   const handleSwitchToEmployee = (emp: Employee) => {
+    store.syncWithDatabase(true);
     const role: Role = (emp.systemRole as Role) || 'EMPLOYEE';
     store.setUser({
       id: `user-${emp.id}`,
@@ -45,7 +49,7 @@ export function TopContextBar({ title, subtitle }: { title?: string; subtitle?: 
       role,
       employeeCode: emp.code,
       allowedPages: emp.allowedPages || (role === 'ADMIN'
-        ? ['/admin', '/admin/orders', '/admin/attendance', '/admin/catalogue', '/admin/dealers', '/admin/employees', '/admin/rewards', '/admin/integrations', '/admin/audit', '/admin/settings']
+        ? ['/admin', '/admin/orders', '/admin/attendance', '/admin/catalogue', '/admin/dealers', '/admin/employees', '/admin/rewards', '/admin/settings']
         : ['/employee', '/employee/dealers', '/employee/catalogue', '/employee/orders', '/employee/attendance'])
     });
     setIsEmployeeModalOpen(false);
@@ -57,6 +61,7 @@ export function TopContextBar({ title, subtitle }: { title?: string; subtitle?: 
   };
 
   const handleSwitchToDealer = (dlr: Dealer) => {
+    store.syncWithDatabase(true);
     store.setUser({
       id: `user-${dlr.id}`,
       name: dlr.name,
@@ -303,23 +308,47 @@ export function TopContextBar({ title, subtitle }: { title?: string; subtitle?: 
               </button>
             </div>
 
+            <div className="p-3 border-b border-neutral-200 bg-neutral-50/50">
+              <div className="relative">
+                <Search className="w-3.5 h-3.5 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={dealerSearch}
+                  onChange={(e) => setDealerSearch(e.target.value)}
+                  placeholder="Search dealer by name, city, or phone..."
+                  className="w-full pl-8 pr-3 py-2 text-xs rounded-lg border border-neutral-200 bg-white focus:outline-none focus:ring-1 focus:ring-[#DC2626]"
+                />
+              </div>
+            </div>
+
             <div className="p-4 max-h-96 overflow-y-auto space-y-2">
-              {dealers.map((dlr) => (
-                <button
-                  key={dlr.id}
-                  type="button"
-                  onClick={() => handleSwitchToDealer(dlr)}
-                  className="w-full text-left p-3 rounded-xl border border-neutral-200 hover:border-[#DC2626] hover:bg-neutral-50 transition-all flex items-center justify-between text-xs group"
-                >
-                  <div>
-                    <span className="font-bold text-neutral-900 block">{dlr.name}</span>
-                    <span className="text-[11px] font-mono text-neutral-600">
-                      {dlr.phone} • {dlr.city} ({dlr.tier} Partner)
-                    </span>
-                  </div>
-                  <ChevronRight className="w-4 h-4 text-neutral-400 group-hover:text-[#DC2626]" />
-                </button>
-              ))}
+              {dealers
+                .filter(
+                  (dlr) =>
+                    dlr.name.toLowerCase().includes(dealerSearch.toLowerCase()) ||
+                    dlr.city.toLowerCase().includes(dealerSearch.toLowerCase()) ||
+                    dlr.phone.includes(dealerSearch) ||
+                    dlr.code.toLowerCase().includes(dealerSearch.toLowerCase())
+                )
+                .map((dlr) => (
+                  <button
+                    key={dlr.id}
+                    type="button"
+                    onClick={() => {
+                      handleSwitchToDealer(dlr);
+                      setDealerSearch('');
+                    }}
+                    className="w-full text-left p-3 rounded-xl border border-neutral-200 hover:border-[#DC2626] hover:bg-neutral-50 transition-all flex items-center justify-between text-xs group"
+                  >
+                    <div>
+                      <span className="font-bold text-neutral-900 block">{dlr.name}</span>
+                      <span className="text-[11px] font-mono text-neutral-600">
+                        {dlr.code} • {dlr.city} • 📞 {dlr.phone}
+                      </span>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-neutral-400 group-hover:text-[#DC2626]" />
+                  </button>
+                ))}
             </div>
           </div>
         </div>

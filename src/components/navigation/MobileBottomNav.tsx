@@ -26,7 +26,7 @@ export function MobileBottomNav() {
   const pathname = usePathname();
   const { currentUser, orders, cart } = useAppStore();
 
-  const pendingApprovalsCount = orders.filter((o) => o.status === 'PENDING_ADMIN_APPROVAL').length;
+  const pendingApprovalsCount = orders.filter((o) => o.status === 'SUBMITTED' || o.status === 'PENDING_ADMIN_APPROVAL').length;
   const cartItemsCount = cart.items.length;
 
   const isPageAllowed = (path: string) => {

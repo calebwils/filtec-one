@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { Product, ProductVariant } from '@/types';
-import { store } from '@/data/store';
+import { store, useAppStore } from '@/data/store';
 import { Plus, Check, Info, Package, Shield, Maximize2 } from 'lucide-react';
 import { ProductImageModal } from './ProductImageModal';
 import { formatProductCode } from '@/lib/catalogueUtils';
@@ -14,6 +14,9 @@ export function ProductCard({
   product: Product;
   onOpenDetails?: (product: Product) => void;
 }) {
+  const { currentUser } = useAppStore();
+  const isAdmin = currentUser?.role === 'ADMIN';
+
   const [selectedVariantId, setSelectedVariantId] = useState<string>(
     product.variants[0]?.id || ''
   );
@@ -181,17 +184,23 @@ export function ProductCard({
                         <span>{variant.length || variant.size}</span>
                         {varOutOfStock ? (
                           <span className="text-[9px] font-mono text-rose-600 font-bold uppercase">Out</span>
-                        ) : (
+                        ) : isAdmin ? (
                           <span className="text-[11px] font-mono font-bold text-[#DC2626]">
                             ₹{variant.mrp.toFixed(2)}
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-mono text-neutral-600">
+                            {variant.packingQty} {variant.packingUnit}
                           </span>
                         )}
                       </div>
                       <div className="text-[10px] text-[#6B7280] font-mono flex items-center justify-between mt-0.5">
                         <span>Pack: {variant.packingQty} {variant.packingUnit}</span>
-                        <span className="text-neutral-500">
-                          ₹{(variant.mrp * variant.packingQty).toLocaleString('en-IN', { maximumFractionDigits: 0 })}/lot
-                        </span>
+                        {isAdmin && (
+                          <span className="text-neutral-500">
+                            ₹{(variant.mrp * variant.packingQty).toLocaleString('en-IN', { maximumFractionDigits: 0 })}/lot
+                          </span>
+                        )}
                       </div>
                     </button>
                   );
@@ -201,20 +210,35 @@ export function ProductCard({
           )}
         </div>
 
-        {/* Bottom Actions: Pricing, Packing & Quick Add */}
+        {/* Bottom Actions: Pricing / Packing & Quick Add */}
         <div className="mt-4 pt-3 border-t border-[#F3F4F6] flex items-center justify-between">
           <div>
-            <div className="flex items-baseline gap-1.5">
-              <span className="text-base font-bold text-[#111827] font-mono">
-                ₹{selectedVariant?.mrp?.toFixed(2)}
-              </span>
-              <span className="text-[10px] text-[#6B7280]">
-                / {selectedVariant?.packingUnit || 'pc'}
-              </span>
-            </div>
-            <div className="text-[11px] text-[#6B7280] font-mono mt-0.5">
-              {totalQuantity} {selectedVariant?.packingUnit || 'Pcs'} = <strong className="text-[#111827]">₹{totalPrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong>
-            </div>
+            {isAdmin ? (
+              <>
+                <div className="flex items-baseline gap-1.5">
+                  <span className="text-base font-bold text-[#111827] font-mono">
+                    ₹{selectedVariant?.mrp?.toFixed(2)}
+                  </span>
+                  <span className="text-[10px] text-[#6B7280]">
+                    / {selectedVariant?.packingUnit || 'pc'}
+                  </span>
+                </div>
+                <div className="text-[11px] text-[#6B7280] font-mono mt-0.5">
+                  {totalQuantity} {selectedVariant?.packingUnit || 'Pcs'} = <strong className="text-[#111827]">₹{totalPrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="flex items-baseline gap-1.5">
+                  <span className="text-xs font-bold text-[#111827] font-mono">
+                    {selectedVariant?.packingQty} {selectedVariant?.packingUnit || 'Pcs'} / box
+                  </span>
+                </div>
+                <div className="text-[11px] text-[#6B7280] font-mono mt-0.5">
+                  Order: <strong className="text-[#111827]">{totalQuantity} {selectedVariant?.packingUnit || 'Pcs'}</strong>
+                </div>
+              </>
+            )}
           </div>
 
           <div className="flex items-center gap-1.5">

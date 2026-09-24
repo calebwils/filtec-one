@@ -16,17 +16,17 @@ import {
   Building2,
   FileText,
   Activity,
-  ScrollText,
   UserCheck,
   Settings,
   Shield,
-  ArrowLeft
+  ArrowLeft,
+  BarChart3
 } from 'lucide-react';
 
 export function DesktopSubNav() {
   const pathname = usePathname();
   const { currentUser, orders, cart } = useAppStore();
-  const pendingApprovalsCount = orders.filter((o) => o.status === 'PENDING_ADMIN_APPROVAL').length;
+  const pendingApprovalsCount = orders.filter((o) => o.status === 'SUBMITTED' || o.status === 'PENDING_ADMIN_APPROVAL').length;
 
   const isPageAllowed = (path: string) => {
     if (!currentUser.allowedPages || currentUser.allowedPages.length === 0) {
@@ -37,19 +37,18 @@ export function DesktopSubNav() {
 
   const adminNavItems = [
     { path: '/admin', label: 'Control Center', icon: Activity },
+    { path: '/dashboard', label: '⚡ Executive Cockpit', icon: BarChart3 },
     {
       path: '/admin/orders',
-      label: 'Order Approvals',
+      label: 'Orders',
       icon: FileCheck,
       count: pendingApprovalsCount
     },
-    { path: '/admin/attendance', label: 'Attendance & GPS', icon: Radio },
+    { path: '/admin/attendance', label: 'Attendance & Tracking', icon: Radio },
     { path: '/admin/catalogue', label: 'Catalogue & Stock', icon: BookOpen },
     { path: '/admin/dealers', label: 'Dealers', icon: Building2 },
     { path: '/admin/employees', label: 'Staff', icon: Users },
     { path: '/admin/rewards', label: 'Rewards', icon: Award },
-    { path: '/admin/integrations', label: 'ERP / Integrations', icon: Radio },
-    { path: '/admin/audit', label: 'Audit Logs', icon: ScrollText },
     { path: '/admin/settings', label: 'Settings', icon: Settings }
   ];
 
@@ -96,7 +95,7 @@ export function DesktopSubNav() {
                     <Icon className="w-3.5 h-3.5" />
                     <span>{item.label}</span>
                     {item.count && item.count > 0 ? (
-                      <span className="bg-[#DC2626] text-white text-[10px] px-1.5 py-0.2 rounded-full font-mono font-semibold">
+                      <span className="bg-neutral-800 text-white text-[10px] px-1.5 py-0.2 rounded-full font-mono font-semibold">
                         {item.count}
                       </span>
                     ) : null}
@@ -171,7 +170,7 @@ export function DesktopSubNav() {
                   }`}
                 >
                   <Radio className="w-3.5 h-3.5" />
-                  GPS Attendance
+                  Attendance
                 </Link>
               )}
 
@@ -296,7 +295,7 @@ export function DesktopSubNav() {
                     <Icon className="w-3.5 h-3.5" />
                     <span>{item.label}</span>
                     {item.count && item.count > 0 ? (
-                      <span className="bg-[#DC2626] text-white text-[10px] px-1.5 py-0.2 rounded-full font-mono font-semibold">
+                      <span className="bg-neutral-800 text-white text-[10px] px-1.5 py-0.2 rounded-full font-mono font-semibold">
                         {item.count}
                       </span>
                     ) : null}

@@ -34,7 +34,6 @@ export default function AdminCataloguePage() {
   const { products } = useAppStore();
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('ALL');
-  const [stockFilter, setStockFilter] = useState<'ALL' | 'IN_STOCK' | 'OUT_OF_STOCK'>('ALL');
   const [expandedProductId, setExpandedProductId] = useState<string | null>(null);
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -45,22 +44,15 @@ export default function AdminCataloguePage() {
   // Active unarchived products
   const activeProducts = products.filter((p) => !p.isArchived);
 
-  const inStockCount = activeProducts.filter((p) => p.inStock !== false).length;
-  const outOfStockCount = activeProducts.filter((p) => p.inStock === false).length;
-
   const filteredProducts = useMemo(() => {
     const matched = activeProducts.filter((p) => {
       const matchesSearch = matchesProductSearch(p, search);
       const matchesCategory = categoryFilter === 'ALL' || p.category === categoryFilter;
-      const matchesStock =
-        stockFilter === 'ALL' ||
-        (stockFilter === 'IN_STOCK' && p.inStock !== false) ||
-        (stockFilter === 'OUT_OF_STOCK' && p.inStock === false);
 
-      return matchesSearch && matchesCategory && matchesStock;
+      return matchesSearch && matchesCategory;
     });
     return sortProductsNaturally(matched);
-  }, [activeProducts, search, categoryFilter, stockFilter]);
+  }, [activeProducts, search, categoryFilter]);
 
   const handleToggleStock = (p: Product) => {
     const nextState = !(p.inStock !== false);
@@ -86,7 +78,7 @@ export default function AdminCataloguePage() {
 
   return (
     <div className="min-h-screen bg-[#F8F9FA] pb-mobile-nav">
-      <TopContextBar title="Catalogue Management" subtitle="Stock Availability & Products Master" />
+      <TopContextBar title="Catalogue Management" subtitle="Products Master" />
       <DesktopSubNav />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-5 space-y-5">
@@ -134,40 +126,11 @@ export default function AdminCataloguePage() {
           </div>
         </div>
 
-        {/* Metrics Row */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <div className="bg-white p-3.5 rounded-xl border border-[#E5E7EB] shadow-2xs">
-            <span className="text-[10px] uppercase font-mono text-[#6B7280] block">Catalogue SKUs</span>
-            <div className="text-xl font-bold font-mono text-[#111827] mt-0.5">{activeProducts.length}</div>
-            <span className="text-[10px] text-[#6B7280]">F1 to F99 active items</span>
-          </div>
-
-          <div className="bg-white p-3.5 rounded-xl border border-[#E5E7EB] shadow-2xs">
-            <span className="text-[10px] uppercase font-mono text-emerald-700 block">Available in Stock</span>
-            <div className="text-xl font-bold font-mono text-emerald-700 mt-0.5">{inStockCount}</div>
-            <span className="text-[10px] text-emerald-600">Available for live booking</span>
-          </div>
-
-          <div className="bg-white p-3.5 rounded-xl border border-[#E5E7EB] shadow-2xs">
-            <span className="text-[10px] uppercase font-mono text-rose-700 block">Out of Stock</span>
-            <div className="text-xl font-bold font-mono text-[#DC2626] mt-0.5">{outOfStockCount}</div>
-            <span className="text-[10px] text-[#DC2626]">Disabled in order builder</span>
-          </div>
-
-          <div className="bg-white p-3.5 rounded-xl border border-[#E5E7EB] shadow-2xs">
-            <span className="text-[10px] uppercase font-mono text-[#6B7280] block">Factory Fulfillment</span>
-            <div className="text-xl font-bold font-mono text-[#111827] mt-0.5">
-              {Math.round((inStockCount / (activeProducts.length || 1)) * 100)}%
-            </div>
-            <span className="text-[10px] text-emerald-700 font-medium">Ready for dispatch</span>
-          </div>
-        </div>
-
         {/* Filter Bar */}
         <div className="bg-white border border-[#E5E7EB] rounded-xl p-3.5 shadow-2xs space-y-3">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             {/* Search Input */}
-            <div className="relative flex-1 max-w-md">
+            <div className="relative w-full max-w-md">
               <Search className="w-4 h-4 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
@@ -176,44 +139,6 @@ export default function AdminCataloguePage() {
                 placeholder="Search by code (F-1..F-99), size (25mm), material..."
                 className="w-full pl-9 pr-3 py-2 text-xs rounded-lg border border-[#E5E7EB] focus:outline-none focus:ring-1 focus:ring-[#DC2626]"
               />
-            </div>
-
-            {/* Stock Toggle Filters */}
-            <div className="flex items-center gap-1.5 text-xs">
-              <span className="text-neutral-500 text-[11px] mr-1">Stock Status:</span>
-              <button
-                type="button"
-                onClick={() => setStockFilter('ALL')}
-                className={`px-2.5 py-1 rounded-md font-medium text-xs transition-colors ${
-                  stockFilter === 'ALL'
-                    ? 'bg-[#111827] text-white'
-                    : 'bg-neutral-100 hover:bg-neutral-200 text-[#4B5563]'
-                }`}
-              >
-                All ({activeProducts.length})
-              </button>
-              <button
-                type="button"
-                onClick={() => setStockFilter('IN_STOCK')}
-                className={`px-2.5 py-1 rounded-md font-medium text-xs transition-colors ${
-                  stockFilter === 'IN_STOCK'
-                    ? 'bg-emerald-700 text-white'
-                    : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800'
-                }`}
-              >
-                In Stock ({inStockCount})
-              </button>
-              <button
-                type="button"
-                onClick={() => setStockFilter('OUT_OF_STOCK')}
-                className={`px-2.5 py-1 rounded-md font-medium text-xs transition-colors ${
-                  stockFilter === 'OUT_OF_STOCK'
-                    ? 'bg-[#DC2626] text-white'
-                    : 'bg-rose-50 hover:bg-rose-100 text-rose-800'
-                }`}
-              >
-                Out of Stock ({outOfStockCount})
-              </button>
             </div>
           </div>
 
@@ -247,8 +172,7 @@ export default function AdminCataloguePage() {
                   <th className="py-3 px-4">Product Name & Standard</th>
                   <th className="py-3 px-4">Category / Material</th>
                   <th className="py-3 px-4">Variants / Packaging</th>
-                  <th className="py-3 px-4">Stock Availability</th>
-                  <th className="py-3 px-4 text-right">Actions</th>
+
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#F3F4F6]">
@@ -328,56 +252,6 @@ export default function AdminCataloguePage() {
                           </button>
                         </td>
 
-                        {/* 1-Click Stock Toggle */}
-                        <td className="py-3.5 px-4">
-                          <div className="flex items-center gap-2">
-                            <button
-                              type="button"
-                              onClick={() => handleToggleStock(p)}
-                              title="Click to toggle stock status"
-                              className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                                isAvailable ? 'bg-emerald-600' : 'bg-neutral-300'
-                              }`}
-                            >
-                              <span
-                                className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                                  isAvailable ? 'translate-x-4' : 'translate-x-0'
-                                }`}
-                              />
-                            </button>
-                            <span
-                              className={`text-[10px] font-mono font-bold uppercase px-2 py-0.5 rounded border ${
-                                isAvailable
-                                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                                  : 'bg-rose-50 text-rose-700 border-rose-200'
-                              }`}
-                            >
-                              {isAvailable ? 'In Stock' : 'Out of Stock'}
-                            </span>
-                          </div>
-                        </td>
-
-                        {/* Actions */}
-                        <td className="py-3.5 px-4 text-right">
-                          <div className="flex items-center justify-end gap-1.5">
-                            <button
-                              type="button"
-                              onClick={() => setEditingProduct(p)}
-                              title="Edit product details & pricing"
-                              className="p-1.5 text-neutral-500 hover:text-[#111827] hover:bg-neutral-100 rounded-md transition-colors"
-                            >
-                              <Edit2 className="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteProduct(p)}
-                              title="Delete or archive SKU"
-                              className="p-1.5 text-neutral-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition-colors"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </td>
                       </tr>
 
                       {/* Expanded Variant Sub-Row */}

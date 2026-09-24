@@ -3,27 +3,76 @@
 import React, { useState } from 'react';
 import { Order } from '@/types';
 import { OrderStatusBadge } from './OrderStatusBadge';
-import { ProformaInvoiceModal } from './ProformaInvoiceModal';
 import { store } from '@/data/store';
-import { CheckCircle2, XCircle, Clock, Building2, User, Phone, MapPin, X, ArrowRight, ShieldCheck, Receipt } from 'lucide-react';
+import {
+  CheckCircle2,
+  XCircle,
+  Clock,
+  Building2,
+  User,
+  Phone,
+  MapPin,
+  X,
+  ArrowRight,
+  ShieldCheck,
+  MessageSquare,
+  Copy,
+  Check,
+  ExternalLink
+} from 'lucide-react';
 import confetti from 'canvas-confetti';
 
 export function OrderApprovalModal({
   order,
   isOpen,
-  onClose
+  onClose,
+  onOpenRelease
 }: {
   order: Order | null;
   isOpen: boolean;
   onClose: () => void;
+  onOpenRelease?: (order: Order) => void;
 }) {
   const [adminNotes, setAdminNotes] = useState('');
   const [rejectionReason, setRejectionReason] = useState('');
   const [isRejecting, setIsRejecting] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [showProforma, setShowProforma] = useState(false);
+  const [copiedWhatsApp, setCopiedWhatsApp] = useState(false);
 
   if (!isOpen || !order) return null;
+
+  const getWhatsAppMessageText = () => {
+    if (!order) return '';
+    const itemsList = (order.items || [])
+      .map(
+        (item, idx) =>
+          `${idx + 1}. *${item.productName}* (${item.productCode})\n   • Spec: ${item.variantDescription}\n   • Quantity: *${item.quantity} ${item.packingUnit || 'Pcs'}*`
+      )
+      .join('\n\n');
+
+    return (
+      `*FILTEC ONE — ORDER REQUISITION*\n` +
+      `━━━━━━━━━━━━━━━━━━━━\n` +
+      `📋 *Order No:* ${order.orderNumber}\n` +
+      `🏢 *Dealer:* ${order.dealerName}\n` +
+      `📍 *Location:* ${order.dealerCity}\n` +
+      `📞 *Phone:* ${order.dealerPhone}\n` +
+      `👤 *Field Staff:* ${order.employeeName}\n` +
+      `📅 *Date:* ${new Date(order.createdAt).toLocaleDateString('en-IN')}\n\n` +
+      `📦 *ORDERED PRODUCTS & QUANTITIES:*\n` +
+      `${itemsList}\n\n` +
+      (order.notes ? `📝 *Dispatch Notes:* ${order.notes}\n\n` : '') +
+      `━━━━━━━━━━━━━━━━━━━━\n` +
+      `*FILTEC Polyplast Pvt. Ltd.* — Order Requisition`
+    );
+  };
+
+  const handleCopyWhatsApp = () => {
+    const text = getWhatsAppMessageText();
+    navigator.clipboard.writeText(text);
+    setCopiedWhatsApp(true);
+    setTimeout(() => setCopiedWhatsApp(false), 2000);
+  };
 
   const handleApprove = () => {
     setIsProcessing(true);
@@ -170,10 +219,10 @@ export function OrderApprovalModal({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
             <div className="bg-[#F8F9FA] p-3 rounded-lg border border-[#E5E7EB] text-xs space-y-1.5">
               <div className="text-[11px] font-mono uppercase font-semibold text-[#4B5563]">
-                Commercial Incentive (1% Rule)
+                Commercial Incentive (1% of Total Order Value)
               </div>
               <div className="flex justify-between text-[#4B5563]">
-                <span>Total Generated Reward:</span>
+                <span>Total Reward (1%):</span>
                 <span className="font-mono font-bold text-[#111827]">₹{order.rewardEstimated.toFixed(2)}</span>
               </div>
               <div className="flex justify-between text-[#6B7280] text-[11px]">
@@ -181,7 +230,7 @@ export function OrderApprovalModal({
                 <span className="font-mono font-semibold text-emerald-700">₹{order.rewardDealerShare.toFixed(2)}</span>
               </div>
               <div className="flex justify-between text-[#6B7280] text-[11px]">
-                <span>Plumber Pool (25%):</span>
+                <span>Plumber Share (25%):</span>
                 <span className="font-mono font-semibold text-blue-700">₹{order.rewardPlumberShare.toFixed(2)}</span>
               </div>
             </div>
@@ -218,7 +267,7 @@ export function OrderApprovalModal({
                 value={rejectionReason}
                 onChange={(e) => setRejectionReason(e.target.value)}
                 rows={2}
-                placeholder="e.g. Insufficient dealer credit limit, MOQ not met, or size unavailable..."
+                placeholder="e.g. MOQ not met, size unavailable, or commercial hold..."
                 className="w-full text-xs p-2 rounded border border-rose-300 focus:outline-none focus:ring-1 focus:ring-rose-500 bg-white"
               />
             </div>
@@ -230,74 +279,56 @@ export function OrderApprovalModal({
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() => setShowProforma(true)}
-              className="px-3 py-2 rounded-lg text-xs font-semibold bg-white hover:bg-neutral-50 text-[#111827] border border-[#D1D5DB] flex items-center gap-1.5 transition-all shadow-xs"
+              onClick={handleCopyWhatsApp}
+              className="px-3 py-2 rounded-lg text-xs font-semibold bg-white hover:bg-neutral-50 text-[#111827] border border-[#D1D5DB] flex items-center gap-1.5 transition-all shadow-xs cursor-pointer"
             >
-              <Receipt className="w-4 h-4 text-[#DC2626]" />
-              <span>View Proforma</span>
-            </button>
-            <span className="hidden sm:inline text-[11px] text-[#6B7280]">
-              Official B2B Commercial Proforma
-            </span>
-          </div>
-
-          {order.status === 'PENDING_ADMIN_APPROVAL' ? (
-            <div className="flex items-center gap-2">
-              {!isRejecting ? (
+              {copiedWhatsApp ? (
                 <>
-                  <button
-                    type="button"
-                    onClick={() => setIsRejecting(true)}
-                    className="px-3 py-2 rounded-lg text-xs font-medium text-rose-700 hover:bg-rose-50 border border-rose-200 transition-colors"
-                  >
-                    Reject Order
-                  </button>
-                  <button
-                    type="button"
-                    disabled={isProcessing}
-                    onClick={handleApprove}
-                    className="px-4 py-2 rounded-lg text-xs font-semibold bg-[#DC2626] hover:bg-[#B91C1C] text-white flex items-center gap-1.5 transition-all shadow-xs disabled:opacity-50"
-                  >
-                    <CheckCircle2 className="w-4 h-4" />
-                    <span>Approve & Dispatch to ERP</span>
-                  </button>
+                  <Check className="w-4 h-4 text-emerald-600" />
+                  <span className="text-emerald-700">Copied WhatsApp!</span>
                 </>
               ) : (
                 <>
-                  <button
-                    type="button"
-                    onClick={() => setIsRejecting(false)}
-                    className="px-3 py-2 rounded-lg text-xs font-medium text-neutral-600 hover:bg-neutral-100"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    disabled={!rejectionReason.trim() || isProcessing}
-                    onClick={handleReject}
-                    className="px-4 py-2 rounded-lg text-xs font-semibold bg-rose-600 hover:bg-rose-700 text-white flex items-center gap-1.5 transition-all disabled:opacity-50"
-                  >
-                    <XCircle className="w-4 h-4" />
-                    <span>Confirm Rejection</span>
-                  </button>
+                  <Copy className="w-4 h-4 text-neutral-500" />
+                  <span>Copy WhatsApp Order</span>
                 </>
               )}
-            </div>
+            </button>
+            <a
+              href={`https://wa.me/${order.dealerPhone?.replace(/\D/g, '').length === 10 ? `91${order.dealerPhone?.replace(/\D/g, '')}` : order.dealerPhone?.replace(/\D/g, '')}?text=${encodeURIComponent(getWhatsAppMessageText())}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-3 py-2 rounded-lg text-xs font-semibold bg-white hover:bg-neutral-50 text-[#111827] border border-[#D1D5DB] flex items-center gap-1.5 transition-all"
+            >
+              <MessageSquare className="w-4 h-4 text-neutral-600" />
+              <span>Dealer WhatsApp</span>
+            </a>
+          </div>
+
+          {order.status === 'PENDING_ADMIN_APPROVAL' || order.status === 'SUBMITTED' ? (
+            <button
+              type="button"
+              onClick={() => {
+                if (onOpenRelease) {
+                  onOpenRelease(order);
+                } else {
+                  store.releaseOrder(order.id);
+                  onClose();
+                }
+              }}
+              className="px-3.5 py-2 rounded-lg text-xs font-semibold bg-[#111827] hover:bg-black text-white flex items-center gap-1.5 transition-all shadow-xs cursor-pointer"
+            >
+              <CheckCircle2 className="w-4 h-4 text-neutral-300" />
+              <span>Release Order</span>
+            </button>
           ) : (
-            <div className="text-xs font-mono font-medium text-emerald-700 flex items-center gap-1">
-              <ShieldCheck className="w-4 h-4" />
-              <span>Processed {order.invoiceNumber ? `(${order.invoiceNumber})` : ''}</span>
+            <div className="text-xs font-mono font-medium text-neutral-700 flex items-center gap-1">
+              <CheckCircle2 className="w-4 h-4 text-neutral-500" />
+              <span>Completed</span>
             </div>
           )}
         </div>
       </div>
-
-      {/* Commercial Proforma Invoice Modal */}
-      <ProformaInvoiceModal
-        order={order}
-        isOpen={showProforma}
-        onClose={() => setShowProforma(false)}
-      />
     </div>
   );
 }

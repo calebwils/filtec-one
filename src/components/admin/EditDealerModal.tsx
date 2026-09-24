@@ -6,14 +6,13 @@ import {
   Building2,
   Phone,
   MapPin,
-  CreditCard,
   Award,
   CheckCircle2,
   ShieldCheck,
   MessageSquare,
-  AlertTriangle
+  UserCheck
 } from 'lucide-react';
-import { store } from '@/data/store';
+import { store, useAppStore } from '@/data/store';
 import { Dealer } from '@/types';
 
 export function EditDealerModal({
@@ -27,16 +26,19 @@ export function EditDealerModal({
   onClose: () => void;
   onSuccess?: (updated: Dealer) => void;
 }) {
+  const { employees, currentUser } = useAppStore();
   const [formData, setFormData] = useState({
     name: '',
     ownerName: '',
     phone: '',
+    email: '',
     city: '',
     state: 'Odisha',
     address: '',
-    creditLimit: 500000,
-    outstandingBalance: 0,
-    tier: 'Gold' as 'Platinum' | 'Gold' | 'Silver'
+    pincode: '',
+    gstin: '',
+    tier: 'Gold' as 'Platinum' | 'Gold' | 'Silver',
+    assignedRepId: ''
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -48,12 +50,14 @@ export function EditDealerModal({
         name: dealer.name || '',
         ownerName: dealer.ownerName || '',
         phone: dealer.phone || '',
+        email: dealer.email || '',
         city: dealer.city || '',
         state: dealer.state || 'Odisha',
         address: dealer.address || '',
-        creditLimit: dealer.creditLimit || 300000,
-        outstandingBalance: dealer.outstandingBalance || 0,
-        tier: dealer.tier || 'Silver'
+        pincode: dealer.pincode || '',
+        gstin: dealer.gstin || '',
+        tier: dealer.tier || 'Silver',
+        assignedRepId: dealer.assignedRepId || ''
       });
       setSuccessMessage('');
     }
@@ -62,11 +66,6 @@ export function EditDealerModal({
   if (!isOpen || !dealer) return null;
 
   const cleanPhone = formData.phone.replace(/[^0-9]/g, '');
-
-  const utilizationPercent =
-    formData.creditLimit > 0
-      ? Math.min(100, Math.round((formData.outstandingBalance / formData.creditLimit) * 100))
-      : 0;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -79,12 +78,16 @@ export function EditDealerModal({
         name: formData.name.trim(),
         ownerName: formData.ownerName.trim(),
         phone: formData.phone.trim(),
+        email: formData.email.trim(),
         city: formData.city.trim(),
         state: formData.state.trim(),
         address: formData.address.trim(),
-        creditLimit: Number(formData.creditLimit) || 300000,
-        outstandingBalance: Number(formData.outstandingBalance) || 0,
-        tier: formData.tier
+        pincode: formData.pincode.trim(),
+        gstin: formData.gstin.trim().toUpperCase(),
+        creditLimit: 0,
+        outstandingBalance: 0,
+        tier: formData.tier,
+        assignedRepId: currentUser.role === 'ADMIN' ? (formData.assignedRepId || undefined) : dealer.assignedRepId
       });
 
       setIsSubmitting(false);
@@ -116,7 +119,7 @@ export function EditDealerModal({
                 </span>
               </div>
               <p className="text-xs text-[#6B7280]">
-                Commercial credit terms, location & primary authorized contacts
+                Commercial account master, location & primary authorized contacts
               </p>
             </div>
           </div>
@@ -202,6 +205,35 @@ export function EditDealerModal({
               </div>
             </div>
 
+            {/* GSTIN / Tax ID */}
+            <div>
+              <label className="block text-xs font-semibold text-[#374151] mb-1 flex items-center justify-between">
+                <span>GSTIN / Tax Identification</span>
+                <span className="text-[10px] text-[#DC2626] font-mono">Official Tax Record</span>
+              </label>
+              <input
+                type="text"
+                value={formData.gstin}
+                onChange={(e) => setFormData({ ...formData, gstin: e.target.value.toUpperCase() })}
+                placeholder="e.g. 21AMMPB6918J1Z3"
+                className="w-full px-3 py-2 text-xs rounded-lg border border-[#E5E7EB] bg-white focus:outline-none focus:ring-1 focus:ring-[#DC2626] font-mono uppercase"
+              />
+            </div>
+
+            {/* Business Email */}
+            <div>
+              <label className="block text-xs font-semibold text-[#374151] mb-1">
+                Official Business Email
+              </label>
+              <input
+                type="email"
+                value={formData.email}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                placeholder="e.g. accounts@dealer.com"
+                className="w-full px-3 py-2 text-xs rounded-lg border border-[#E5E7EB] bg-white focus:outline-none focus:ring-1 focus:ring-[#DC2626]"
+              />
+            </div>
+
             {/* City */}
             <div>
               <label className="block text-xs font-semibold text-[#374151] mb-1">
@@ -220,23 +252,39 @@ export function EditDealerModal({
               </div>
             </div>
 
-            {/* State */}
-            <div>
-              <label className="block text-xs font-semibold text-[#374151] mb-1">
-                State / Region
-              </label>
-              <select
-                value={formData.state}
-                onChange={(e) => setFormData({ ...formData, state: e.target.value })}
-                className="w-full px-3 py-2 text-xs rounded-lg border border-[#E5E7EB] bg-white focus:outline-none focus:ring-1 focus:ring-[#DC2626]"
-              >
-                <option value="Odisha">Odisha</option>
-                <option value="Gujarat">Gujarat</option>
-                <option value="West Bengal">West Bengal</option>
-                <option value="Chhattisgarh">Chhattisgarh</option>
-                <option value="Jharkhand">Jharkhand</option>
-                <option value="Andhra Pradesh">Andhra Pradesh</option>
-              </select>
+            {/* State & Pincode Grid */}
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="block text-xs font-semibold text-[#374151] mb-1">
+                  State / Region
+                </label>
+                <select
+                  value={formData.state}
+                  onChange={(e) => setFormData({ ...formData, state: e.target.value })}
+                  className="w-full px-2.5 py-2 text-xs rounded-lg border border-[#E5E7EB] bg-white focus:outline-none focus:ring-1 focus:ring-[#DC2626]"
+                >
+                  <option value="21-Odisha">21-Odisha</option>
+                  <option value="Odisha">Odisha</option>
+                  <option value="Gujarat">Gujarat</option>
+                  <option value="West Bengal">West Bengal</option>
+                  <option value="Chhattisgarh">Chhattisgarh</option>
+                  <option value="Jharkhand">Jharkhand</option>
+                  <option value="Andhra Pradesh">Andhra Pradesh</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-[#374151] mb-1">
+                  PIN Code
+                </label>
+                <input
+                  type="text"
+                  value={formData.pincode}
+                  onChange={(e) => setFormData({ ...formData, pincode: e.target.value })}
+                  placeholder="754225"
+                  className="w-full px-2.5 py-2 text-xs rounded-lg border border-[#E5E7EB] bg-white focus:outline-none focus:ring-1 focus:ring-[#DC2626] font-mono"
+                />
+              </div>
             </div>
 
             {/* Full Street Address */}
@@ -277,77 +325,32 @@ export function EditDealerModal({
               </div>
             </div>
 
-            {/* Credit Limit */}
-            <div>
-              <label className="block text-xs font-semibold text-[#374151] mb-1">
-                Approved Credit Limit (₹ INR) <span className="text-rose-600">*</span>
-              </label>
-              <div className="relative">
-                <span className="font-mono text-xs text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2">
-                  ₹
-                </span>
-                <input
-                  type="number"
-                  min="0"
-                  step="25000"
-                  required
-                  value={formData.creditLimit}
-                  onChange={(e) =>
-                    setFormData({ ...formData, creditLimit: Number(e.target.value) })
-                  }
-                  className="w-full pl-8 pr-3 py-2 text-xs rounded-lg border border-[#E5E7EB] bg-white focus:outline-none focus:ring-1 focus:ring-[#DC2626] font-mono"
-                />
-              </div>
-            </div>
-
-            {/* Outstanding Balance */}
-            <div>
-              <label className="block text-xs font-semibold text-[#374151] mb-1">
-                Current Ledger Balance (₹ INR)
-              </label>
-              <div className="relative">
-                <span className="font-mono text-xs text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2">
-                  ₹
-                </span>
-                <input
-                  type="number"
-                  min="0"
-                  value={formData.outstandingBalance}
-                  onChange={(e) =>
-                    setFormData({ ...formData, outstandingBalance: Number(e.target.value) })
-                  }
-                  className="w-full pl-8 pr-3 py-2 text-xs rounded-lg border border-[#E5E7EB] bg-white focus:outline-none focus:ring-1 focus:ring-[#DC2626] font-mono"
-                />
-              </div>
-            </div>
-
-            {/* Credit Utilization Preview Card */}
-            <div className="bg-[#F8F9FA] p-3 rounded-lg border border-[#E5E7EB] flex flex-col justify-center">
-              <div className="flex items-center justify-between text-xs mb-1">
-                <span className="text-[#6B7280]">Credit Utilization:</span>
-                <span
-                  className={`font-mono font-bold ${
-                    utilizationPercent > 80 ? 'text-rose-700' : 'text-emerald-700'
-                  }`}
-                >
-                  {utilizationPercent}%
-                </span>
-              </div>
-              <div className="w-full bg-neutral-200 rounded-full h-1.5 overflow-hidden">
-                <div
-                  className={`h-full rounded-full transition-all ${
-                    utilizationPercent > 80 ? 'bg-rose-600' : 'bg-neutral-900'
-                  }`}
-                  style={{ width: `${utilizationPercent}%` }}
-                />
-              </div>
-              {utilizationPercent > 80 && (
-                <div className="flex items-center gap-1 text-[10px] text-rose-600 mt-1">
-                  <AlertTriangle className="w-3 h-3 shrink-0" />
-                  <span>Approaching credit threshold</span>
+            {/* Assigned Field Staff / Sales Officer (Admin Only) */}
+            {currentUser.role === 'ADMIN' && (
+              <div className="sm:col-span-2">
+                <label className="block text-xs font-semibold text-[#374151] mb-1">
+                  Assigned Field Staff / Sales Officer (Admin Only)
+                </label>
+                <div className="relative">
+                  <UserCheck className="w-4 h-4 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <select
+                    value={formData.assignedRepId}
+                    onChange={(e) => setFormData({ ...formData, assignedRepId: e.target.value })}
+                    className="w-full pl-9 pr-3 py-2 text-xs rounded-lg border border-[#E5E7EB] bg-white focus:outline-none focus:ring-1 focus:ring-[#DC2626]"
+                  >
+                    <option value="">Unassigned (Open Territory — All Field Staff)</option>
+                    {employees.map((emp) => (
+                      <option key={emp.id} value={emp.id}>
+                        {emp.name} ({emp.code}) — {emp.designation || 'Field Staff'}
+                      </option>
+                    ))}
+                  </select>
                 </div>
-              )}
-            </div>
+                <p className="text-[11px] text-[#6B7280] mt-1">
+                  You can leave this unassigned so all sales personnel can book orders for this dealer, or assign to a dedicated sales officer.
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Audit Trail Note */}

@@ -22,18 +22,38 @@ import {
 } from 'lucide-react';
 
 export default function EmployeeHomePage() {
-  const { currentUser, orders, dealers, attendanceRecords, cart } = useAppStore();
+  const { currentUser, employees, orders, dealers, attendanceRecords, cart } = useAppStore();
   const [isAttendanceModalOpen, setIsAttendanceModalOpen] = useState(false);
   const [attendanceMode, setAttendanceMode] = useState<'CHECK_IN' | 'CHECK_OUT'>('CHECK_IN');
+
+  const currentEmployee = employees.find(
+    (e) => e.id === currentUser.id || e.code === currentUser.employeeCode
+  );
 
   const employeeOrders = orders.filter((o) => o.employeeName === currentUser.name || o.employeeId === currentUser.employeeCode);
   const todaySales = employeeOrders.reduce((acc, o) => acc + o.totalAmount, 0);
 
-  const lastAttendance = attendanceRecords[0];
+  const todayStr = new Date().toISOString().split('T')[0];
+  const myRecords = attendanceRecords.filter(
+    (r) =>
+      r.employeeId === currentUser.id ||
+      r.employeeId === currentUser.employeeCode ||
+      r.employeeName === currentUser.name
+  );
+  const myTodayAttendance = myRecords.find((r) => r.timestamp.startsWith(todayStr));
+  const isCheckedInToday = myTodayAttendance?.type === 'CHECK_IN';
 
-  const handleStartOrderForDealer = (dealerId: string) => {
-    store.setCartDealer(dealerId);
-  };
+  const myAssignedDealers = dealers.filter(
+    (d) =>
+      d.assignedRepId === currentUser.id ||
+      d.assignedRepId === currentUser.employeeCode ||
+      (currentEmployee?.assignedDealerIds && currentEmployee.assignedDealerIds.includes(d.id))
+  );
+
+  const monthlyTarget = currentEmployee?.targetMonthly || 0;
+  const pendingOrders = employeeOrders.filter(
+    (o) => o.status === 'PENDING_ADMIN_APPROVAL' || o.status === 'SUBMITTED'
+  );
 
   return (
     <div className="min-h-screen bg-[#F8F9FA] pb-mobile-nav">
@@ -51,7 +71,11 @@ export default function EmployeeHomePage() {
                 </span>
                 <span className="text-neutral-300">•</span>
                 <span className="text-xs text-[#6B7280] font-mono">
-                  {lastAttendance?.type === 'CHECK_IN' ? 'Status: On Field' : 'Status: Ready to Check In'}
+                  {myTodayAttendance
+                    ? isCheckedInToday
+                      ? 'Status: On Field • Checked In'
+                      : 'Status: Shift Completed'
+                    : 'Status: Absent (Not Checked In)'}
                 </span>
               </div>
               <h2 className="text-xl font-bold text-[#111827] mt-1">
@@ -64,13 +88,13 @@ export default function EmployeeHomePage() {
               <button
                 type="button"
                 onClick={() => {
-                  setAttendanceMode(lastAttendance?.type === 'CHECK_IN' ? 'CHECK_OUT' : 'CHECK_IN');
+                  setAttendanceMode(isCheckedInToday ? 'CHECK_OUT' : 'CHECK_IN');
                   setIsAttendanceModalOpen(true);
                 }}
-                className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-semibold border border-[#E5E7EB] bg-neutral-50 hover:bg-neutral-100 text-[#111827] transition-all"
+                className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-semibold border border-[#E5E7EB] bg-neutral-50 hover:bg-neutral-100 text-[#111827] transition-all cursor-pointer"
               >
                 <Radio className="w-3.5 h-3.5 text-[#DC2626]" />
-                <span>{lastAttendance?.type === 'CHECK_IN' ? 'Check Out' : 'GPS Check In'}</span>
+                <span>{isCheckedInToday ? 'Check Out' : 'GPS Check In'}</span>
               </button>
 
               <Link
@@ -87,112 +111,55 @@ export default function EmployeeHomePage() {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-4">
             <div className="bg-[#F9FAFB] p-3 rounded-lg border border-[#E5E7EB]">
               <span className="text-[10px] uppercase font-mono text-[#6B7280] block">Assigned Dealers</span>
-              <div className="text-lg font-bold text-[#111827] font-mono mt-0.5">{dealers.length}</div>
-              <span className="text-[10px] text-[#6B7280]">4 planned visits today</span>
+              <div className="text-lg font-bold text-[#111827] font-mono mt-0.5">{myAssignedDealers.length}</div>
+              <span className="text-[10px] text-neutral-500 font-mono">
+                {myAssignedDealers.length === 0 ? 'Open Territory' : `${myAssignedDealers.length} accounts`}
+              </span>
             </div>
 
             <div className="bg-[#F9FAFB] p-3 rounded-lg border border-[#E5E7EB]">
               <span className="text-[10px] uppercase font-mono text-[#6B7280] block">Active Orders</span>
               <div className="text-lg font-bold text-[#111827] font-mono mt-0.5">{employeeOrders.length}</div>
-              <span className="text-[10px] text-amber-700 font-medium">1 awaiting central approval</span>
+              <span className="text-[10px] text-neutral-500 font-medium">
+                {pendingOrders.length > 0
+                  ? `${pendingOrders.length} orders in pipeline`
+                  : employeeOrders.length > 0
+                  ? 'All orders processed'
+                  : 'No active orders'}
+              </span>
             </div>
 
             <div className="bg-[#F9FAFB] p-3 rounded-lg border border-[#E5E7EB]">
               <span className="text-[10px] uppercase font-mono text-[#6B7280] block">Monthly Target</span>
-              <div className="text-lg font-bold text-[#111827] font-mono mt-0.5">₹1.20 M</div>
-              <span className="text-[10px] text-emerald-700 font-medium">₹845,000 achieved (70%)</span>
+              <div className="text-lg font-bold text-[#111827] font-mono mt-0.5">
+                {monthlyTarget > 0 ? `₹${monthlyTarget.toLocaleString('en-IN')}` : '0'}
+              </div>
+              <span className="text-[10px] text-neutral-500 font-mono">
+                {monthlyTarget > 0 ? `₹${todaySales.toLocaleString('en-IN')} achieved` : 'No Target Set'}
+              </span>
             </div>
 
             <div className="bg-[#F9FAFB] p-3 rounded-lg border border-[#E5E7EB]">
               <span className="text-[10px] uppercase font-mono text-[#6B7280] block">GPS Verification</span>
-              <div className="text-sm font-semibold text-[#111827] mt-1 truncate">
-                {lastAttendance ? lastAttendance.locationName.split(',')[0] : 'Not recorded'}
-              </div>
-              <span className="text-[10px] text-neutral-500 font-mono">
-                {lastAttendance ? new Date(lastAttendance.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Tap Check In'}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* TODAY'S DEALER VISITS LIST (Contextual action) */}
-        <div>
-          <div className="flex items-center justify-between mb-3">
-            <div>
-              <h3 className="text-sm font-bold text-[#111827] uppercase font-mono tracking-tight">
-                Dealers in Territory
-              </h3>
-              <p className="text-xs text-[#6B7280]">Select a dealer to inspect balances or create an order</p>
-            </div>
-            <Link
-              href="/employee/dealers"
-              className="text-xs font-semibold text-[#DC2626] hover:underline flex items-center gap-1"
-            >
-              <span>View All</span>
-              <ArrowRight className="w-3 h-3" />
-            </Link>
-          </div>
-
-          <div className="bg-white border border-[#E5E7EB] rounded-xl overflow-hidden shadow-2xs">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs border-collapse">
-                <thead>
-                  <tr className="bg-[#F9FAFB] border-b border-[#E5E7EB] text-[#4B5563] uppercase font-mono text-[10px]">
-                    <th className="py-2.5 px-3">Code</th>
-                    <th className="py-2.5 px-3">Dealer Account</th>
-                    <th className="py-2.5 px-3">City</th>
-                    <th className="py-2.5 px-3">Outstanding</th>
-                    <th className="py-2.5 px-3">Credit Limit</th>
-                    <th className="py-2.5 px-3 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[#F3F4F6]">
-                  {dealers.slice(0, 4).map((dealer) => (
-                    <tr key={dealer.id} className="hover:bg-neutral-50/80 transition-colors">
-                      <td className="py-2.5 px-3 whitespace-nowrap">
-                        <span className="tech-code font-bold text-xs bg-[#111827] text-white px-2 py-0.5 rounded font-mono">
-                          {dealer.code}
-                        </span>
-                      </td>
-                      <td className="py-2.5 px-3">
-                        <div className="font-semibold text-xs text-[#111827]">{dealer.name}</div>
-                        <div className="text-[10px] text-neutral-500">{dealer.tier} Tier • {dealer.ownerName}</div>
-                      </td>
-                      <td className="py-2.5 px-3 whitespace-nowrap">
-                        <div className="flex items-center gap-1 text-neutral-600">
-                          <MapPin className="w-3 h-3 text-neutral-400 shrink-0" />
-                          <span>{dealer.city}</span>
-                        </div>
-                      </td>
-                      <td className="py-2.5 px-3 whitespace-nowrap font-mono font-semibold text-amber-800">
-                        ₹{dealer.outstandingBalance.toLocaleString('en-IN')}
-                      </td>
-                      <td className="py-2.5 px-3 whitespace-nowrap font-mono text-neutral-600">
-                        ₹{dealer.creditLimit.toLocaleString('en-IN')}
-                      </td>
-                      <td className="py-2.5 px-3 text-right whitespace-nowrap">
-                        <div className="flex items-center justify-end gap-1.5">
-                          <a
-                            href={`tel:${dealer.phone}`}
-                            className="p-1.5 rounded border border-[#E5E7EB] hover:bg-neutral-100 text-neutral-700"
-                            title="Call"
-                          >
-                            <Phone className="w-3 h-3" />
-                          </a>
-                          <Link
-                            href="/employee/orders/new"
-                            onClick={() => handleStartOrderForDealer(dealer.id)}
-                            className="bg-[#111827] hover:bg-black text-white text-[11px] font-semibold py-1 px-2.5 rounded transition-all inline-flex items-center gap-1"
-                          >
-                            <PlusCircle className="w-3 h-3" />
-                            <span>Order</span>
-                          </Link>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              {myTodayAttendance ? (
+                <>
+                  <div className="text-sm font-semibold text-[#111827] mt-1 truncate" title={myTodayAttendance.locationName}>
+                    {myTodayAttendance.locationName.split(',')[0]}
+                  </div>
+                  <span className="text-[10px] text-emerald-700 font-mono">
+                    Today • {new Date(myTodayAttendance.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} • ±{myTodayAttendance.accuracy || 14.5}m Lock
+                  </span>
+                </>
+              ) : (
+                <>
+                  <div className="text-sm font-semibold text-rose-700 mt-1 truncate">
+                    Absent (No GPS Punch)
+                  </div>
+                  <span className="text-[10px] text-rose-600 font-mono">
+                    Today • Tap Check In
+                  </span>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -235,12 +202,25 @@ export default function EmployeeHomePage() {
                 </div>
 
                 <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-center">
-                  <div className="font-bold text-sm text-[#111827] font-mono">
-                    ₹{order.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                  </div>
-                  <span className="text-[10px] text-emerald-700 font-mono">
-                    +₹{order.rewardEstimated.toFixed(2)} reward
-                  </span>
+                  {currentUser.role === 'ADMIN' ? (
+                    <>
+                      <div className="font-bold text-sm text-[#111827] font-mono">
+                        ₹{order.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      </div>
+                      <span className="text-[10px] text-emerald-700 font-mono">
+                        +₹{order.rewardEstimated.toFixed(2)} reward
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <div className="font-bold text-sm text-[#111827] font-mono">
+                        {order.items.reduce((s, i) => s + (i.quantity || 0), 0)} Units
+                      </div>
+                      <span className="text-[10px] text-emerald-700 font-medium">
+                        WhatsApp Requisition
+                      </span>
+                    </>
+                  )}
                 </div>
               </div>
             ))}

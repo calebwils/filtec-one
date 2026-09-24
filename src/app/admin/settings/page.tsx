@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { TopContextBar } from '@/components/navigation/TopContextBar';
 import { DesktopSubNav } from '@/components/navigation/DesktopSubNav';
 import { MobileBottomNav } from '@/components/navigation/MobileBottomNav';
@@ -23,7 +23,9 @@ import {
   FileCheck,
   UserCheck,
   Pencil,
-  CheckSquare
+  CheckSquare,
+  Loader2,
+  AlertCircle
 } from 'lucide-react';
 import { AppSettings, Employee, Role } from '@/types';
 import { EditEmployeeModal } from '@/components/admin/EditEmployeeModal';
@@ -32,7 +34,8 @@ import {
   EMPLOYEE_PAGE_OPTIONS,
   ALL_ADMIN_PAGES,
   ALL_EMPLOYEE_PAGES,
-  ALL_DEALER_PAGES
+  ALL_DEALER_PAGES,
+  INITIAL_SETTINGS
 } from '@/data/initialSeed';
 
 export default function AdminSettingsPage() {
@@ -42,29 +45,67 @@ export default function AdminSettingsPage() {
     'ROLES_PERMISSIONS' | 'COMPANY_PROFILE' | 'LEAVE_POLICY' | 'AUTOMATIONS'
   >('ROLES_PERMISSIONS');
 
-  const [formData, setFormData] = useState<AppSettings>(settings);
+  const [formData, _setFormData] = useState<AppSettings>(() => ({
+    ...settings,
+    company: {
+      ...INITIAL_SETTINGS.company,
+      ...settings.company
+    }
+  }));
+  const [isDirty, setIsDirty] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [isSaved, setIsSaved] = useState(false);
   const [selectedEmployeeForEdit, setSelectedEmployeeForEdit] = useState<Employee | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
-  const handleSave = (e?: React.FormEvent) => {
+  // Sync formData with store when settings update from PostgreSQL database, unless user is actively editing
+  useEffect(() => {
+    if (!isDirty) {
+      _setFormData({
+        ...settings,
+        company: {
+          ...INITIAL_SETTINGS.company,
+          ...settings.company
+        }
+      });
+    }
+  }, [settings, isDirty]);
+
+  const setFormData = (value: React.SetStateAction<AppSettings>) => {
+    setIsDirty(true);
+    _setFormData(value);
+  };
+
+  const handleSave = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    store.updateSettings(formData);
-    setIsSaved(true);
-    setTimeout(() => {
-      setIsSaved(false);
-    }, 3000);
+    setIsSaving(true);
+    setSaveError(null);
+    try {
+      await store.updateSettings(formData);
+      setIsSaved(true);
+      setIsDirty(false);
+      setTimeout(() => {
+        setIsSaved(false);
+      }, 3500);
+    } catch (err: any) {
+      console.error('Failed to save settings:', err);
+      setSaveError(err.message || 'Failed to save settings to database');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleReset = () => {
-    if (confirm('Reset settings to factory operational defaults?')) {
-      setFormData(settings);
+    if (confirm('Reset form to current saved operational settings?')) {
+      _setFormData(settings);
+      setIsDirty(false);
     }
   };
 
   return (
     <div className="min-h-screen bg-[#F8F9FA] pb-mobile-nav">
-      <TopContextBar title="Settings" subtitle="Access Governance & Operational Parameters" />
+      <TopContextBar title="Settings" />
       <DesktopSubNav />
 
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-5 space-y-5">
@@ -72,23 +113,27 @@ export default function AdminSettingsPage() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <h2 className="text-lg font-bold text-[#111827]">Operations & System Settings</h2>
-            <p className="text-xs text-[#6B7280]">
-              Role permissions, enterprise company details, HR leave quotas, and automated WhatsApp triggers
-            </p>
           </div>
 
           <div className="flex items-center gap-2">
             {isSaved && (
               <span className="text-xs text-emerald-700 font-semibold flex items-center gap-1 bg-emerald-50 border border-emerald-200 px-2.5 py-1.5 rounded-lg animate-in fade-in duration-200">
                 <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                Settings Saved!
+                Settings Saved to Database!
+              </span>
+            )}
+
+            {isDirty && !isSaved && !isSaving && (
+              <span className="text-xs text-amber-700 font-medium bg-amber-50 border border-amber-200 px-2 py-1 rounded-md">
+                Unsaved changes
               </span>
             )}
 
             <button
               type="button"
               onClick={handleReset}
-              className="px-3 py-1.5 rounded-lg border border-[#E5E7EB] hover:bg-neutral-100 text-xs text-[#4B5563] flex items-center gap-1 transition-colors"
+              disabled={isSaving}
+              className="px-3 py-1.5 rounded-lg border border-[#E5E7EB] hover:bg-neutral-100 text-xs text-[#4B5563] flex items-center gap-1 transition-colors disabled:opacity-50 cursor-pointer"
             >
               <RotateCcw className="w-3 h-3" />
               <span>Reset</span>
@@ -97,13 +142,30 @@ export default function AdminSettingsPage() {
             <button
               type="button"
               onClick={() => handleSave()}
-              className="bg-[#DC2626] hover:bg-[#B91C1C] text-white text-xs font-semibold px-4 py-2 rounded-lg flex items-center gap-1.5 transition-all shadow-xs"
+              disabled={isSaving}
+              className="bg-[#DC2626] hover:bg-[#B91C1C] text-white text-xs font-semibold px-4 py-2 rounded-lg flex items-center gap-1.5 transition-all shadow-xs disabled:opacity-60 cursor-pointer"
             >
-              <Save className="w-3.5 h-3.5" />
-              <span>Save Changes</span>
+              {isSaving ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <span>Saving...</span>
+                </>
+              ) : (
+                <>
+                  <Save className="w-3.5 h-3.5" />
+                  <span>Save Changes</span>
+                </>
+              )}
             </button>
           </div>
         </div>
+
+        {saveError && (
+          <div className="bg-rose-50 border border-rose-200 text-rose-700 p-3 rounded-lg text-xs flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
+            <span>{saveError}</span>
+          </div>
+        )}
 
         {/* Tab Navigation */}
         <div className="flex items-center gap-1.5 border-b border-[#E5E7EB] pb-2 overflow-x-auto text-xs">
@@ -383,185 +445,6 @@ export default function AdminSettingsPage() {
               </div>
             </div>
 
-            {/* SECTION 3: OPERATIONAL CAPABILITY MATRIX */}
-            <div className="bg-white border border-[#E5E7EB] rounded-xl p-5 shadow-2xs">
-              <div className="pb-3 border-b border-[#F3F4F6] mb-4">
-                <h3 className="text-sm font-bold text-[#111827] flex items-center gap-2">
-                  <Shield className="w-4 h-4 text-[#DC2626]" />
-                  <span>Operational Action Permissions</span>
-                </h3>
-                <p className="text-xs text-[#6B7280]">
-                  Specific functional privileges across Admin, Employee, and Dealer tiers
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {/* Admin Role Column */}
-                <div className="bg-[#F9FAFB] rounded-xl border border-[#E5E7EB] p-4 space-y-3">
-                  <div className="flex items-center justify-between pb-2 border-b border-[#E5E7EB]">
-                    <div>
-                      <span className="text-xs font-bold text-[#111827] block">ADMIN</span>
-                      <span className="text-[10px] text-[#6B7280]">Operations & Leadership</span>
-                    </div>
-                    <span className="bg-rose-50 text-rose-700 text-[10px] font-mono px-2 py-0.5 rounded border border-rose-200 font-semibold">
-                      Full Control
-                    </span>
-                  </div>
-
-                  <div className="space-y-2.5 text-xs">
-                    {[
-                      { key: 'canApproveOrders', label: 'Approve & Reject Field Orders' },
-                      { key: 'canOverridePricing', label: 'Override Catalogue Pricing & Stock' },
-                      { key: 'canManageStaff', label: 'Onboard & Edit Staff Profiles' },
-                      { key: 'canManageDealers', label: 'Manage Dealers & Credit Limits' },
-                      { key: 'canApproveLeave', label: 'Approve & Reject Staff Leaves' },
-                      { key: 'canAccessIntegrations', label: 'Access ERP & WhatsApp Logs' }
-                    ].map((item) => {
-                      const checked =
-                        formData.permissions.admin[
-                          item.key as keyof typeof formData.permissions.admin
-                        ];
-                      return (
-                        <label
-                          key={item.key}
-                          className="flex items-center justify-between p-2 rounded-lg bg-white border border-[#E5E7EB] hover:bg-neutral-50 cursor-pointer"
-                        >
-                          <span className="text-[#374151] pr-2 font-medium text-[11px]">
-                            {item.label}
-                          </span>
-                          <input
-                            type="checkbox"
-                            checked={checked}
-                            onChange={(e) =>
-                              setFormData({
-                                ...formData,
-                                permissions: {
-                                  ...formData.permissions,
-                                  admin: {
-                                    ...formData.permissions.admin,
-                                    [item.key]: e.target.checked
-                                  }
-                                }
-                              })
-                            }
-                            className="rounded border-neutral-300 text-[#DC2626] focus:ring-[#DC2626] w-4 h-4 cursor-pointer"
-                          />
-                        </label>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Employee Role Column */}
-                <div className="bg-[#F9FAFB] rounded-xl border border-[#E5E7EB] p-4 space-y-3">
-                  <div className="flex items-center justify-between pb-2 border-b border-[#E5E7EB]">
-                    <div>
-                      <span className="text-xs font-bold text-[#111827] block">EMPLOYEE</span>
-                      <span className="text-[10px] text-[#6B7280]">Field Sales Executives</span>
-                    </div>
-                    <span className="bg-blue-50 text-blue-700 text-[10px] font-mono px-2 py-0.5 rounded border border-blue-200 font-semibold">
-                      Field Ops
-                    </span>
-                  </div>
-
-                  <div className="space-y-2.5 text-xs">
-                    {[
-                      { key: 'canCreateOrders', label: 'Book Field Orders on Credit' },
-                      { key: 'canViewDealers', label: 'View Assigned Dealer Ledger' },
-                      { key: 'canEditDealerContact', label: 'Edit Dealer Phone & Contacts' },
-                      { key: 'canApplyLeave', label: 'Apply for Leave & Regularization' },
-                      { key: 'canViewAttendanceHistory', label: 'View GPS Punch & Selfie History' }
-                    ].map((item) => {
-                      const checked =
-                        formData.permissions.employee[
-                          item.key as keyof typeof formData.permissions.employee
-                        ];
-                      return (
-                        <label
-                          key={item.key}
-                          className="flex items-center justify-between p-2 rounded-lg bg-white border border-[#E5E7EB] hover:bg-neutral-50 cursor-pointer"
-                        >
-                          <span className="text-[#374151] pr-2 font-medium text-[11px]">
-                            {item.label}
-                          </span>
-                          <input
-                            type="checkbox"
-                            checked={checked}
-                            onChange={(e) =>
-                              setFormData({
-                                ...formData,
-                                permissions: {
-                                  ...formData.permissions,
-                                  employee: {
-                                    ...formData.permissions.employee,
-                                    [item.key]: e.target.checked
-                                  }
-                                }
-                              })
-                            }
-                            className="rounded border-neutral-300 text-[#DC2626] focus:ring-[#DC2626] w-4 h-4 cursor-pointer"
-                          />
-                        </label>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Dealer Role Column */}
-                <div className="bg-[#F9FAFB] rounded-xl border border-[#E5E7EB] p-4 space-y-3">
-                  <div className="flex items-center justify-between pb-2 border-b border-[#E5E7EB]">
-                    <div>
-                      <span className="text-xs font-bold text-[#111827] block">DEALER</span>
-                      <span className="text-[10px] text-[#6B7280]">Authorized Distributors</span>
-                    </div>
-                    <span className="bg-emerald-50 text-emerald-700 text-[10px] font-mono px-2 py-0.5 rounded border border-emerald-200 font-semibold">
-                      B2B Partner
-                    </span>
-                  </div>
-
-                  <div className="space-y-2.5 text-xs">
-                    {[
-                      { key: 'canCreateDirectOrders', label: 'Book Direct Wholesale Orders' },
-                      { key: 'canAllocatePlumberRewards', label: 'Allocate Plumber Reward Points' },
-                      { key: 'canViewInvoices', label: 'Download Commercial Invoices' },
-                      { key: 'canManagePlumbers', label: 'Add & Manage Linked Plumbers' }
-                    ].map((item) => {
-                      const checked =
-                        formData.permissions.dealer[
-                          item.key as keyof typeof formData.permissions.dealer
-                        ];
-                      return (
-                        <label
-                          key={item.key}
-                          className="flex items-center justify-between p-2 rounded-lg bg-white border border-[#E5E7EB] hover:bg-neutral-50 cursor-pointer"
-                        >
-                          <span className="text-[#374151] pr-2 font-medium text-[11px]">
-                            {item.label}
-                          </span>
-                          <input
-                            type="checkbox"
-                            checked={checked}
-                            onChange={(e) =>
-                              setFormData({
-                                ...formData,
-                                permissions: {
-                                  ...formData.permissions,
-                                  dealer: {
-                                    ...formData.permissions.dealer,
-                                    [item.key]: e.target.checked
-                                  }
-                                }
-                              })
-                            }
-                            className="rounded border-neutral-300 text-[#DC2626] focus:ring-[#DC2626] w-4 h-4 cursor-pointer"
-                          />
-                        </label>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-            </div>
           </div>
         )}
 
@@ -632,6 +515,24 @@ export default function AdminSettingsPage() {
 
               <div>
                 <label className="block text-xs font-semibold text-[#374151] mb-1">
+                  Official Phone Number (Printed on Estimates)
+                </label>
+                <input
+                  type="text"
+                  value={formData.company.phone || '+91 9437505814'}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      company: { ...formData.company, phone: e.target.value }
+                    })
+                  }
+                  className="w-full px-3 py-2 text-xs rounded-lg border border-[#E5E7EB] font-mono"
+                  placeholder="+91 9437505814"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-[#374151] mb-1">
                   Official Operations WhatsApp Support Number
                 </label>
                 <input
@@ -683,6 +584,24 @@ export default function AdminSettingsPage() {
 
               <div>
                 <label className="block text-xs font-semibold text-[#374151] mb-1">
+                  Company Registered State
+                </label>
+                <input
+                  type="text"
+                  value={formData.company.state || '21-Odisha'}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      company: { ...formData.company, state: e.target.value }
+                    })
+                  }
+                  placeholder="e.g. 21-Odisha"
+                  className="w-full px-3 py-2 text-xs rounded-lg border border-[#E5E7EB] font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-[#374151] mb-1">
                   Standard GST Rate (%)
                 </label>
                 <input
@@ -699,6 +618,201 @@ export default function AdminSettingsPage() {
                   }
                   className="w-full px-3 py-2 text-xs rounded-lg border border-[#E5E7EB] font-mono"
                 />
+              </div>
+
+              {/* COMMERCIAL TRADE DISCOUNT & PLACE OF SUPPLY */}
+              <div className="sm:col-span-2 pt-4 border-t border-[#F3F4F6]">
+                <div className="flex items-center gap-2 mb-3">
+                  <CreditCard className="w-4 h-4 text-[#DC2626]" />
+                  <span className="text-xs font-bold text-[#111827] uppercase tracking-wider">
+                    Commercial Proforma / Estimate Discount & Place of Supply
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-[#374151] mb-1 flex items-center justify-between">
+                      <span>Proforma Trade Discount Rate (%)</span>
+                      <span className="text-[10px] text-[#DC2626] font-mono font-bold">Client Estimate Spec</span>
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        step="0.1"
+                        min="0"
+                        max="90"
+                        value={formData.company.defaultDiscountPercent ?? 48.0}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            company: {
+                              ...formData.company,
+                              defaultDiscountPercent: Number(e.target.value)
+                            }
+                          })
+                        }
+                        className="w-full px-3 py-2 text-xs rounded-lg border border-[#E5E7EB] font-mono font-bold text-[#111827] pr-8"
+                      />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-neutral-400 font-mono">%</span>
+                    </div>
+                    <span className="text-[10px] text-[#6B7280] mt-0.5 block">
+                      Default discount applied on catalogue list rates for generated Proformas and order payment amounts.
+                    </span>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-[#374151] mb-1">
+                      Place of Supply
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.company.placeOfSupply || '21-Odisha'}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          company: { ...formData.company, placeOfSupply: e.target.value }
+                        })
+                      }
+                      placeholder="e.g. 21-Odisha"
+                      className="w-full px-3 py-2 text-xs rounded-lg border border-[#E5E7EB] font-mono"
+                    />
+                    <span className="text-[10px] text-[#6B7280] mt-0.5 block">
+                      Used for State & GST place-of-supply classification on generated Estimates.
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* BANKING & REMITTANCE DETAILS */}
+              <div className="sm:col-span-2 pt-4 border-t border-[#F3F4F6]">
+                <div className="flex items-center gap-2 mb-3">
+                  <Building2 className="w-4 h-4 text-[#DC2626]" />
+                  <span className="text-xs font-bold text-[#111827] uppercase tracking-wider">
+                    Official Proforma Bank Account & Payment QR
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-[#374151] mb-1">
+                      Bank Name
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.company.bankName || 'CANARA BANK'}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          company: { ...formData.company, bankName: e.target.value }
+                        })
+                      }
+                      className="w-full px-3 py-2 text-xs rounded-lg border border-[#E5E7EB]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-[#374151] mb-1">
+                      Account Number
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.company.accountNumber || '120036945389'}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          company: { ...formData.company, accountNumber: e.target.value }
+                        })
+                      }
+                      className="w-full px-3 py-2 text-xs rounded-lg border border-[#E5E7EB] font-mono"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-[#374151] mb-1">
+                      IFSC Code
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.company.ifscCode || 'CNRB0005928'}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          company: { ...formData.company, ifscCode: e.target.value }
+                        })
+                      }
+                      className="w-full px-3 py-2 text-xs rounded-lg border border-[#E5E7EB] font-mono uppercase"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-[#374151] mb-1">
+                      Beneficiary / Account Holder Name
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.company.accountHolderName || 'FILTEC POLYPLAST PRIVATE LIMITED'}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          company: { ...formData.company, accountHolderName: e.target.value }
+                        })
+                      }
+                      className="w-full px-3 py-2 text-xs rounded-lg border border-[#E5E7EB]"
+                    />
+                  </div>
+
+                  <div className="sm:col-span-2">
+                    <label className="block text-xs font-semibold text-[#374151] mb-1">
+                      UPI ID (For Quick Click-to-Pay QR)
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.company.upiId || 'filtec@canarabank'}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          company: { ...formData.company, upiId: e.target.value }
+                        })
+                      }
+                      placeholder="e.g. filtec@canarabank"
+                      className="w-full px-3 py-2 text-xs rounded-lg border border-[#E5E7EB] font-mono"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* ESTIMATE TERMS & CONDITIONS */}
+              <div className="sm:col-span-2 pt-4 border-t border-[#F3F4F6]">
+                <div className="flex items-center gap-2 mb-3">
+                  <FileCheck className="w-4 h-4 text-[#DC2626]" />
+                  <span className="text-xs font-bold text-[#111827] uppercase tracking-wider">
+                    Estimate Terms & Conditions (One clause per line)
+                  </span>
+                </div>
+                <div>
+                  <textarea
+                    rows={4}
+                    value={(formData.company.termsAndConditions || [
+                      '*All disputes shall be under jurisdiction of Bhubaneswar, Odisha',
+                      '*Once goods sold may not be returned unless it is mutually agreed.',
+                      '*Payment must be paid within the due date of invoice or else 10% interest may applied as per company policy.'
+                    ]).join('\n')}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        company: {
+                          ...formData.company,
+                          termsAndConditions: e.target.value
+                            .split('\n')
+                            .filter((line) => line.trim().length > 0)
+                        }
+                      })
+                    }
+                    className="w-full px-3 py-2 text-xs rounded-lg border border-[#E5E7EB] font-mono leading-relaxed"
+                    placeholder="*All disputes shall be under jurisdiction of Bhubaneswar, Odisha&#10;*Once goods sold may not be returned unless it is mutually agreed.&#10;*Payment must be paid within the due date of invoice or else 10% interest may applied as per company policy."
+                  />
+                  <span className="text-[10px] text-[#6B7280] mt-1 block">
+                    These terms are dynamically printed at the bottom of all generated Proforma Invoices & Estimates.
+                  </span>
+                </div>
               </div>
             </div>
           </div>

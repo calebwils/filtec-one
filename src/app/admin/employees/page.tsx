@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState } from 'react';
-import Link from 'next/link';
 import { TopContextBar } from '@/components/navigation/TopContextBar';
 import { DesktopSubNav } from '@/components/navigation/DesktopSubNav';
 import { MobileBottomNav } from '@/components/navigation/MobileBottomNav';
@@ -21,16 +20,33 @@ import {
   XCircle,
   Shield,
   UserCheck,
-  Sliders
+  Sliders,
+  FileText,
+  Calculator,
+  ChevronLeft,
+  ChevronRight,
+  Info,
+  CalendarDays,
+  IndianRupee
 } from 'lucide-react';
 import { OnboardEmployeeModal } from '@/components/admin/OnboardEmployeeModal';
 import { EditEmployeeModal } from '@/components/admin/EditEmployeeModal';
+import { PayslipModal } from '@/components/payroll/PayslipModal';
+import {
+  calculateEmployeePayroll,
+  EmployeePayrollCalculation,
+  getWorkingDaysInMonth,
+  formatMonthLabel
+} from '@/utils/payroll';
 import { Employee } from '@/types';
 
 export default function AdminEmployeesPage() {
-  const { employees, leaveRequests } = useAppStore();
+  const { employees, leaveRequests, dailyAttendance } = useAppStore();
+  const [selectedPayroll, setSelectedPayroll] = useState<EmployeePayrollCalculation | null>(null);
   const [search, setSearch] = useState('');
-  const [tab, setTab] = useState<'ROSTER' | 'LEAVE'>('ROSTER');
+  const [tab, setTab] = useState<'ROSTER' | 'SALARY' | 'LEAVE'>('ROSTER');
+  const [selectedMonth, setSelectedMonth] = useState(() => new Date().toISOString().substring(0, 7));
+  const [salarySearch, setSalarySearch] = useState('');
   const [isOnboardModalOpen, setIsOnboardModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedEmployeeForEdit, setSelectedEmployeeForEdit] = useState<Employee | null>(null);
@@ -72,18 +88,79 @@ export default function AdminEmployeesPage() {
     setRejectionReason('');
   };
 
+  // ── Monthly Working Days & Payroll Engine Calculations ───────────────────
+  const { totalWorkingDays, calendarDays, workingDateStrings } = getWorkingDaysInMonth(selectedMonth);
+  const todayStr = new Date().toISOString().split('T')[0];
+  const elapsedWorkingDays = workingDateStrings.filter((d) => d <= todayStr).length;
+  const monthTitle = formatMonthLabel(selectedMonth);
+
+  const handlePrevMonth = () => {
+    let [y, m] = selectedMonth.split('-').map(Number);
+    m -= 1;
+    if (m < 1) {
+      m = 12;
+      y -= 1;
+    }
+    setSelectedMonth(`${y}-${String(m).padStart(2, '0')}`);
+  };
+
+  const handleNextMonth = () => {
+    let [y, m] = selectedMonth.split('-').map(Number);
+    m += 1;
+    if (m > 12) {
+      m = 1;
+      y += 1;
+    }
+    setSelectedMonth(`${y}-${String(m).padStart(2, '0')}`);
+  };
+
+  const salaryEligibleEmployees = employees.filter(
+    (e) => e.systemRole !== 'ADMIN' || (e.baseSalary && e.baseSalary > 0)
+  );
+
+  const payrollRows = salaryEligibleEmployees
+    .map((emp) => {
+      const payroll = calculateEmployeePayroll(emp, selectedMonth, dailyAttendance, leaveRequests);
+      return {
+        emp,
+        payroll,
+        present: payroll.presentDays,
+        leave: payroll.approvedLeaves,
+        absent: payroll.absentDays,
+        pct: payroll.attendancePercentage,
+        base: payroll.baseSalary,
+        perDay: payroll.perDayRate,
+        payable: payroll.netPayableSalary,
+        deductions: payroll.lossOfPayDeduction,
+      };
+    })
+    .filter(({ emp }) => {
+      if (!salarySearch.trim()) return true;
+      const q = salarySearch.toLowerCase();
+      return (
+        emp.name.toLowerCase().includes(q) ||
+        emp.code.toLowerCase().includes(q) ||
+        (emp.designation && emp.designation.toLowerCase().includes(q)) ||
+        (emp.territory && emp.territory.toLowerCase().includes(q))
+      );
+    });
+
+  const totalBaseSalarySum = payrollRows.reduce((sum, r) => sum + r.base, 0);
+  const totalPayableSalarySum = payrollRows.reduce((sum, r) => sum + r.payable, 0);
+  const totalDeductionsSum = payrollRows.reduce((sum, r) => sum + r.deductions, 0);
+  const avgAttendancePct = payrollRows.length > 0
+    ? Math.round(payrollRows.reduce((sum, r) => sum + r.pct, 0) / payrollRows.length)
+    : 0;
+
   return (
     <div className="min-h-screen bg-[#F8F9FA] pb-mobile-nav">
-      <TopContextBar title="Employee Management" subtitle="Field Personnel & Targets" />
+      <TopContextBar title="Employee Management" />
       <DesktopSubNav />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-5 space-y-5">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <h2 className="text-lg font-bold text-[#111827]">Field Personnel & Performance</h2>
-            <p className="text-xs text-[#6B7280]">
-              Territory coverage, monthly sales targets, verified check-in statuses, and leave administration
-            </p>
           </div>
 
           <div className="flex items-center gap-2">
@@ -106,6 +183,18 @@ export default function AdminEmployeesPage() {
               }`}
             >
               Staff Directory ({employees.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setTab('SALARY')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
+                tab === 'SALARY'
+                  ? 'bg-[#111827] text-white'
+                  : 'bg-white border border-[#E5E7EB] text-[#4B5563]'
+              }`}
+            >
+              <Calculator className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Salary Calculation ({salaryEligibleEmployees.length})</span>
             </button>
             <button
               type="button"
@@ -207,7 +296,7 @@ export default function AdminEmployeesPage() {
                       <th className="py-3 px-4 whitespace-nowrap">Contact</th>
                       <th className="py-3 px-3 whitespace-nowrap">Territory</th>
                       <th className="py-3 px-3 whitespace-nowrap">Target / Sales</th>
-                      <th className="py-3 px-3 whitespace-nowrap">Remarks</th>
+                      <th className="py-3 px-3 whitespace-nowrap">Base Salary</th>
                       <th className="py-3 px-3 whitespace-nowrap">Status</th>
                       <th className="py-3 px-4 text-right whitespace-nowrap">Actions</th>
                     </tr>
@@ -217,7 +306,6 @@ export default function AdminEmployeesPage() {
                       const hasTarget = (emp.targetMonthly || 0) > 0;
                       const hasSales = (emp.currentMonthSales || 0) > 0;
                       const isTerritoryEmpty = !emp.territory || emp.territory === '(-)' || emp.territory.trim() === '';
-                      const isRemarksEmpty = !emp.remarks || emp.remarks === '(-)' || emp.remarks.trim() === '';
 
                       return (
                         <tr
@@ -243,9 +331,6 @@ export default function AdminEmployeesPage() {
                             </div>
                             <div className="text-[11px] font-medium text-neutral-600 mt-0.5">
                               {emp.designation || '(-)'}
-                              {emp.baseSalary && emp.baseSalary > 0 ? (
-                                <span className="text-neutral-400 font-normal"> • ₹{(emp.baseSalary / 1000).toFixed(0)}k/mo</span>
-                              ) : null}
                             </div>
                           </td>
 
@@ -297,20 +382,33 @@ export default function AdminEmployeesPage() {
 
                           {/* Contact */}
                           <td className="py-3 px-4">
-                            <div className="flex items-center gap-1.5 font-mono text-xs text-[#111827]">
-                              <Phone className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
-                              <a
-                                href={`tel:${emp.phone}`}
-                                className="hover:text-[#DC2626] transition-colors"
-                              >
-                                {emp.phone}
-                              </a>
-                            </div>
-                            {emp.email && emp.email !== '(-)' && (
-                              <div className="text-[10px] text-neutral-500 truncate max-w-[150px]">
-                                {emp.email}
-                              </div>
-                            )}
+                            {(() => {
+                              const isSamir = emp.name.toLowerCase() === 'samir' || emp.code === 'FPPL/ADM-001';
+                              const rawPhone = isSamir ? '+91 9437505814' : (emp.phone || '');
+                              const clean = rawPhone.replace(/^\+91[\s-]*/, '').replace(/^91(?=\d{10})/, '').replace(/\s+/g, '').trim();
+                              const formattedPhone = isSamir
+                                ? '+91 9437505814'
+                                : (clean && clean !== '-' && clean !== '(-)' ? `+91 ${clean}` : (emp.phone || '(-)'));
+
+                              return (
+                                <>
+                                  <div className="flex items-center gap-1.5 font-mono text-xs text-[#111827]">
+                                    <Phone className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
+                                    <a
+                                      href={`tel:${formattedPhone}`}
+                                      className="hover:text-[#DC2626] transition-colors"
+                                    >
+                                      {formattedPhone}
+                                    </a>
+                                  </div>
+                                  {emp.email && emp.email !== '(-)' && (
+                                    <div className="text-[10px] text-neutral-500 truncate max-w-[150px]">
+                                      {emp.email}
+                                    </div>
+                                  )}
+                                </>
+                              );
+                            })()}
                           </td>
 
                           {/* Territory */}
@@ -341,14 +439,18 @@ export default function AdminEmployeesPage() {
                             )}
                           </td>
 
-                          {/* Remarks */}
-                          <td className="py-3 px-3">
-                            {isRemarksEmpty ? (
-                              <span className="font-mono text-neutral-400 font-medium">(-)</span>
+                          {/* Base Salary */}
+                          <td className="py-3 px-3 whitespace-nowrap">
+                            {emp.baseSalary && emp.baseSalary > 0 ? (
+                              <div className="font-mono text-xs font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded inline-block">
+                                ₹{emp.baseSalary.toLocaleString('en-IN')}<span className="text-[9px] font-normal text-emerald-700">/mo</span>
+                              </div>
                             ) : (
-                              <span className="text-neutral-700 text-xs">{emp.remarks}</span>
+                              <span className="font-mono text-neutral-400 text-xs">(-)</span>
                             )}
                           </td>
+
+
 
                           {/* Status */}
                           <td className="py-3 px-3 whitespace-nowrap">
@@ -388,23 +490,6 @@ export default function AdminEmployeesPage() {
                                 <Pencil className="w-3 h-3 text-neutral-600" />
                                 <span>Edit</span>
                               </button>
-
-                              <a
-                                href={`https://wa.me/${emp.phone.replace(/[^0-9]/g, '')}?text=Hello%20${encodeURIComponent(emp.name)}%2C%20FILTEC%20Operations%20Update.`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                title="Send WhatsApp Message"
-                                className="p-1.5 rounded-md border border-[#E5E7EB] hover:border-emerald-300 hover:bg-emerald-50 text-neutral-600 hover:text-emerald-700 transition-colors"
-                              >
-                                <span className="text-[10px] font-mono font-bold text-emerald-700">WA</span>
-                              </a>
-
-                              <Link
-                                href="/admin/attendance"
-                                className="text-xs font-semibold px-2.5 py-1 rounded-md border border-[#E5E7EB] hover:border-neutral-400 hover:bg-neutral-50 text-[#111827] transition-all"
-                              >
-                                Attendance
-                              </Link>
                             </div>
                           </td>
                         </tr>
@@ -412,6 +497,290 @@ export default function AdminEmployeesPage() {
                     })}
                   </tbody>
                 </table>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ═══════════════════════════════════════════════════════════════════ */}
+        {/* DEDICATED SALARY CALCULATION & ATTENDANCE-BASED PAYROLL LEDGER     */}
+        {/* ═══════════════════════════════════════════════════════════════════ */}
+        {tab === 'SALARY' && (
+          <div className="space-y-4">
+            {/* Header with Month Navigation & Search */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white border border-[#E5E7EB] rounded-xl p-4 shadow-2xs">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs uppercase font-mono font-bold text-emerald-800 bg-emerald-50 px-2.5 py-0.5 rounded border border-emerald-200 flex items-center gap-1">
+                    <Calculator className="w-3 h-3 text-emerald-700" />
+                    ATTENDANCE-BASED SALARY ENGINE
+                  </span>
+                  <span className="text-xs font-mono text-[#6B7280]">
+                    {elapsedWorkingDays} / {totalWorkingDays} Mon–Sat working days elapsed
+                  </span>
+                </div>
+                <h3 className="text-base font-bold text-[#111827] mt-1">
+                  Monthly Salary Ledger — {monthTitle}
+                </h3>
+                <p className="text-xs text-[#6B7280] mt-0.5">
+                  Salaries computed automatically based on verified attendance punches. Payable Remuneration = (Present Days + Approved Leaves) ÷ Total Working Days × Base Salary.
+                </p>
+              </div>
+
+              {/* Month Navigation Controls */}
+              <div className="flex items-center gap-1.5 shrink-0">
+                <button
+                  type="button"
+                  onClick={handlePrevMonth}
+                  className="p-1.5 rounded-lg border border-[#E5E7EB] hover:bg-neutral-50 text-neutral-600 transition-colors cursor-pointer"
+                  title="Previous Month"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <input
+                  type="month"
+                  value={selectedMonth}
+                  onChange={(e) => setSelectedMonth(e.target.value)}
+                  className="text-xs font-mono font-bold border border-[#E5E7EB] rounded-lg px-3 py-1.5 bg-[#F9FAFB] outline-none text-[#111827] focus:ring-1 focus:ring-[#DC2626]"
+                />
+                <button
+                  type="button"
+                  onClick={handleNextMonth}
+                  className="p-1.5 rounded-lg border border-[#E5E7EB] hover:bg-neutral-50 text-neutral-600 transition-colors cursor-pointer"
+                  title="Next Month"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedMonth(new Date().toISOString().substring(0, 7))}
+                  className="px-2.5 py-1.5 rounded-lg text-xs font-medium border border-[#E5E7EB] hover:bg-neutral-50 text-[#111827] transition-all cursor-pointer"
+                  title="Reset to Current Month"
+                >
+                  Current Month
+                </button>
+              </div>
+            </div>
+
+            {/* Summary Statistics Cards */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="bg-white border border-[#E5E7EB] rounded-xl p-3.5 shadow-2xs">
+                <span className="text-[10px] uppercase font-mono font-bold text-[#6B7280] block">
+                  STAFF ON PAYROLL
+                </span>
+                <div className="text-xl font-bold font-mono text-[#111827] mt-1">
+                  {payrollRows.length}
+                </div>
+                <span className="text-[10px] text-[#6B7280]">
+                  {calendarDays} calendar days • {totalWorkingDays} working days
+                </span>
+              </div>
+
+              <div className="bg-white border border-[#E5E7EB] rounded-xl p-3.5 shadow-2xs">
+                <span className="text-[10px] uppercase font-mono font-bold text-[#6B7280] block">
+                  MONTHLY BASE COMMITTED
+                </span>
+                <div className="text-xl font-bold font-mono text-[#111827] mt-1">
+                  ₹{totalBaseSalarySum.toLocaleString('en-IN')}
+                </div>
+                <span className="text-[10px] text-[#6B7280]">Contracted base total</span>
+              </div>
+
+              <div className="bg-emerald-50/60 border border-emerald-200 rounded-xl p-3.5 shadow-2xs">
+                <span className="text-[10px] uppercase font-mono font-bold text-emerald-800 block">
+                  NET PAYABLE REMUNERATION
+                </span>
+                <div className="text-xl font-bold font-mono text-emerald-900 mt-1">
+                  ₹{totalPayableSalarySum.toLocaleString('en-IN')}
+                </div>
+                <span className="text-[10px] text-emerald-700">Attendance-verified payout</span>
+              </div>
+
+              <div className="bg-white border border-[#E5E7EB] rounded-xl p-3.5 shadow-2xs">
+                <span className="text-[10px] uppercase font-mono font-bold text-[#6B7280] block">
+                  AVG ATTENDANCE RATE
+                </span>
+                <div className="text-xl font-bold font-mono text-[#111827] mt-1">
+                  {avgAttendancePct}%
+                </div>
+                <span className="text-[10px] text-rose-600 font-mono">
+                  {totalDeductionsSum > 0 ? `₹${totalDeductionsSum.toLocaleString('en-IN')} LOP Deductions` : 'Zero Loss of Pay'}
+                </span>
+              </div>
+            </div>
+
+            {/* Search filter in Salary Ledger */}
+            <div className="bg-white border border-[#E5E7EB] rounded-xl p-3.5 shadow-2xs">
+              <div className="relative w-full sm:w-80">
+                <Search className="w-4 h-4 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={salarySearch}
+                  onChange={(e) => setSalarySearch(e.target.value)}
+                  placeholder="Filter payroll by name, code, territory..."
+                  className="w-full pl-9 pr-3 py-2 text-xs rounded-lg border border-[#E5E7EB] bg-white focus:outline-none focus:ring-1 focus:ring-[#DC2626]"
+                />
+              </div>
+            </div>
+
+            {/* Master Salary Calculation Ledger Table */}
+            <div className="bg-white border border-[#E5E7EB] rounded-xl shadow-2xs overflow-hidden">
+              <div className="px-4 py-3 border-b border-[#F3F4F6] flex items-center justify-between bg-[#F9FAFB]">
+                <div>
+                  <h3 className="text-xs font-bold font-mono uppercase tracking-wider text-[#111827]">
+                    Attendance-Based Payroll Ledger — {monthTitle}
+                  </h3>
+                  <p className="text-[11px] text-[#6B7280]">
+                    Calculated on {elapsedWorkingDays} elapsed of {totalWorkingDays} working days (Mon–Sat, Sundays excluded)
+                  </p>
+                </div>
+                <span className="text-[10px] font-mono text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 font-semibold">
+                  Official Ledger • {payrollRows.length} Staff
+                </span>
+              </div>
+
+              {payrollRows.length === 0 ? (
+                <div className="text-center py-10 text-neutral-500 text-xs">
+                  No employee payroll records match your search.
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead className="bg-[#F8F9FA] text-[#4B5563] font-mono uppercase text-[10px] border-b border-[#E5E7EB]">
+                      <tr>
+                        <th className="py-3 px-3 text-center w-10">Sr.</th>
+                        <th className="py-3 px-3">Field Representative</th>
+                        <th className="py-3 px-3 text-right">Working Days</th>
+                        <th className="py-3 px-3 text-right">Present</th>
+                        <th className="py-3 px-3 text-right">Absent</th>
+                        <th className="py-3 px-3 text-right">Leave</th>
+                        <th className="py-3 px-3 text-right">Attendance %</th>
+                        <th className="py-3 px-3 text-right">Base Salary</th>
+                        <th className="py-3 px-3 text-right">Per Day Rate</th>
+                        <th className="py-3 px-3 text-right">Payable Remuneration</th>
+                        <th className="py-3 px-4 text-right">Official Payslip</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#E5E7EB]">
+                      {payrollRows.map(({ emp, payroll, present, leave, absent, pct, base, perDay, payable }, idx) => (
+                        <tr key={emp.id} className="hover:bg-neutral-50/70 transition-colors">
+                          <td className="py-3 px-3 text-center font-mono text-neutral-500 text-[11px]">
+                            {idx + 1}
+                          </td>
+
+                          <td className="py-3 px-3">
+                            <div className="flex items-center gap-2">
+                              <div className="w-7 h-7 rounded-full bg-neutral-900 text-white flex items-center justify-center font-bold text-xs shrink-0">
+                                {emp.name.charAt(0)}
+                              </div>
+                              <div>
+                                <div className="font-semibold text-sm text-[#111827]">{emp.name}</div>
+                                <div className="text-[10px] text-[#6B7280] font-mono">
+                                  {emp.code} • {emp.designation || 'Field Representative'}
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+
+                          <td className="py-3 px-3 text-right font-mono text-[#4B5563]">
+                            {elapsedWorkingDays} / {totalWorkingDays}
+                          </td>
+
+                          <td className="py-3 px-3 text-right">
+                            <span className="inline-block font-mono font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded text-[11px]">
+                              {present}
+                            </span>
+                          </td>
+
+                          <td className="py-3 px-3 text-right">
+                            <span className={`inline-block font-mono font-bold px-2 py-0.5 rounded text-[11px] ${
+                              absent > 0
+                                ? 'text-rose-800 bg-rose-50 border border-rose-200'
+                                : 'text-neutral-500 bg-neutral-100'
+                            }`}>
+                              {absent}
+                            </span>
+                          </td>
+
+                          <td className="py-3 px-3 text-right">
+                            <span className={`inline-block font-mono px-2 py-0.5 rounded text-[11px] ${
+                              leave > 0
+                                ? 'text-amber-800 bg-amber-50 border border-amber-200 font-semibold'
+                                : 'text-neutral-400'
+                            }`}>
+                              {leave}
+                            </span>
+                          </td>
+
+                          <td className="py-3 px-3 text-right">
+                            <span className={`font-mono text-xs font-bold px-1.5 py-0.5 rounded ${
+                              pct >= 90
+                                ? 'bg-emerald-50 text-emerald-800'
+                                : pct >= 75
+                                ? 'bg-amber-50 text-amber-800'
+                                : 'bg-rose-50 text-rose-800'
+                            }`}>
+                              {pct}%
+                            </span>
+                          </td>
+
+                          <td className="py-3 px-3 text-right font-mono text-[#111827]">
+                            {base > 0 ? (
+                              <span className="font-semibold">₹{base.toLocaleString('en-IN')}</span>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSelectedEmployeeForEdit(emp);
+                                  setIsEditModalOpen(true);
+                                }}
+                                className="text-rose-600 underline text-[10px]"
+                              >
+                                Set base salary
+                              </button>
+                            )}
+                          </td>
+
+                          <td className="py-3 px-3 text-right font-mono text-[#6B7280]">
+                            {perDay > 0 ? `₹${perDay.toLocaleString('en-IN')}` : '—'}
+                          </td>
+
+                          <td className="py-3 px-3 text-right font-mono font-bold text-emerald-800 text-sm">
+                            {base > 0 ? (
+                              `₹${payable.toLocaleString('en-IN')}`
+                            ) : (
+                              <span className="text-neutral-400 text-xs font-normal">—</span>
+                            )}
+                          </td>
+
+                          <td className="py-3 px-4 text-right whitespace-nowrap">
+                            <button
+                              type="button"
+                              onClick={() => setSelectedPayroll(payroll)}
+                              className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-3 py-1.5 rounded-lg transition-all shadow-2xs cursor-pointer"
+                              title="Generate Official Payslip"
+                            >
+                              <FileText className="w-3.5 h-3.5 text-emerald-700" />
+                              <span>Payslip</span>
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              <div className="p-4 bg-[#F9FAFB] border-t border-[#E5E7EB] text-[11px] text-[#6B7280] space-y-1">
+                <p>
+                  <strong>• Working Days Policy:</strong> Total month working days are calculated Monday through Saturday (Sundays excluded).
+                </p>
+                <p>
+                  <strong>• Attendance-Based Pay:</strong> Daily Rate = Base Salary ÷ Total Month Working Days. Paid Days = Verified GPS Punches + Approved Leaves.
+                </p>
+                <p>
+                  <strong>• Official Payslips:</strong> Click the "Payslip" button in any row to generate, inspect, and print the official signed employee payslip.
+                </p>
               </div>
             </div>
           </div>
@@ -583,6 +952,13 @@ export default function AdminEmployeesPage() {
           setIsEditModalOpen(false);
           setSelectedEmployeeForEdit(null);
         }}
+      />
+
+      {/* Official Attendance-Based Payslip Modal */}
+      <PayslipModal
+        isOpen={!!selectedPayroll}
+        payroll={selectedPayroll}
+        onClose={() => setSelectedPayroll(null)}
       />
     </div>
   );

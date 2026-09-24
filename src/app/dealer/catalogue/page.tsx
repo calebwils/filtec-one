@@ -77,7 +77,7 @@ export default function DealerCataloguePage() {
               Product Catalogue
             </h1>
             <p className="text-xs text-[#6B7280] mt-0.5">
-              Official technical specifications and wholesale price list
+              Official technical specifications and packaging directory
             </p>
           </div>
 
@@ -245,7 +245,7 @@ export default function DealerCataloguePage() {
                 onClick={() => setIsCheckoutOpen(true)}
                 className="px-4 py-2 rounded-xl bg-[#DC2626] hover:bg-[#B91C1C] text-white text-xs font-bold flex items-center gap-1.5 transition-all shadow-xs cursor-pointer"
               >
-                <span>Review & Proforma</span>
+                <span>Review Requisition</span>
                 <ArrowRight className="w-3.5 h-3.5" />
               </button>
             </div>

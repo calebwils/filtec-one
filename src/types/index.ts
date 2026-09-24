@@ -41,16 +41,20 @@ export interface Dealer {
   name: string;
   ownerName: string;
   phone: string;
+  email?: string;
   city: string;
   state: string;
   address: string;
+  pincode?: string;
   creditLimit: number;
   outstandingBalance: number;
   tier: 'Platinum' | 'Gold' | 'Silver';
   totalPurchases: number;
   availableRewards: number;
+  pendingPlumberRewards?: number; // Rewards reserved strictly for plumbers while dealer has no plumbers
   plumbersCount: number;
   gstin?: string;
+  assignedRepId?: string;
 }
 
 export interface Plumber {
@@ -153,6 +157,8 @@ export interface Order {
   confirmedAt?: string;
   invoicedAt?: string;
   invoiceNumber?: string;
+  invoiceDate?: string;
+  invoiceValue?: number;
 }
 
 export interface RewardTransaction {
@@ -162,11 +168,33 @@ export interface RewardTransaction {
   orderNumber?: string;
   plumberId?: string;
   plumberName?: string;
-  type: 'CREDIT_ORDER' | 'DEBIT_PLUMBER_ALLOCATION' | 'ADJUSTMENT';
+  type: 'CREDIT_ORDER' | 'DEBIT_PLUMBER_ALLOCATION' | 'ADJUSTMENT' | 'PLUMBER_REWARD' | 'PLUMBER_REWARD_ESCROW' | 'ESCROW_RELEASE' | 'DEALER_REDEEM_VOUCHER' | 'PLUMBER_REDEEM_VOUCHER' | 'PLUMBER_VOUCHER_ISSUED';
   amount: number;
   balanceAfter: number;
   description: string;
+  voucherNumber?: string;
   createdAt: string;
+}
+
+export interface RewardVoucher {
+  id: string;
+  voucherNumber: string; // e.g. "D-001" or "P-001"
+  type: 'DEALER' | 'PLUMBER';
+  dealerId: string;
+  dealerName: string;
+  dealerCode?: string;
+  plumberId?: string;
+  plumberName?: string;
+  plumberPhone?: string;
+  points: number; // e.g. 128
+  amount: number; // in INR
+  status: 'ISSUED' | 'PENDING_SETTLEMENT' | 'SETTLED';
+  dateRedeemed: string; // e.g. "22/09/2026"
+  createdAt: string;
+  settledAt?: string;
+  creditNoteNumber?: string;
+  contactNumber: string; // "+91 99000 11223" (main office number)
+  instructions: string;
 }
 
 export interface RewardConfig {
@@ -186,6 +214,9 @@ export interface AttendanceRecord {
   locationName: string;
   photoUrl: string;
   verified: boolean;
+  accuracy?: number; // GPS precision radius in meters (e.g. 10 - 25m)
+  accuracyBand?: 'OPTIMAL' | 'ACCEPTABLE' | 'LOW';
+  distanceFromOffice?: number; // Distance in meters from FILTEC HQ (Water Park Rd, Kurangsasan)
 }
 
 export interface IntegrationEvent {
@@ -229,6 +260,9 @@ export interface AttendanceVerificationPoint {
   locationName: string;
   photoUrl: string;
   verified: boolean;
+  accuracy?: number; // Precision in meters
+  accuracyBand?: 'OPTIMAL' | 'ACCEPTABLE' | 'LOW';
+  distanceFromOffice?: number; // Distance in meters from FILTEC HQ
 }
 
 export interface DailyAttendanceSummary {
@@ -313,6 +347,16 @@ export interface AppSettings {
     defaultGstPercent: number;
     currency: string;
     timezone: string;
+    defaultDiscountPercent: number; // e.g. 48.0
+    phone?: string;
+    state?: string;
+    placeOfSupply?: string;
+    bankName?: string;
+    accountNumber?: string;
+    ifscCode?: string;
+    accountHolderName?: string;
+    upiId?: string;
+    termsAndConditions?: string[];
   };
   permissions: {
     admin: {

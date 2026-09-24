@@ -18,17 +18,24 @@ import {
   PlusCircle,
   Users,
   MessageSquare,
-  ShieldCheck
+  ShieldCheck,
+  Eye,
+  Mail,
+  UserCheck,
+  UserPlus
 } from 'lucide-react';
 import { EditDealerModal } from '@/components/admin/EditDealerModal';
+import { ViewDealerModal } from '@/components/admin/ViewDealerModal';
 import { Dealer } from '@/types';
 
 export default function AdminDealersPage() {
-  const { dealers } = useAppStore();
+  const { dealers, employees } = useAppStore();
   const [search, setSearch] = useState('');
-  const [tierFilter, setTierFilter] = useState<'ALL' | 'Platinum' | 'Gold' | 'Silver' | 'RISK'>('ALL');
+  const [tierFilter, setTierFilter] = useState<'ALL' | 'UNASSIGNED'>('ALL');
   const [selectedDealerForEdit, setSelectedDealerForEdit] = useState<Dealer | null>(null);
+  const [selectedDealerForView, setSelectedDealerForView] = useState<Dealer | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [isOnboardModalOpen, setIsOnboardModalOpen] = useState(false);
 
   // New Dealer state for simple onboard modal
@@ -36,32 +43,36 @@ export default function AdminDealersPage() {
     name: '',
     ownerName: '',
     phone: '',
+    email: '',
     city: '',
-    state: 'Odisha',
+    state: '21-Odisha',
     address: '',
-    creditLimit: 300000,
-    tier: 'Gold' as 'Platinum' | 'Gold' | 'Silver'
+    pincode: '',
+    gstin: '',
+    creditLimit: 0,
+    tier: 'Gold' as 'Platinum' | 'Gold' | 'Silver',
+    assignedRepId: '' as string | undefined
   });
 
-  const totalOutstanding = dealers.reduce((sum, d) => sum + (d.outstandingBalance || 0), 0);
-  const totalCreditLimit = dealers.reduce((sum, d) => sum + (d.creditLimit || 0), 0);
   const totalPlumbers = dealers.reduce((sum, d) => sum + (d.plumbersCount || 0), 0);
+  const uniqueDistricts = new Set(dealers.map((d) => d.city).filter(Boolean)).size;
+  const assignedStaffCount = dealers.filter((d) => Boolean(d.assignedRepId)).length;
+  const unassignedCount = dealers.length - assignedStaffCount;
 
   const filteredDealers = dealers.filter((d) => {
     const matchesSearch =
       d.name.toLowerCase().includes(search.toLowerCase()) ||
       d.city.toLowerCase().includes(search.toLowerCase()) ||
       d.ownerName.toLowerCase().includes(search.toLowerCase()) ||
-      d.code.toLowerCase().includes(search.toLowerCase());
+      d.code.toLowerCase().includes(search.toLowerCase()) ||
+      (d.phone && d.phone.includes(search));
 
     if (!matchesSearch) return false;
 
-    if (tierFilter === 'ALL') return true;
-    if (tierFilter === 'RISK') {
-      const util = d.creditLimit > 0 ? (d.outstandingBalance / d.creditLimit) * 100 : 0;
-      return util >= 80;
+    if (tierFilter === 'UNASSIGNED') {
+      return !d.assignedRepId;
     }
-    return d.tier === tierFilter;
+    return true;
   });
 
   const handleCreateDealer = (e: React.FormEvent) => {
@@ -72,10 +83,13 @@ export default function AdminDealersPage() {
       name: newDealerData.name,
       ownerName: newDealerData.ownerName,
       phone: newDealerData.phone,
+      email: newDealerData.email || undefined,
       city: newDealerData.city || 'Bhubaneswar',
-      state: newDealerData.state || 'Odisha',
+      state: newDealerData.state || '21-Odisha',
       address: newDealerData.address || 'Commercial Market',
-      creditLimit: Number(newDealerData.creditLimit) || 300000,
+      pincode: newDealerData.pincode || undefined,
+      gstin: newDealerData.gstin ? newDealerData.gstin.trim().toUpperCase() : undefined,
+      creditLimit: 0,
       tier: newDealerData.tier
     });
 
@@ -84,17 +98,21 @@ export default function AdminDealersPage() {
       name: '',
       ownerName: '',
       phone: '',
+      email: '',
       city: '',
-      state: 'Odisha',
+      state: '21-Odisha',
       address: '',
-      creditLimit: 300000,
-      tier: 'Gold'
+      pincode: '',
+      gstin: '',
+      creditLimit: 0,
+      tier: 'Gold',
+      assignedRepId: ''
     });
   };
 
   return (
     <div className="min-h-screen bg-[#F8F9FA] pb-mobile-nav">
-      <TopContextBar title="Dealer Directory" subtitle="Commercial Accounts & Credit Master" />
+      <TopContextBar title="Dealer Directory" />
       <DesktopSubNav />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-5 space-y-5">
@@ -102,16 +120,13 @@ export default function AdminDealersPage() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <h2 className="text-lg font-bold text-[#111827]">Authorized Dealer Network</h2>
-            <p className="text-xs text-[#6B7280]">
-              Credit exposure, outstanding balances, commercial tiers, and master profile administration
-            </p>
           </div>
 
           <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={() => setIsOnboardModalOpen(true)}
-              className="bg-[#DC2626] hover:bg-[#B91C1C] text-white text-xs font-semibold px-3.5 py-2 rounded-lg flex items-center gap-1.5 transition-all shadow-xs"
+              className="bg-[#DC2626] hover:bg-[#B91C1C] text-white text-xs font-semibold px-3.5 py-2 rounded-lg flex items-center gap-1.5 transition-all shadow-xs cursor-pointer"
             >
               <PlusCircle className="w-3.5 h-3.5" />
               <span>+ Onboard Dealer</span>
@@ -119,8 +134,8 @@ export default function AdminDealersPage() {
           </div>
         </div>
 
-        {/* Financial & Network KPI Overview */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        {/* Operational & Network KPI Overview */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div className="bg-white p-4 rounded-xl border border-[#E5E7EB] shadow-2xs">
             <div className="flex items-center justify-between text-xs text-[#6B7280] mb-1">
               <span className="font-mono uppercase font-semibold text-[10px]">Active Dealers</span>
@@ -132,26 +147,15 @@ export default function AdminDealersPage() {
 
           <div className="bg-white p-4 rounded-xl border border-[#E5E7EB] shadow-2xs">
             <div className="flex items-center justify-between text-xs text-[#6B7280] mb-1">
-              <span className="font-mono uppercase font-semibold text-[10px]">Total Ledger Outstanding</span>
-              <CreditCard className="w-4 h-4 text-amber-500" />
-            </div>
-            <div className="text-xl font-bold font-mono text-amber-800">
-              ₹{totalOutstanding.toLocaleString('en-IN')}
-            </div>
-            <span className="text-[10px] text-neutral-500 font-mono">
-              Limit: ₹{totalCreditLimit.toLocaleString('en-IN')}
-            </span>
-          </div>
-
-          <div className="bg-white p-4 rounded-xl border border-[#E5E7EB] shadow-2xs">
-            <div className="flex items-center justify-between text-xs text-[#6B7280] mb-1">
-              <span className="font-mono uppercase font-semibold text-[10px]">Credit Utilization</span>
-              <AlertTriangle className="w-4 h-4 text-neutral-400" />
+              <span className="font-mono uppercase font-semibold text-[10px]">Districts & Clusters</span>
+              <MapPin className="w-4 h-4 text-rose-500" />
             </div>
             <div className="text-xl font-bold font-mono text-[#111827]">
-              {totalCreditLimit > 0 ? Math.round((totalOutstanding / totalCreditLimit) * 100) : 0}%
+              {uniqueDistricts} Hubs
             </div>
-            <span className="text-[10px] text-emerald-700 font-medium">Safe Operational Ceiling</span>
+            <span className="text-[10px] text-neutral-500 font-mono">
+              Statewide Territory Coverage
+            </span>
           </div>
 
           <div className="bg-white p-4 rounded-xl border border-[#E5E7EB] shadow-2xs">
@@ -160,7 +164,7 @@ export default function AdminDealersPage() {
               <Users className="w-4 h-4 text-blue-500" />
             </div>
             <div className="text-xl font-bold font-mono text-blue-800">{totalPlumbers} Plumbers</div>
-            <span className="text-[10px] text-neutral-500 font-medium">Generating Secondary Sales</span>
+            <span className="text-[10px] text-neutral-500 font-medium">Generating Secondary Demand</span>
           </div>
         </div>
 
@@ -172,30 +176,28 @@ export default function AdminDealersPage() {
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by dealer firm, owner, city, ID..."
+              placeholder="Search by dealer firm, owner, city, phone, ID..."
               className="w-full pl-9 pr-3 py-2 text-xs rounded-lg border border-[#E5E7EB] bg-white focus:outline-none focus:ring-1 focus:ring-[#DC2626]"
             />
           </div>
 
           <div className="flex items-center gap-1.5 overflow-x-auto text-xs">
-            {(['ALL', 'Platinum', 'Gold', 'Silver', 'RISK'] as const).map((filter) => {
+            {(['ALL', 'UNASSIGNED'] as const).map((filter) => {
               const isSelected = tierFilter === filter;
               return (
                 <button
                   key={filter}
                   type="button"
                   onClick={() => setTierFilter(filter)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
                     isSelected
                       ? 'bg-[#111827] text-white shadow-xs'
                       : 'bg-white border border-[#E5E7EB] text-[#4B5563] hover:bg-neutral-50'
                   }`}
                 >
                   {filter === 'ALL'
-                    ? 'All Tiers'
-                    : filter === 'RISK'
-                    ? 'Credit Risk (>80%)'
-                    : `${filter} Tier`}
+                    ? 'All'
+                    : `Unassigned (${unassignedCount})`}
                 </button>
               );
             })}
@@ -226,26 +228,30 @@ export default function AdminDealersPage() {
                   <th className="py-3 px-4">Dealership / Firm</th>
                   <th className="py-3 px-4">Location & Address</th>
                   <th className="py-3 px-4">Authorized Contact</th>
-                  <th className="py-3 px-3">Outstanding / Credit Limit</th>
+                  <th className="py-3 px-3">Assigned Sales Officer</th>
                   <th className="py-3 px-3">Purchases</th>
                   <th className="py-3 px-4 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#F3F4F6]">
                 {filteredDealers.map((dealer) => {
-                  const creditUtilization = Math.min(
-                    100,
-                    Math.round((dealer.outstandingBalance / dealer.creditLimit) * 100)
-                  );
                   const cleanPhone = dealer.phone.replace(/[^0-9]/g, '');
 
                   return (
                     <tr key={dealer.id} className="hover:bg-neutral-50/80 transition-colors group">
                       {/* Code & Tier */}
                       <td className="py-3.5 px-3 whitespace-nowrap">
-                        <span className="tech-code font-bold text-xs bg-[#111827] text-white px-2 py-0.5 rounded font-mono">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedDealerForView(dealer);
+                            setIsViewModalOpen(true);
+                          }}
+                          className="tech-code font-bold text-xs bg-[#111827] hover:bg-neutral-800 text-white px-2 py-0.5 rounded font-mono cursor-pointer transition-colors"
+                          title="Click to view details"
+                        >
                           {dealer.code}
-                        </span>
+                        </button>
                         <div className="mt-1">
                           <span
                             className={`inline-flex text-[9px] font-mono font-bold px-1.5 py-0.2 rounded border ${
@@ -261,11 +267,25 @@ export default function AdminDealersPage() {
                         </div>
                       </td>
 
-                      {/* Name */}
+                      {/* Name & GSTIN */}
                       <td className="py-3.5 px-4">
-                        <div className="font-bold text-sm text-[#111827]">{dealer.name}</div>
-                        <div className="text-[11px] text-[#6B7280] font-mono mt-0.5">
-                          {dealer.plumbersCount} Linked Plumber(s)
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedDealerForView(dealer);
+                            setIsViewModalOpen(true);
+                          }}
+                          className="font-bold text-sm text-[#111827] hover:text-[#DC2626] text-left transition-colors cursor-pointer block"
+                        >
+                          {dealer.name}
+                        </button>
+                        <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                          <span className="text-[10px] font-mono font-bold bg-neutral-100 text-neutral-700 px-1.5 py-0.2 rounded border border-neutral-200">
+                            GSTIN: {dealer.gstin || 'URP'}
+                          </span>
+                          <span className="text-[11px] text-[#6B7280] font-mono">
+                            • {dealer.plumbersCount} Linked Plumber(s)
+                          </span>
                         </div>
                       </td>
 
@@ -293,22 +313,51 @@ export default function AdminDealersPage() {
                         </div>
                       </td>
 
-                      {/* Outstanding / Limit */}
+                      {/* Assigned Sales Officer */}
                       <td className="py-3.5 px-3 whitespace-nowrap">
-                        <div className="font-mono font-bold text-sm text-amber-800">
-                          ₹{dealer.outstandingBalance.toLocaleString('en-IN')}
-                        </div>
-                        <div className="text-[10px] font-mono text-neutral-500">
-                          Limit: ₹{dealer.creditLimit.toLocaleString('en-IN')} ({creditUtilization}%)
-                        </div>
-                        <div className="w-24 bg-neutral-100 rounded-full h-1 mt-1 overflow-hidden">
-                          <div
-                            className={`h-1 rounded-full ${
-                              creditUtilization > 80 ? 'bg-rose-600' : 'bg-neutral-800'
-                            }`}
-                            style={{ width: `${creditUtilization}%` }}
-                          />
-                        </div>
+                        {dealer.assignedRepId ? (
+                          (() => {
+                            const rep = employees.find(
+                              (e) => e.id === dealer.assignedRepId || e.code === dealer.assignedRepId
+                            );
+                            return (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSelectedDealerForEdit(dealer);
+                                  setIsEditModalOpen(true);
+                                }}
+                                className="flex items-center gap-1.5 text-left hover:opacity-80 transition-opacity cursor-pointer group"
+                                title="Click to change assigned staff"
+                              >
+                                <div className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold flex items-center justify-center font-mono shrink-0">
+                                  {rep ? rep.name.slice(0, 2).toUpperCase() : 'SO'}
+                                </div>
+                                <div>
+                                  <div className="text-xs font-semibold text-[#111827] group-hover:text-[#DC2626] transition-colors">
+                                    {rep ? rep.name : dealer.assignedRepId}
+                                  </div>
+                                  <div className="text-[10px] text-[#6B7280] font-mono">
+                                    {rep?.phone || 'Field Officer'}
+                                  </div>
+                                </div>
+                              </button>
+                            );
+                          })()
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedDealerForEdit(dealer);
+                              setIsEditModalOpen(true);
+                            }}
+                            className="inline-flex items-center gap-1 text-[11px] font-medium text-neutral-500 hover:text-[#DC2626] bg-neutral-50 hover:bg-neutral-100 px-2 py-1 rounded border border-dashed border-neutral-300 transition-colors cursor-pointer"
+                            title="Click to assign field representative"
+                          >
+                            <UserPlus className="w-3 h-3 text-neutral-400" />
+                            <span>+ Assign Staff</span>
+                          </button>
+                        )}
                       </td>
 
                       {/* Total Purchases */}
@@ -328,10 +377,23 @@ export default function AdminDealersPage() {
                           <button
                             type="button"
                             onClick={() => {
+                              setSelectedDealerForView(dealer);
+                              setIsViewModalOpen(true);
+                            }}
+                            className="text-xs font-semibold px-2.5 py-1 rounded-md border border-[#E5E7EB] hover:border-neutral-400 hover:bg-neutral-50 text-[#111827] transition-all flex items-center gap-1 shadow-2xs cursor-pointer"
+                            title="View Full Profile"
+                          >
+                            <Eye className="w-3 h-3 text-neutral-600" />
+                            <span>View</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => {
                               setSelectedDealerForEdit(dealer);
                               setIsEditModalOpen(true);
                             }}
-                            className="text-xs font-semibold px-2.5 py-1 rounded-md border border-[#E5E7EB] hover:border-neutral-400 hover:bg-neutral-50 text-[#111827] transition-all flex items-center gap-1 shadow-2xs"
+                            className="text-xs font-semibold px-2.5 py-1 rounded-md border border-[#E5E7EB] hover:border-neutral-400 hover:bg-neutral-50 text-[#111827] transition-all flex items-center gap-1 shadow-2xs cursor-pointer"
                           >
                             <Pencil className="w-3 h-3 text-neutral-600" />
                             <span>Edit</span>
@@ -382,10 +444,24 @@ export default function AdminDealersPage() {
         }}
       />
 
+      {/* View Dealer Profile Modal */}
+      <ViewDealerModal
+        isOpen={isViewModalOpen}
+        dealer={selectedDealerForView}
+        onClose={() => {
+          setIsViewModalOpen(false);
+          setSelectedDealerForView(null);
+        }}
+        onEdit={(dealer) => {
+          setSelectedDealerForEdit(dealer);
+          setIsEditModalOpen(true);
+        }}
+      />
+
       {/* Simple Onboard Modal */}
       {isOnboardModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto">
-          <div className="bg-white rounded-2xl shadow-2xl border border-[#E5E7EB] w-full max-w-lg overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+          <div className="bg-white rounded-2xl shadow-2xl border border-[#E5E7EB] w-full max-w-lg overflow-hidden animate-in fade-in zoom-in-95 duration-150 my-auto">
             <div className="px-6 py-4 border-b border-[#E5E7EB] flex items-center justify-between bg-[#F9FAFB]">
               <div className="flex items-center gap-2">
                 <Building2 className="w-5 h-5 text-rose-600" />
@@ -394,7 +470,7 @@ export default function AdminDealersPage() {
               <button
                 type="button"
                 onClick={() => setIsOnboardModalOpen(false)}
-                className="text-[#6B7280] hover:text-[#111827]"
+                className="text-[#6B7280] hover:text-[#111827] cursor-pointer"
               >
                 ✕
               </button>
@@ -413,6 +489,38 @@ export default function AdminDealersPage() {
                   onChange={(e) => setNewDealerData({ ...newDealerData, name: e.target.value })}
                   className="w-full px-3 py-2 text-xs rounded-lg border border-[#E5E7EB]"
                 />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-[#374151] mb-1">
+                    GSTIN / Tax ID
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 21AMMPB6918J1Z3"
+                    value={newDealerData.gstin}
+                    onChange={(e) =>
+                      setNewDealerData({ ...newDealerData, gstin: e.target.value.toUpperCase() })
+                    }
+                    className="w-full px-3 py-2 text-xs rounded-lg border border-[#E5E7EB] font-mono uppercase"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-[#374151] mb-1">
+                    Official Email
+                  </label>
+                  <input
+                    type="email"
+                    placeholder="e.g. dealer@filtec.in"
+                    value={newDealerData.email}
+                    onChange={(e) =>
+                      setNewDealerData({ ...newDealerData, email: e.target.value })
+                    }
+                    className="w-full px-3 py-2 text-xs rounded-lg border border-[#E5E7EB]"
+                  />
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -447,7 +555,7 @@ export default function AdminDealersPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-3 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-[#374151] mb-1">
                     City <span className="text-rose-600">*</span>
@@ -455,13 +563,41 @@ export default function AdminDealersPage() {
                   <input
                     type="text"
                     required
-                    placeholder="e.g. Bhubaneswar"
+                    placeholder="e.g. Kendrapara"
                     value={newDealerData.city}
                     onChange={(e) => setNewDealerData({ ...newDealerData, city: e.target.value })}
                     className="w-full px-3 py-2 text-xs rounded-lg border border-[#E5E7EB]"
                   />
                 </div>
 
+                <div>
+                  <label className="block text-xs font-semibold text-[#374151] mb-1">
+                    State
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="21-Odisha"
+                    value={newDealerData.state}
+                    onChange={(e) => setNewDealerData({ ...newDealerData, state: e.target.value })}
+                    className="w-full px-3 py-2 text-xs rounded-lg border border-[#E5E7EB]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-[#374151] mb-1">
+                    PIN Code
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="754225"
+                    value={newDealerData.pincode}
+                    onChange={(e) => setNewDealerData({ ...newDealerData, pincode: e.target.value })}
+                    className="w-full px-3 py-2 text-xs rounded-lg border border-[#E5E7EB] font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-[#374151] mb-1">
                     Commercial Tier
@@ -478,21 +614,26 @@ export default function AdminDealersPage() {
                     <option value="Silver">Silver</option>
                   </select>
                 </div>
-              </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-[#374151] mb-1">
-                  Credit Limit (₹ INR)
-                </label>
-                <input
-                  type="number"
-                  step="25000"
-                  value={newDealerData.creditLimit}
-                  onChange={(e) =>
-                    setNewDealerData({ ...newDealerData, creditLimit: Number(e.target.value) })
-                  }
-                  className="w-full px-3 py-2 text-xs rounded-lg border border-[#E5E7EB] font-mono"
-                />
+                <div>
+                  <label className="block text-xs font-semibold text-[#374151] mb-1">
+                    Assigned Sales Staff
+                  </label>
+                  <select
+                    value={newDealerData.assignedRepId || ''}
+                    onChange={(e) =>
+                      setNewDealerData({ ...newDealerData, assignedRepId: e.target.value })
+                    }
+                    className="w-full px-3 py-2 text-xs rounded-lg border border-[#E5E7EB] bg-white focus:outline-none focus:ring-1 focus:ring-[#DC2626]"
+                  >
+                    <option value="">Unassigned (Open Territory)</option>
+                    {employees.map((emp) => (
+                      <option key={emp.id} value={emp.id}>
+                        {emp.name} ({emp.designation || 'Staff'})
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
               <div>
@@ -512,13 +653,13 @@ export default function AdminDealersPage() {
                 <button
                   type="button"
                   onClick={() => setIsOnboardModalOpen(false)}
-                  className="px-3.5 py-1.5 text-xs text-[#4B5563]"
+                  className="px-3.5 py-1.5 text-xs text-[#4B5563] cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="bg-[#DC2626] hover:bg-[#B91C1C] text-white text-xs font-semibold px-4 py-1.5 rounded-lg shadow-xs"
+                  className="bg-[#DC2626] hover:bg-[#B91C1C] text-white text-xs font-semibold px-4 py-1.5 rounded-lg shadow-xs cursor-pointer"
                 >
                   Save & Onboard
                 </button>

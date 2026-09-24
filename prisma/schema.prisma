@@ -53,14 +53,18 @@ model Dealer {
   name               String
   ownerName          String
   phone              String
+  email              String?
   city               String
   state              String
   address            String
+  pincode            String?
+  gstin              String?
   creditLimit        Float    @default(0)
   outstandingBalance Float    @default(0)
   tier               String   @default("Silver") // "Platinum" | "Gold" | "Silver"
   totalPurchases     Float    @default(0)
   availableRewards   Float    @default(0)
+  pendingPlumberRewards Float @default(0)
   plumbersCount      Int      @default(0)
   assignedRepId      String?
   createdAt          DateTime @default(now())
@@ -141,6 +145,8 @@ model Order {
   confirmedAt        String?
   invoicedAt         String?
   invoiceNumber      String?
+  invoiceDate        String?
+  invoiceValue       Float?
   items              OrderItem[]
 }
 
@@ -185,6 +191,7 @@ model AttendanceRecord {
   locationName String
   photoUrl     String
   verified     Boolean  @default(true)
+  distanceFromOffice Float?
 }
 
 model DailyAttendanceSummary {

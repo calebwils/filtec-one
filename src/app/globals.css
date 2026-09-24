@@ -89,8 +89,10 @@
     color-adjust: exact !important;
   }
 
-  /* Isolate proforma: Hide everything else in the body tree */
-  body > *:not(#filtec-proforma-print-portal) {
+  /* Isolate proforma & payslip: Hide everything else in the body tree */
+  body:has(#filtec-proforma-print-portal) > *:not(#filtec-proforma-print-portal),
+  body:has(#filtec-estimate-print-portal) > *:not(#filtec-estimate-print-portal),
+  body:has(#filtec-payslip-print-portal) > *:not(#filtec-payslip-print-portal) {
     display: none !important;
     visibility: hidden !important;
   }
@@ -108,7 +110,9 @@
     display: none !important;
   }
 
-  #filtec-proforma-print-portal {
+  #filtec-proforma-print-portal,
+  #filtec-estimate-print-portal,
+  #filtec-payslip-print-portal {
     position: static !important;
     display: block !important;
     width: 100% !important;

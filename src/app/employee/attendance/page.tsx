@@ -18,8 +18,10 @@ import {
   PlusCircle,
   AlertCircle,
   XCircle,
-  FileText
+  FileText,
+  Navigation
 } from 'lucide-react';
+import { calculateDistanceMeters, formatDistanceToFiltec, formatDistanceShort } from '@/utils/distance';
 
 export default function AttendancePage() {
   const { attendanceRecords, currentUser, leaveRequests, settings } = useAppStore();
@@ -28,7 +30,15 @@ export default function AttendancePage() {
   const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false);
   const [mode, setMode] = useState<'CHECK_IN' | 'CHECK_OUT'>('CHECK_IN');
 
-  const latestRecord = attendanceRecords[0];
+  const todayStr = new Date().toISOString().split('T')[0];
+  const myRecords = attendanceRecords.filter(
+    (r) =>
+      r.employeeId === currentUser.id ||
+      r.employeeId === currentUser.employeeCode ||
+      r.employeeName === currentUser.name
+  );
+  const myTodayRecord = myRecords.find((r) => r.timestamp.startsWith(todayStr));
+  const latestRecord = myTodayRecord || myRecords[0];
 
   const myLeaves = leaveRequests.filter(
     (l) => l.employeeId === currentUser.id || l.employeeName === currentUser.name
@@ -142,27 +152,43 @@ export default function AttendancePage() {
 
                 <div className="bg-[#F9FAFB] p-3 rounded-lg border border-[#E5E7EB] flex items-center justify-between">
                   <div>
-                    <span className="text-[10px] uppercase font-mono text-[#6B7280] block">Last Status</span>
-                    <div className="font-semibold text-xs text-[#111827] mt-0.5">
-                      {latestRecord ? (latestRecord.type === 'CHECK_IN' ? 'Checked In' : 'Checked Out') : 'None'}
+                    <span className="text-[10px] uppercase font-mono text-[#6B7280] block">Today Status</span>
+                    <div className={`font-semibold text-xs mt-0.5 ${myTodayRecord ? 'text-[#111827]' : 'text-rose-700'}`}>
+                      {myTodayRecord ? (myTodayRecord.type === 'CHECK_IN' ? 'Checked In' : 'Checked Out') : 'Absent / Not Checked In'}
                     </div>
                     <span className="text-[10px] font-mono text-[#6B7280]">
-                      {latestRecord ? new Date(latestRecord.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Awaiting punch'}
+                      {myTodayRecord ? `Today at ${new Date(myTodayRecord.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'No punch recorded today'}
                     </span>
                   </div>
-                  {latestRecord?.photoUrl && (
+                  {myTodayRecord?.photoUrl && (
                     <div className="w-10 h-10 rounded-lg overflow-hidden border border-[#E5E7EB] bg-neutral-900 shrink-0">
-                      <img src={latestRecord.photoUrl} alt="Verified Selfie" className="w-full h-full object-cover" />
+                      <img src={myTodayRecord.photoUrl} alt="Verified Selfie" className="w-full h-full object-cover" />
                     </div>
                   )}
                 </div>
 
                 <div className="bg-[#F9FAFB] p-3 rounded-lg border border-[#E5E7EB]">
-                  <span className="text-[10px] uppercase font-mono text-[#6B7280] block">Last Verified Location</span>
-                  <div className="font-semibold text-xs text-[#111827] mt-0.5 truncate" title={latestRecord?.locationName}>
-                    {latestRecord ? latestRecord.locationName : 'No GPS record'}
+                  <span className="text-[10px] uppercase font-mono text-[#6B7280] block">Today Verified Location</span>
+                  <div className={`font-semibold text-xs mt-0.5 truncate ${myTodayRecord ? 'text-[#111827]' : 'text-rose-700'}`} title={myTodayRecord?.locationName}>
+                    {myTodayRecord ? myTodayRecord.locationName : 'Absent (No GPS Punch Today)'}
                   </div>
-                  <span className="text-[10px] text-emerald-700 font-medium">Real GPS Verified</span>
+                  {myTodayRecord && (
+                    <div className="text-[11px] font-mono text-purple-800 font-semibold flex items-center gap-1 mt-1">
+                      <Navigation className="w-3 h-3 text-purple-600 shrink-0" />
+                      <span>
+                        {formatDistanceToFiltec(
+                          myTodayRecord.distanceFromOffice !== undefined
+                            ? myTodayRecord.distanceFromOffice
+                            : calculateDistanceMeters(myTodayRecord.latitude, myTodayRecord.longitude)
+                        )}
+                      </span>
+                    </div>
+                  )}
+                  <span className={`text-[10px] font-mono font-medium block mt-0.5 ${myTodayRecord ? 'text-emerald-700' : 'text-rose-600'}`}>
+                    {myTodayRecord
+                      ? `GPS Precision: ±${myTodayRecord.accuracy || 14.5}m (10-25m Target)`
+                      : 'Tap Record Check-In'}
+                  </span>
                 </div>
               </div>
             </div>
@@ -170,49 +196,66 @@ export default function AttendancePage() {
             {/* Verification History Log */}
             <div className="bg-white border border-[#E5E7EB] rounded-xl p-5 shadow-2xs">
               <h3 className="text-xs font-bold uppercase font-mono text-[#111827] mb-3">
-                Recent Attendance Records
+                My Attendance Records ({myRecords.length})
               </h3>
 
               <div className="divide-y divide-[#F3F4F6]">
-                {attendanceRecords.map((record) => (
-                  <div key={record.id} className="py-3 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="relative w-12 h-12 rounded-lg overflow-hidden bg-neutral-900 border border-[#E5E7EB] shrink-0">
-                        {record.photoUrl ? (
-                          <img
-                            src={record.photoUrl}
-                            alt="Attendance Selfie"
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center text-[#111827] font-mono text-xs font-bold bg-neutral-100">
-                            {record.type === 'CHECK_IN' ? 'IN' : 'OUT'}
+                {myRecords.length === 0 ? (
+                  <div className="py-6 text-center text-xs text-neutral-400 font-mono">
+                    No attendance records found for this account.
+                  </div>
+                ) : (
+                  myRecords.map((record) => {
+                    const recordDist =
+                      record.distanceFromOffice !== undefined
+                        ? record.distanceFromOffice
+                        : calculateDistanceMeters(record.latitude, record.longitude);
+                    return (
+                      <div key={record.id} className="py-3 flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="relative w-12 h-12 rounded-lg overflow-hidden bg-neutral-900 border border-[#E5E7EB] shrink-0">
+                            {record.photoUrl ? (
+                              <img
+                                src={record.photoUrl}
+                                alt="Attendance Selfie"
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center text-[#111827] font-mono text-xs font-bold bg-neutral-100">
+                                {record.type === 'CHECK_IN' ? 'IN' : 'OUT'}
+                              </div>
+                            )}
+                            <span
+                              className={`absolute bottom-0 inset-x-0 text-[8px] font-mono font-bold text-center text-white py-0.2 ${
+                                record.type === 'CHECK_IN' ? 'bg-emerald-600' : 'bg-neutral-800'
+                              }`}
+                            >
+                              {record.type === 'CHECK_IN' ? 'IN' : 'OUT'}
+                            </span>
                           </div>
-                        )}
-                        <span
-                          className={`absolute bottom-0 inset-x-0 text-[8px] font-mono font-bold text-center text-white py-0.2 ${
-                            record.type === 'CHECK_IN' ? 'bg-emerald-600' : 'bg-neutral-800'
-                          }`}
-                        >
-                          {record.type === 'CHECK_IN' ? 'IN' : 'OUT'}
-                        </span>
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-semibold text-xs text-[#111827]">
-                            {record.type === 'CHECK_IN' ? 'Check-In Punch' : 'Check-Out Punch'}
-                          </span>
-                          <span className="inline-flex items-center gap-1 text-[10px] font-mono text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
-                            <ShieldCheck className="w-3 h-3" />
-                            Real Photo Verified
-                          </span>
+                          <div>
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <span className="font-semibold text-xs text-[#111827]">
+                                {record.type === 'CHECK_IN' ? 'Check-In Punch' : 'Check-Out Punch'}
+                              </span>
+                              <span className="inline-flex items-center gap-1 text-[10px] font-mono text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
+                                <ShieldCheck className="w-3 h-3" />
+                                Photo Verified
+                              </span>
+                              <span className="inline-flex items-center gap-1 text-[10px] font-mono text-emerald-800 bg-neutral-100 px-1.5 py-0.2 rounded border border-neutral-200">
+                                ±{record.accuracy || 14.5}m Precision
+                              </span>
+                              <span className="inline-flex items-center gap-1 text-[10px] font-mono text-purple-800 bg-purple-50 px-1.5 py-0.2 rounded border border-purple-200 font-semibold">
+                                <Navigation className="w-2.5 h-2.5 text-purple-600" />
+                                {formatDistanceShort(recordDist)} from HQ
+                              </span>
+                            </div>
+                            <div className="text-xs text-[#6B7280] flex items-center gap-1 mt-0.5">
+                              <MapPin className="w-3 h-3 text-neutral-400 shrink-0" />
+                              <span className="line-clamp-1">{record.locationName}</span>
+                            </div>
+                          </div>
                         </div>
-                        <div className="text-xs text-[#6B7280] flex items-center gap-1 mt-0.5">
-                          <MapPin className="w-3 h-3 text-neutral-400 shrink-0" />
-                          <span className="line-clamp-1">{record.locationName}</span>
-                        </div>
-                      </div>
-                    </div>
 
                     <div className="text-right font-mono text-xs text-[#4B5563] shrink-0 ml-2">
                       {new Date(record.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -221,9 +264,11 @@ export default function AttendancePage() {
                       </span>
                     </div>
                   </div>
-                ))}
-              </div>
+                );
+              })
+            )}
             </div>
+          </div>
           </>
         ) : (
           /* LEAVE & REGULARIZATION TAB */

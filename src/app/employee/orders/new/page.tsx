@@ -19,23 +19,31 @@ import {
   BookOpen,
   MapPin,
   Phone,
-  ShieldAlert,
   Send,
-  Receipt
+  MessageSquare,
+  Copy,
+  Check,
+  ExternalLink,
+  ShieldAlert
 } from 'lucide-react';
-import { ProformaInvoiceModal } from '@/components/orders/ProformaInvoiceModal';
+import { DealerSearchCombobox } from '@/components/dealers/DealerSearchCombobox';
 import confetti from 'canvas-confetti';
 
 export default function NewOrderPage() {
   const router = useRouter();
-  const { dealers, cart, rewardConfig, currentUser } = useAppStore();
+  const { dealers, cart, rewardConfig, currentUser, settings } = useAppStore();
+
+  const isAdmin = currentUser?.role === 'ADMIN';
 
   const [notes, setNotes] = useState(cart.notes || '');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submittedOrder, setSubmittedOrder] = useState<any | null>(null);
-  const [showProformaModal, setShowProformaModal] = useState(false);
+  const [copiedWhatsApp, setCopiedWhatsApp] = useState(false);
 
-  const selectedDealer = dealers.find((d) => d.id === cart.dealerId) || dealers[0];
+  // Do NOT preselect a vendor: null if none explicitly selected
+  const selectedDealer = cart.dealerId
+    ? dealers.find((d) => d.id === cart.dealerId) || null
+    : null;
 
   const totals = OrderService.calculateOrderTotals(cart.items, rewardConfig);
 
@@ -44,7 +52,7 @@ export default function NewOrderPage() {
   };
 
   const handleSubmitOrder = () => {
-    if (cart.items.length === 0) return;
+    if (!selectedDealer || cart.items.length === 0) return;
     setIsSubmitting(true);
 
     setTimeout(() => {
@@ -63,6 +71,59 @@ export default function NewOrderPage() {
     }, 450);
   };
 
+  // Generate WhatsApp message with products and quantities only (NO PRICES)
+  const getWhatsAppMessageText = () => {
+    if (!submittedOrder) return '';
+    const itemsList = (submittedOrder.items || [])
+      .map(
+        (item: any, idx: number) =>
+          `${idx + 1}. *${item.productName}* (${item.productCode})\n   • Spec: ${item.variantDescription}\n   • Qty: *${item.quantity} ${item.packingUnit || 'Pcs'}*`
+      )
+      .join('\n\n');
+
+    return (
+      `*FILTEC ONE — NEW FIELD ORDER REQUISITION*\n` +
+      `━━━━━━━━━━━━━━━━━━━━\n` +
+      `📋 *Order No:* ${submittedOrder.orderNumber}\n` +
+      `🏢 *Dealer:* ${submittedOrder.dealerName}\n` +
+      `📍 *Location:* ${submittedOrder.dealerCity}\n` +
+      `📞 *Dealer Phone:* ${submittedOrder.dealerPhone}\n` +
+      `👤 *Field Staff:* ${currentUser.name} (${currentUser.phone})\n` +
+      `📅 *Date:* ${new Date().toLocaleDateString('en-IN')}\n\n` +
+      `📦 *ORDERED PRODUCTS & QUANTITIES:*\n` +
+      `${itemsList}\n\n` +
+      (submittedOrder.notes ? `📝 *Delivery Notes:* ${submittedOrder.notes}\n\n` : '') +
+      `━━━━━━━━━━━━━━━━━━━━\n` +
+      `*FILTEC Polyplast Pvt. Ltd.* — Official Requisition`
+    );
+  };
+
+  const handleCopyWhatsApp = () => {
+    const text = getWhatsAppMessageText();
+    navigator.clipboard.writeText(text);
+    setCopiedWhatsApp(true);
+    setTimeout(() => setCopiedWhatsApp(false), 2000);
+  };
+
+  // Build WhatsApp URLs
+  const rawAdminPhone = settings?.company?.supportWhatsApp || '+91 9437505814';
+  const adminPhoneDigits = rawAdminPhone.replace(/\D/g, '') || '919437505814';
+  const cleanAdminPhone = adminPhoneDigits.length === 10 ? `91${adminPhoneDigits}` : adminPhoneDigits;
+  // Display phone: always show as "+91 XXXXXXXXXX"
+  const adminPhoneDisplay = (() => {
+    const digits = adminPhoneDigits.replace(/^91(?=\d{10})/, '');
+    return `+91 ${digits}`;
+  })();
+  const adminWhatsAppUrl = submittedOrder
+    ? `https://wa.me/${cleanAdminPhone}?text=${encodeURIComponent(getWhatsAppMessageText())}`
+    : '#';
+
+  const cleanDealerPhone = submittedOrder?.dealerPhone?.replace(/\D/g, '') || '';
+  const dealerPhoneWithCountry = cleanDealerPhone.length === 10 ? `91${cleanDealerPhone}` : cleanDealerPhone;
+  const dealerWhatsAppUrl = submittedOrder && cleanDealerPhone
+    ? `https://wa.me/${dealerPhoneWithCountry}?text=${encodeURIComponent(getWhatsAppMessageText())}`
+    : '#';
+
   return (
     <div className="min-h-screen bg-[#F8F9FA] pb-mobile-nav">
       <TopContextBar title="Create Field Order" subtitle="Employee Flow" />
@@ -79,7 +140,7 @@ export default function NewOrderPage() {
             <span>Return to Catalogue</span>
           </Link>
           <span className="text-[11px] font-mono text-[#6B7280]">
-            Lifecycle: DRAFT → SUBMITTED → PENDING_ADMIN_APPROVAL
+            Lifecycle: DRAFT → SUBMITTED → DISPATCHED
           </span>
         </div>
 
@@ -95,51 +156,53 @@ export default function NewOrderPage() {
               </h3>
             </div>
             <span className="text-xs font-mono text-[#6B7280]">
-              Credit Limit Verified
+              {selectedDealer ? 'Dealer Verified' : 'Action Required'}
             </span>
           </div>
 
           <div className="space-y-3">
             <div>
               <label className="text-xs font-semibold text-[#111827] block mb-1.5">
-                Select Dealer:
+                Select Dealer Account:
               </label>
-              <select
-                value={cart.dealerId || selectedDealer?.id}
-                onChange={(e) => handleDealerChange(e.target.value)}
-                className="w-full text-xs p-2.5 rounded-lg border border-[#E5E7EB] bg-[#F9FAFB] focus:outline-none focus:ring-1 focus:ring-[#DC2626] font-medium"
-              >
-                {dealers.map((dealer) => (
-                  <option key={dealer.id} value={dealer.id}>
-                    {dealer.name} — {dealer.city} ({dealer.tier} Tier)
-                  </option>
-                ))}
-              </select>
+              <DealerSearchCombobox
+                dealers={dealers}
+                selectedDealerId={selectedDealer?.id || null}
+                onSelectDealer={(dealer) => handleDealerChange(dealer.id)}
+                placeholder="Click or type to search authorized dealer (e.g. Ashirbad, Mamata, Kendrapara)..."
+              />
             </div>
 
-            {/* Selected Dealer Snapshot */}
-            {selectedDealer && (
-              <div className="bg-[#F9FAFB] p-3 rounded-lg border border-[#E5E7EB] grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+            {/* Selected Dealer Snapshot or Guidance Note */}
+            {selectedDealer ? (
+              <div className="bg-[#F9FAFB] p-3 rounded-lg border border-[#E5E7EB] grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs animate-in fade-in-50 duration-150">
                 <div>
-                  <span className="text-[10px] uppercase font-mono text-[#9CA3AF] block">City</span>
-                  <span className="font-medium text-[#111827]">{selectedDealer.city}</span>
-                </div>
-                <div>
-                  <span className="text-[10px] uppercase font-mono text-[#9CA3AF] block">Contact</span>
-                  <span className="font-mono text-[#111827]">{selectedDealer.phone}</span>
-                </div>
-                <div>
-                  <span className="text-[10px] uppercase font-mono text-[#9CA3AF] block">Outstanding Balance</span>
-                  <span className="font-mono font-semibold text-amber-800">
-                    ₹{selectedDealer.outstandingBalance.toLocaleString('en-IN')}
+                  <span className="text-[10px] uppercase font-mono text-[#9CA3AF] block">City / District</span>
+                  <span className="font-medium text-[#111827] flex items-center gap-1">
+                    <MapPin className="w-3 h-3 text-[#DC2626]" />
+                    {selectedDealer.city}
                   </span>
                 </div>
                 <div>
-                  <span className="text-[10px] uppercase font-mono text-[#9CA3AF] block">Credit Limit</span>
-                  <span className="font-mono font-semibold text-neutral-800">
-                    ₹{selectedDealer.creditLimit.toLocaleString('en-IN')}
+                  <span className="text-[10px] uppercase font-mono text-[#9CA3AF] block">Contact Phone</span>
+                  <span className="font-mono text-[#111827] flex items-center gap-1">
+                    <Phone className="w-3 h-3 text-neutral-400" />
+                    {selectedDealer.phone}
                   </span>
                 </div>
+                <div>
+                  <span className="text-[10px] uppercase font-mono text-[#9CA3AF] block">Dealer Code</span>
+                  <span className="font-mono font-semibold text-neutral-800">{selectedDealer.code}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] uppercase font-mono text-[#9CA3AF] block">Market / Area</span>
+                  <span className="font-medium text-neutral-800 truncate block">{selectedDealer.address}</span>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-amber-50/70 border border-amber-200/80 rounded-xl p-3 text-xs text-amber-900 flex items-center gap-2">
+                <Building2 className="w-4 h-4 text-amber-600 shrink-0" />
+                <span>Please search and select an authorized dealer partner above to book this order.</span>
               </div>
             )}
           </div>
@@ -179,7 +242,8 @@ export default function NewOrderPage() {
                           {item.productName}
                         </h4>
                         <div className="text-[11px] text-[#6B7280] font-mono mt-0.5">
-                          {item.variantDescription} • Rate: ₹{item.unitPrice.toFixed(2)}
+                          {item.variantDescription} • Pack: {item.packingQty} {item.packingUnit}
+                          {isAdmin && ` • Rate: ₹${item.unitPrice.toFixed(2)}`}
                         </div>
                       </div>
                     </div>
@@ -206,18 +270,21 @@ export default function NewOrderPage() {
                         </button>
                       </div>
 
-                      {/* Line total */}
-                      <div className="text-right min-w-[90px]">
-                        <span className="font-mono font-bold text-xs text-[#111827] block">
-                          ₹{item.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                        </span>
-                      </div>
+                      {/* Line total only visible to Admin */}
+                      {isAdmin && (
+                        <div className="text-right min-w-[90px]">
+                          <span className="font-mono font-bold text-xs text-[#111827] block">
+                            ₹{item.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                      )}
 
                       {/* Remove button */}
                       <button
                         type="button"
                         onClick={() => store.removeFromCart(item.id)}
                         className="text-neutral-400 hover:text-rose-600 p-1 rounded"
+                        title="Remove product"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
@@ -235,69 +302,99 @@ export default function NewOrderPage() {
                   type="text"
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
-                  placeholder="e.g. Deliver before 2 PM to Mithakhali branch warehouse..."
+                  placeholder="e.g. Urgent delivery needed, deliver to Kendrapara depot..."
                   className="w-full text-xs p-2 rounded-lg border border-[#E5E7EB] bg-[#F9FAFB] focus:outline-none focus:ring-1 focus:ring-[#DC2626]"
                 />
               </div>
 
-              {/* Financial Calculation Summary */}
-              <div className="mt-4 pt-3 border-t border-[#E5E7EB] grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* Commercial Incentive Preview (1% Rule) */}
-                <div className="bg-[#F8F9FA] p-3 rounded-lg border border-[#E5E7EB] text-xs space-y-1.5">
-                  <div className="text-[10px] uppercase font-mono font-bold text-[#4B5563]">
-                    Estimated Rewards ({rewardConfig.ratePercent}% Sales Rule)
+              {/* Order Summary: Admin gets full pricing; Staff/Dealers get quantity composition */}
+              {isAdmin ? (
+                <div className="mt-4 pt-3 border-t border-[#E5E7EB] grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Commercial Incentive Preview */}
+                  <div className="bg-[#F8F9FA] p-3 rounded-lg border border-[#E5E7EB] text-xs space-y-1.5">
+                    <div className="text-[10px] uppercase font-mono font-bold text-[#4B5563]">
+                      Estimated Rewards ({rewardConfig.ratePercent}% Sales Rule)
+                    </div>
+                    <div className="flex justify-between text-[#4B5563]">
+                      <span>Total Incentive:</span>
+                      <span className="font-mono font-bold text-[#111827]">₹{totals.totalReward.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between text-[#6B7280] text-[11px]">
+                      <span>Dealer Credit ({rewardConfig.dealerSharePercent}%):</span>
+                      <span className="font-mono font-semibold text-emerald-700">₹{totals.dealerReward.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between text-[#6B7280] text-[11px]">
+                      <span>Plumber Pool ({rewardConfig.plumberSharePercent}%):</span>
+                      <span className="font-mono font-semibold text-blue-700">₹{totals.plumberReward.toFixed(2)}</span>
+                    </div>
                   </div>
-                  <div className="flex justify-between text-[#4B5563]">
-                    <span>Total Incentive:</span>
-                    <span className="font-mono font-bold text-[#111827]">₹{totals.totalReward.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between text-[#6B7280] text-[11px]">
-                    <span>Dealer Credit ({rewardConfig.dealerSharePercent}%):</span>
-                    <span className="font-mono font-semibold text-emerald-700">₹{totals.dealerReward.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between text-[#6B7280] text-[11px]">
-                    <span>Plumber Pool ({rewardConfig.plumberSharePercent}%):</span>
-                    <span className="font-mono font-semibold text-blue-700">₹{totals.plumberReward.toFixed(2)}</span>
-                  </div>
-                </div>
 
-                {/* Subtotal & Total Value */}
-                <div className="bg-[#F8F9FA] p-3 rounded-lg border border-[#E5E7EB] text-xs space-y-1.5">
-                  <div className="flex justify-between text-[#4B5563]">
-                    <span>Subtotal:</span>
-                    <span className="font-mono font-medium text-[#111827]">
-                      ₹{totals.subtotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                    </span>
-                  </div>
-                  <div className="flex justify-between text-[#6B7280]">
-                    <span>GST (18%):</span>
-                    <span className="font-mono text-[#111827]">
-                      ₹{totals.gstAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                    </span>
-                  </div>
-                  <div className="border-t border-[#E5E7EB] pt-1.5 flex justify-between text-sm font-bold text-[#111827]">
-                    <span>Total Order Value:</span>
-                    <span className="font-mono text-[#DC2626]">
-                      ₹{totals.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                    </span>
+                  {/* Subtotal & Total Value */}
+                  <div className="bg-[#F8F9FA] p-3 rounded-lg border border-[#E5E7EB] text-xs space-y-1.5">
+                    <div className="flex justify-between text-[#4B5563]">
+                      <span>Subtotal:</span>
+                      <span className="font-mono font-medium text-[#111827]">
+                        ₹{totals.subtotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-[#6B7280]">
+                      <span>GST (18%):</span>
+                      <span className="font-mono text-[#111827]">
+                        ₹{totals.gstAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                    <div className="border-t border-[#E5E7EB] pt-1.5 flex justify-between text-sm font-bold text-[#111827]">
+                      <span>Total Order Value:</span>
+                      <span className="font-mono text-[#DC2626]">
+                        ₹{totals.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      </span>
+                    </div>
                   </div>
                 </div>
-              </div>
+              ) : (
+                <div className="mt-4 pt-3 border-t border-[#E5E7EB] bg-[#F8F9FA] p-3.5 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                  <div>
+                    <span className="text-[10px] uppercase font-mono text-[#6B7280] block font-bold">
+                      Requisition Order Summary
+                    </span>
+                    <span className="font-bold text-sm text-[#111827]">
+                      {cart.items.length} Product Line{cart.items.length > 1 ? 's' : ''} • {cart.items.reduce((s, i) => s + i.quantity, 0)} Total Units
+                    </span>
+                    <p className="text-[11px] text-[#6B7280] mt-0.5">
+                      Order will be dispatched via WhatsApp to dealer and administrative center upon submission.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-xs text-emerald-800 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-lg shrink-0 font-medium">
+                    <MessageSquare className="w-4 h-4 text-emerald-600" />
+                    <span>WhatsApp Dispatch Ready</span>
+                  </div>
+                </div>
+              )}
 
               {/* Submit Order Action Button */}
-              <div className="mt-4 pt-3 flex items-center justify-between">
+              <div className="mt-4 pt-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div className="text-xs text-[#6B7280]">
-                  Submitting will automatically notify Admin for central authorization.
+                  {!selectedDealer ? (
+                    <span className="text-amber-700 font-medium">⚠️ Please select a dealer account in Step 1 to proceed.</span>
+                  ) : (
+                    <span>Submitting will book this order and prepare instant WhatsApp dispatch.</span>
+                  )}
                 </div>
 
                 <button
                   type="button"
-                  disabled={isSubmitting}
+                  disabled={!selectedDealer || cart.items.length === 0 || isSubmitting}
                   onClick={handleSubmitOrder}
-                  className="bg-[#DC2626] hover:bg-[#B91C1C] text-white text-xs font-semibold px-6 py-2.5 rounded-lg flex items-center gap-2 transition-all shadow-xs disabled:opacity-50"
+                  className="bg-[#DC2626] hover:bg-[#B91C1C] text-white text-xs font-semibold px-6 py-2.5 rounded-lg flex items-center justify-center gap-2 transition-all shadow-xs disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                 >
                   <Send className="w-4 h-4" />
-                  <span>{isSubmitting ? 'Submitting Order...' : 'Submit to Admin Approval'}</span>
+                  <span>
+                    {isSubmitting
+                      ? 'Submitting Order...'
+                      : !selectedDealer
+                      ? 'Select Dealer to Submit'
+                      : 'Submit & Send to WhatsApp'}
+                  </span>
                 </button>
               </div>
             </div>
@@ -306,7 +403,7 @@ export default function NewOrderPage() {
               <BookOpen className="w-8 h-8 text-neutral-400 mx-auto mb-2" />
               <h4 className="font-semibold text-sm text-[#111827]">Your field order is empty</h4>
               <p className="text-xs text-[#6B7280] mt-1">
-                Browse the digital catalogue to select uPVC / CPVC pipes, fittings, or valves.
+                Browse the catalogue to select products and quantities.
               </p>
               <Link
                 href="/employee/catalogue"
@@ -322,64 +419,100 @@ export default function NewOrderPage() {
 
       <MobileBottomNav />
 
-      {/* Submission Success Modal */}
+      {/* Submission Success Modal with Direct WhatsApp Buttons */}
       {submittedOrder && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl max-w-md w-full p-6 text-center shadow-2xl border border-neutral-200">
-            <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto mb-3">
-              <CheckCircle2 className="w-6 h-6" />
-            </div>
-
-            <h3 className="font-bold text-base text-[#111827]">
-              Order Successfully Submitted!
-            </h3>
-            <p className="text-xs font-mono font-semibold text-[#DC2626] mt-0.5">
-              {submittedOrder.orderNumber}
-            </p>
-            <p className="text-xs text-[#4B5563] mt-2">
-              Order of <strong>₹{submittedOrder.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong> for{' '}
-              <strong>{submittedOrder.dealerName}</strong> is now in status{' '}
-              <span className="font-mono bg-amber-50 text-amber-800 border border-amber-200 px-1 rounded">
-                PENDING_ADMIN_APPROVAL
-              </span>
-              .
-            </p>
-
-            <div className="mt-4 p-3 bg-neutral-50 rounded text-xs text-left border border-[#E5E7EB] space-y-1">
-              <div className="text-[10px] font-mono uppercase font-bold text-[#6B7280]">
-                Automated System Triggers:
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-neutral-200 text-left">
+            <div className="flex items-center gap-3 pb-4 border-b border-[#F3F4F6]">
+              <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
+                <CheckCircle2 className="w-6 h-6" />
               </div>
-              <div className="text-emerald-700 flex items-center gap-1 text-[11px]">
-                <CheckCircle2 className="w-3 h-3" />
-                <span>Simulated WhatsApp notification dispatched to dealer</span>
-              </div>
-              <div className="text-emerald-700 flex items-center gap-1 text-[11px]">
-                <CheckCircle2 className="w-3 h-3" />
-                <span>Audit entry logged under field rep {currentUser.name}</span>
+              <div>
+                <h3 className="font-bold text-base text-[#111827]">
+                  Order Requisition Booked!
+                </h3>
+                <span className="text-xs font-mono font-bold text-[#DC2626]">
+                  {submittedOrder.orderNumber}
+                </span>
               </div>
             </div>
 
-            {/* Complete Vertical Slice Shortcut */}
-            <div className="mt-5 space-y-2">
+            {/* Order Details (NO PRICES) */}
+            <div className="my-4 bg-neutral-50 rounded-xl p-3.5 border border-[#E5E7EB] space-y-2 text-xs">
+              <div className="flex justify-between">
+                <span className="text-[#6B7280]">Dealer Partner:</span>
+                <span className="font-bold text-[#111827]">{submittedOrder.dealerName} ({submittedOrder.dealerCity})</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-[#6B7280]">Dealer Contact:</span>
+                <span className="font-mono text-[#111827]">{submittedOrder.dealerPhone}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-[#6B7280]">Line Items:</span>
+                <span className="font-semibold text-[#111827]">
+                  {submittedOrder.items?.length || 0} Products ({submittedOrder.items?.reduce((s: number, i: any) => s + (i.quantity || 0), 0) || 0} Total Units)
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-[#6B7280]">Field Representative:</span>
+                <span className="font-medium text-[#111827]">{currentUser.name}</span>
+              </div>
+            </div>
+
+            {/* WhatsApp Dispatch Action Center */}
+            <div className="space-y-2.5">
+              <div className="text-[11px] font-mono uppercase font-bold text-[#4B5563]">
+                Instant WhatsApp Dispatch:
+              </div>
+
+              {/* 1. Send to Dealer WhatsApp */}
+              <a
+                href={dealerWhatsAppUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold py-2.5 px-4 rounded-xl transition-all flex items-center justify-between shadow-xs"
+              >
+                <div className="flex items-center gap-2">
+                  <MessageSquare className="w-4 h-4" />
+                  <span>Send to Dealer ({submittedOrder.dealerPhone})</span>
+                </div>
+                <ExternalLink className="w-3.5 h-3.5 opacity-80" />
+              </a>
+
+
+
+
+              {/* 3. One-click Copy message */}
               <button
                 type="button"
-                onClick={() => setShowProformaModal(true)}
-                className="w-full bg-[#DC2626] hover:bg-[#B91C1C] text-white text-xs font-semibold py-2.5 rounded-lg transition-all flex items-center justify-center gap-2 shadow-xs"
+                onClick={handleCopyWhatsApp}
+                className="w-full border border-neutral-300 hover:bg-neutral-100 text-[#111827] text-xs font-medium py-2 px-4 rounded-xl transition-all flex items-center justify-center gap-1.5"
               >
-                <Receipt className="w-4 h-4" />
-                <span>View Generated Proforma Invoice</span>
+                {copiedWhatsApp ? (
+                  <>
+                    <Check className="w-3.5 h-3.5 text-emerald-600" />
+                    <span className="text-emerald-700 font-semibold">WhatsApp Message Copied!</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-3.5 h-3.5 text-neutral-500" />
+                    <span>Copy Full Order WhatsApp Message</span>
+                  </>
+                )}
               </button>
+            </div>
 
+            {/* Bottom Navigation */}
+            <div className="mt-5 pt-3 border-t border-[#F3F4F6] flex items-center justify-between">
               <button
                 type="button"
                 onClick={() => {
-                  store.switchUser('ADMIN');
-                  router.push('/admin/orders');
+                  setSubmittedOrder(null);
+                  router.push('/employee/catalogue');
                 }}
-                className="w-full bg-[#111827] hover:bg-black text-white text-xs font-semibold py-2.5 rounded-lg transition-all flex items-center justify-center gap-2"
+                className="text-xs text-[#6B7280] hover:text-[#111827] font-medium"
               >
-                <span>Switch to Admin & Review Approval</span>
-                <ArrowRight className="w-3.5 h-3.5" />
+                + Book Another Order
               </button>
 
               <button
@@ -388,21 +521,12 @@ export default function NewOrderPage() {
                   setSubmittedOrder(null);
                   router.push('/employee/orders');
                 }}
-                className="w-full border border-neutral-300 hover:bg-neutral-50 text-[#111827] text-xs font-medium py-2 rounded-lg"
+                className="text-xs font-semibold text-[#DC2626] hover:underline"
               >
-                View in Employee Orders
+                View in Order History →
               </button>
             </div>
           </div>
-
-          {/* Proforma Invoice Modal */}
-          {submittedOrder && (
-            <ProformaInvoiceModal
-              order={submittedOrder}
-              isOpen={showProformaModal}
-              onClose={() => setShowProformaModal(false)}
-            />
-          )}
         </div>
       )}
     </div>

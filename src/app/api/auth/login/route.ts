@@ -135,8 +135,6 @@ export async function POST(req: Request) {
             '/admin/dealers',
             '/admin/employees',
             '/admin/rewards',
-            '/admin/integrations',
-            '/admin/audit',
             '/admin/settings'
           ]
         : [
@@ -173,7 +171,7 @@ export async function POST(req: Request) {
         id: adminEmployee ? `user-${adminEmployee.id}` : 'user-admin-samir',
         name: adminEmployee?.name || 'Samir',
         email: adminEmployee?.email || 'samir@filtec.in',
-        phone: adminEmployee?.phone || '+91 98000 12345',
+        phone: adminEmployee?.phone || '+91 9437505814',
         role: 'ADMIN',
         allowedPages: [
           '/admin',
@@ -183,8 +181,6 @@ export async function POST(req: Request) {
           '/admin/dealers',
           '/admin/employees',
           '/admin/rewards',
-          '/admin/integrations',
-          '/admin/audit',
           '/admin/settings'
         ]
       };

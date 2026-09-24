@@ -6,7 +6,7 @@ import { TopContextBar } from '@/components/navigation/TopContextBar';
 import { DesktopSubNav } from '@/components/navigation/DesktopSubNav';
 import { MobileBottomNav } from '@/components/navigation/MobileBottomNav';
 import { useAppStore, store } from '@/data/store';
-import { Building2, MapPin, Phone, PlusCircle, Search, Award, Pencil } from 'lucide-react';
+import { Building2, MapPin, Phone, PlusCircle, Search, Award, Pencil, Users } from 'lucide-react';
 import { EditDealerModal } from '@/components/admin/EditDealerModal';
 import { Dealer } from '@/types';
 
@@ -20,12 +20,13 @@ export default function EmployeeDealersPage() {
     (d) =>
       d.name.toLowerCase().includes(search.toLowerCase()) ||
       d.city.toLowerCase().includes(search.toLowerCase()) ||
-      d.code.toLowerCase().includes(search.toLowerCase())
+      d.code.toLowerCase().includes(search.toLowerCase()) ||
+      (d.phone && d.phone.includes(search))
   );
 
   return (
     <div className="min-h-screen bg-[#F8F9FA] pb-mobile-nav">
-      <TopContextBar title="Assigned Dealers" subtitle="Accounts & Credit Profile" />
+      <TopContextBar title="Dealer Directory" subtitle="Territory Network & Quick Order" />
       <DesktopSubNav />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-5 space-y-4">
@@ -33,7 +34,7 @@ export default function EmployeeDealersPage() {
           <div>
             <h2 className="text-lg font-bold text-[#111827]">Dealer Directory</h2>
             <p className="text-xs text-[#6B7280]">
-              Commercial terms, credit ceilings, outstanding balances, and quick order triggers
+              Field contact directory, territory addresses, and fast WhatsApp order booking
             </p>
           </div>
 
@@ -43,7 +44,7 @@ export default function EmployeeDealersPage() {
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search dealer or city..."
+              placeholder="Search dealer, city, phone..."
               className="w-full pl-9 pr-3 py-2 text-xs rounded-lg border border-[#E5E7EB] bg-white focus:outline-none focus:ring-1 focus:ring-[#DC2626]"
             />
           </div>
@@ -54,10 +55,10 @@ export default function EmployeeDealersPage() {
           <div className="px-4 py-3 border-b border-[#F3F4F6] flex items-center justify-between bg-[#F9FAFB]">
             <div>
               <h3 className="text-xs font-bold font-mono uppercase tracking-wider text-[#111827]">
-                Assigned Dealer Accounts
+                Authorized Dealer Accounts
               </h3>
               <p className="text-[11px] text-[#6B7280]">
-                Commercial credit lines, outstanding ledgers, and fast order booking
+                Field partner roster and fast WhatsApp order booking
               </p>
             </div>
             <span className="text-[10px] font-mono text-[#6B7280] bg-white px-2 py-0.5 rounded border border-[#E5E7EB]">
@@ -73,18 +74,12 @@ export default function EmployeeDealersPage() {
                   <th className="py-3 px-4">Dealer / Vendor Account</th>
                   <th className="py-3 px-4">Location & Address</th>
                   <th className="py-3 px-4">Contact & Owner</th>
-                  <th className="py-3 px-3">Outstanding / Limit</th>
-                  <th className="py-3 px-3">Purchases & Rewards</th>
+                  <th className="py-3 px-3">Plumbers Linked</th>
                   <th className="py-3 px-4 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#F3F4F6]">
                 {filteredDealers.map((dealer) => {
-                  const creditUtilization = Math.min(
-                    100,
-                    Math.round((dealer.outstandingBalance / dealer.creditLimit) * 100)
-                  );
-
                   return (
                     <tr
                       key={dealer.id}
@@ -106,7 +101,7 @@ export default function EmployeeDealersPage() {
                           {dealer.name}
                         </div>
                         <div className="text-[11px] text-neutral-500 font-mono mt-0.5">
-                          {dealer.plumbersCount} Linked Plumber(s)
+                          GSTIN: {dealer.gstin || 'URP'}
                         </div>
                       </td>
 
@@ -135,32 +130,14 @@ export default function EmployeeDealersPage() {
                         </div>
                       </td>
 
-                      {/* Financials: Outstanding & Limit */}
+                      {/* Linked Plumbers */}
                       <td className="py-3.5 px-3 whitespace-nowrap">
-                        <div className="font-mono font-bold text-sm text-amber-800">
-                          ₹{dealer.outstandingBalance.toLocaleString('en-IN')}
+                        <div className="flex items-center gap-1.5 font-semibold text-xs text-[#111827]">
+                          <Users className="w-3.5 h-3.5 text-blue-500" />
+                          <span>{dealer.plumbersCount || 0} Plumbers</span>
                         </div>
-                        <div className="text-[10px] font-mono text-neutral-500">
-                          Limit: ₹{dealer.creditLimit.toLocaleString('en-IN')} ({creditUtilization}%)
-                        </div>
-                        <div className="w-24 bg-neutral-100 rounded-full h-1 mt-1 overflow-hidden">
-                          <div
-                            className={`h-1 rounded-full ${
-                              creditUtilization > 80 ? 'bg-rose-600' : 'bg-neutral-800'
-                            }`}
-                            style={{ width: `${creditUtilization}%` }}
-                          />
-                        </div>
-                      </td>
-
-                      {/* Purchases & Rewards */}
-                      <td className="py-3.5 px-3 whitespace-nowrap">
-                        <div className="font-mono text-xs text-[#111827]">
-                          ₹{dealer.totalPurchases.toLocaleString('en-IN')}
-                        </div>
-                        <div className="text-[10px] font-mono font-semibold text-emerald-700 flex items-center gap-0.5 mt-0.5">
-                          <Award className="w-3 h-3" />
-                          <span>₹{dealer.availableRewards.toLocaleString('en-IN')} Points</span>
+                        <div className="text-[10px] text-neutral-500 font-mono mt-0.5">
+                          Secondary Network
                         </div>
                       </td>
 
@@ -174,18 +151,10 @@ export default function EmployeeDealersPage() {
                               setIsEditModalOpen(true);
                             }}
                             title="Edit Dealer Contact Info"
-                            className="p-1.5 rounded-md border border-[#E5E7EB] hover:bg-neutral-100 text-neutral-700 transition-colors"
+                            className="p-1.5 rounded-md border border-[#E5E7EB] hover:bg-neutral-100 text-neutral-700 transition-colors cursor-pointer"
                           >
                             <Pencil className="w-3.5 h-3.5" />
                           </button>
-
-                          <a
-                            href={`tel:${dealer.phone}`}
-                            title="Call Dealer"
-                            className="p-1.5 rounded-md border border-[#E5E7EB] hover:bg-neutral-100 text-neutral-700 transition-colors"
-                          >
-                            <Phone className="w-3.5 h-3.5" />
-                          </a>
 
                           <Link
                             href="/employee/orders/new"

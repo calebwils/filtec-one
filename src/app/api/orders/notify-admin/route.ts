@@ -26,10 +26,10 @@ export async function POST(req: Request) {
         userId: 'system',
         userName: dealerName || 'Dealer Customer',
         role: 'DEALER',
-        action: 'PROFORMA_GENERATED',
+        action: 'ORDER_REQUISITION_DISPATCHED',
         entityType: 'ORDER',
         entityId: orderId || orderNumber,
-        details: `Commercial Proforma ${proformaNumber || orderNumber} generated for ${dealerName} (${dealerCity || 'Odisha'}). Value: ₹${Number(totalAmount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })} (${itemsCount || 0} line items). Dispatched to Admin.`,
+        details: `Order requisition ${orderNumber} generated for ${dealerName} (${dealerCity || 'Odisha'}). Products: ${itemsCount || 0} line items. Dispatched to Admin via WhatsApp / Integration.`,
         timestamp: ts
       }
     });
@@ -39,21 +39,21 @@ export async function POST(req: Request) {
       data: {
         id: `erp-pi-${Date.now()}`,
         type: 'ADMIN_NOTIFICATION',
-        title: `Proforma Dispatched: ${proformaNumber || orderNumber}`,
+        title: `Order Requisition: ${orderNumber}`,
         targetId: orderNumber,
         status: 'SUCCESS',
-        payloadSummary: `Order requisition generated: ${itemsCount} items, Net Value: ₹${Number(totalAmount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}, Dealer: ${dealerName} (${dealerPhone})`,
+        payloadSummary: `Order requisition generated: ${itemsCount} items, Dealer: ${dealerName} (${dealerPhone})`,
         timestamp: ts,
         latencyMs: 85
       }
     });
 
-    console.log(`[PROFORMA DISPATCH] Order ${orderNumber} / ${proformaNumber} for ${dealerName} successfully logged and dispatched to Admin.`);
+    console.log(`[ORDER DISPATCH] Order ${orderNumber} for ${dealerName} successfully logged and dispatched to Admin.`);
 
     return NextResponse.json({
       success: true,
-      message: 'Proforma dispatched to Admin and logged in commercial queue',
-      proformaNumber,
+      message: 'Order requisition dispatched to Admin and logged in queue',
+      orderNumber,
       auditId: audit.id,
       eventId: integrationEvent.id
     });
