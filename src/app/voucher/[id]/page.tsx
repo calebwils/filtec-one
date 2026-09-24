@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, Suspense } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import { RewardVoucher } from '@/types';
@@ -23,7 +23,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 
-export default function VirtualCardPage() {
+function VirtualCardContent() {
   const params = useParams();
   const searchParams = useSearchParams();
   const voucherId = (params?.id as string) || searchParams?.get('id') || '';
@@ -388,5 +388,19 @@ export default function VirtualCardPage() {
         PRE-TECH PIPES & FITTINGS PVT LTD • FILTEC ONE REWARD ECOSYSTEM
       </footer>
     </div>
+  );
+}
+
+export default function VirtualCardPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-[#0F172A] text-white flex items-center justify-center p-4">
+          <Loader2 className="w-8 h-8 animate-spin text-[#DC2626]" />
+        </div>
+      }
+    >
+      <VirtualCardContent />
+    </Suspense>
   );
 }
