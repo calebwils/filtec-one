@@ -257,7 +257,7 @@ ${cardUrl}`
             <div className="bg-white px-3 py-1.5 rounded-lg shadow-sm flex items-center justify-center">
               <img
                 src="/brand/filtec-one-logo.png"
-                alt="f | ONE"
+                alt="FILTEC"
                 className="h-6 sm:h-7 w-auto object-contain"
               />
             </div>
@@ -272,6 +272,12 @@ ${cardUrl}`
           </div>
 
           <div className="flex items-center gap-2">
+            {voucher.status === 'SETTLED' && (
+              <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full uppercase tracking-wider bg-emerald-400 text-neutral-950 border border-emerald-300 shadow-xs flex items-center gap-1">
+                <Check className="w-3 h-3 text-neutral-950" />
+                <span>SETTLED</span>
+              </span>
+            )}
             <span
               className={`text-[10px] font-mono font-bold px-2.5 py-1 rounded-full uppercase tracking-wider border shadow-xs ${
                 isDealer

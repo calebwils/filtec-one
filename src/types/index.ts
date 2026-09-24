@@ -192,8 +192,11 @@ export interface RewardVoucher {
   dateRedeemed: string; // e.g. "22/09/2026"
   createdAt: string;
   settledAt?: string;
+  settledBy?: string;
+  paymentMode?: 'UPI' | 'BANK_TRANSFER' | 'CASH' | 'CREDIT_NOTE';
+  paymentReference?: string;
   creditNoteNumber?: string;
-  contactNumber: string; // "+91 99000 11223" (main office number)
+  contactNumber: string; // "+91 94378 60479"
   instructions: string;
 }
 

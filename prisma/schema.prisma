@@ -180,6 +180,31 @@ model RewardTransaction {
   createdAt    DateTime @default(now())
 }
 
+model RewardVoucher {
+  id               String   @id
+  voucherNumber    String   @unique
+  type             String   // "DEALER" | "PLUMBER"
+  dealerId         String
+  dealerName       String
+  dealerCode       String?
+  plumberId        String?
+  plumberName      String?
+  plumberPhone     String?
+  points           Float
+  amount           Float
+  status           String   @default("ISSUED") // "ISSUED" | "SETTLED"
+  dateRedeemed     String
+  creditNoteNumber String?
+  paymentMode      String?
+  paymentReference String?
+  settledAt        String?
+  settledBy        String?
+  contactNumber    String?
+  instructions     String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
 model AttendanceRecord {
   id           String   @id
   employeeId   String

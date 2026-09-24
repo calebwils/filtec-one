@@ -28,9 +28,10 @@ import {
 } from 'lucide-react';
 
 export default function AdminControlCenterPage() {
-  const { orders, dealers, employees, auditLogs, integrationEvents, rewardConfig, products } = useAppStore();
+  const { orders, dealers, employees, auditLogs, integrationEvents, rewardConfig, products, rewardVouchers } = useAppStore();
 
-
+  const pendingVouchers = (rewardVouchers || []).filter((v) => v.status === 'ISSUED');
+  const pendingVouchersAmount = pendingVouchers.reduce((acc, v) => acc + (v.amount || 0), 0);
 
   const recentOrders = orders.filter((o) => o.status === 'SUBMITTED' || o.status === 'PENDING_ADMIN_APPROVAL').slice(0, 5);
   const confirmedOrders = orders.filter((o) => o.status === 'CONFIRMED');
@@ -73,6 +74,32 @@ export default function AdminControlCenterPage() {
             </Link>
           </div>
         </div>
+
+        {/* PENDING SETTLEMENT ALERT BANNER */}
+        {pendingVouchers.length > 0 && (
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-lg bg-amber-600 text-white flex items-center justify-center shrink-0">
+                <Award className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-bold text-sm text-amber-950">
+                  {pendingVouchers.length} Rewards Voucher{pendingVouchers.length > 1 ? 's' : ''} Pending Payment Settlement
+                </h3>
+                <p className="text-xs text-amber-800">
+                  Total payable amount: <strong className="font-mono font-bold">₹{pendingVouchersAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong> awaiting dealer / plumber settlement.
+                </p>
+              </div>
+            </div>
+            <Link
+              href="/admin/rewards"
+              className="inline-flex items-center gap-1.5 bg-amber-800 hover:bg-amber-900 text-white text-xs font-bold px-4 py-2 rounded-lg transition-all shadow-xs self-start sm:self-auto shrink-0"
+            >
+              <span>Review & Settle Now</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
+        )}
 
         {/* OPERATIONS & MANAGEMENT CENTERS */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

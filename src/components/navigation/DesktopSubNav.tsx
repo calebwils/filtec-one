@@ -25,8 +25,9 @@ import {
 
 export function DesktopSubNav() {
   const pathname = usePathname();
-  const { currentUser, orders, cart } = useAppStore();
+  const { currentUser, orders, cart, rewardVouchers } = useAppStore();
   const pendingApprovalsCount = orders.filter((o) => o.status === 'SUBMITTED' || o.status === 'PENDING_ADMIN_APPROVAL').length;
+  const pendingRewardsSettlementCount = (rewardVouchers || []).filter((v) => v.status === 'ISSUED').length;
 
   const isPageAllowed = (path: string) => {
     if (!currentUser.allowedPages || currentUser.allowedPages.length === 0) {
@@ -48,7 +49,12 @@ export function DesktopSubNav() {
     { path: '/admin/catalogue', label: 'Catalogue & Stock', icon: BookOpen },
     { path: '/admin/dealers', label: 'Dealers', icon: Building2 },
     { path: '/admin/employees', label: 'Staff', icon: Users },
-    { path: '/admin/rewards', label: 'Rewards', icon: Award },
+    {
+      path: '/admin/rewards',
+      label: 'Rewards',
+      icon: Award,
+      count: pendingRewardsSettlementCount
+    },
     { path: '/admin/settings', label: 'Settings', icon: Settings }
   ];
 
@@ -295,7 +301,11 @@ export function DesktopSubNav() {
                     <Icon className="w-3.5 h-3.5" />
                     <span>{item.label}</span>
                     {item.count && item.count > 0 ? (
-                      <span className="bg-neutral-800 text-white text-[10px] px-1.5 py-0.2 rounded-full font-mono font-semibold">
+                      <span
+                        className={`text-white text-[10px] px-1.5 py-0.2 rounded-full font-mono font-semibold ${
+                          item.path === '/admin/rewards' ? 'bg-amber-600' : 'bg-neutral-800'
+                        }`}
+                      >
                         {item.count}
                       </span>
                     ) : null}

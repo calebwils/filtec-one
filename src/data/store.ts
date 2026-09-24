@@ -417,6 +417,24 @@ export const store = {
               rewardLedger: Array.isArray(d.rewardLedger) ? d.rewardLedger : [],
               auditLogs: Array.isArray(d.auditLogs) ? d.auditLogs : [],
               integrationEvents: Array.isArray(d.integrationEvents) ? d.integrationEvents : [],
+              rewardVouchers: Array.isArray(d.rewardVouchers)
+                ? (() => {
+                    const map = new Map<string, RewardVoucher>();
+                    d.rewardVouchers.forEach((v: any) => {
+                      map.set(v.id, {
+                        ...v,
+                        points: Number(v.points),
+                        amount: Number(v.amount)
+                      });
+                    });
+                    (globalState.rewardVouchers || []).forEach((v) => {
+                      if (!map.has(v.id)) map.set(v.id, v);
+                    });
+                    return Array.from(map.values()).sort(
+                      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+                    );
+                  })()
+                : globalState.rewardVouchers,
               settings: d.settings?.company
                 ? {
                     company: {
@@ -1382,25 +1400,104 @@ export const store = {
     return voucher;
   },
 
-  // Settle voucher by Admin / Finance with Credit Note
-  settleVoucher(voucherId: string, creditNoteNumber?: string) {
+  // Settle voucher by Admin / Finance with Payment / Credit Note
+  settleVoucher(
+    voucherId: string,
+    details?:
+      | {
+          paymentMode?: 'UPI' | 'BANK_TRANSFER' | 'CASH' | 'CREDIT_NOTE';
+          paymentReference?: string;
+          creditNoteNumber?: string;
+          settledBy?: string;
+          notes?: string;
+        }
+      | string
+  ) {
     const timestamp = new Date().toISOString();
-    const updatedVouchers = (globalState.rewardVouchers || []).map((v) =>
-      v.id === voucherId
-        ? {
-            ...v,
-            status: 'SETTLED' as const,
-            settledAt: timestamp,
-            creditNoteNumber: creditNoteNumber || `CN-2026-${Math.floor(100 + Math.random() * 900)}`
-          }
-        : v
-    );
+    let paymentMode: 'UPI' | 'BANK_TRANSFER' | 'CASH' | 'CREDIT_NOTE' = 'CREDIT_NOTE';
+    let paymentReference = '';
+    let creditNoteNumber = '';
+    let settledBy = 'Samir (Admin)';
+    let notes = '';
+
+    if (typeof details === 'string') {
+      creditNoteNumber = details;
+      paymentReference = details;
+      paymentMode = 'CREDIT_NOTE';
+    } else if (details) {
+      paymentMode = details.paymentMode || 'CREDIT_NOTE';
+      paymentReference = details.paymentReference || '';
+      creditNoteNumber =
+        details.creditNoteNumber ||
+        (paymentMode === 'CREDIT_NOTE'
+          ? details.paymentReference || `CN-2026-${Math.floor(100 + Math.random() * 900)}`
+          : '');
+      settledBy = details.settledBy || 'Samir (Admin)';
+      notes = details.notes || '';
+    } else {
+      creditNoteNumber = `CN-2026-${Math.floor(100 + Math.random() * 900)}`;
+      paymentReference = creditNoteNumber;
+    }
+
+    let settledVoucher: RewardVoucher | null = null;
+    const updatedVouchers = (globalState.rewardVouchers || []).map((v) => {
+      if (v.id === voucherId || v.voucherNumber === voucherId) {
+        settledVoucher = {
+          ...v,
+          status: 'SETTLED' as const,
+          settledAt: timestamp,
+          settledBy,
+          paymentMode,
+          paymentReference: paymentReference || undefined,
+          creditNoteNumber: creditNoteNumber || undefined
+        };
+        return settledVoucher;
+      }
+      return v;
+    });
+
+    const desc = `Settled ${(settledVoucher as any)?.type || 'Reward'} Voucher ${
+      (settledVoucher as any)?.voucherNumber || voucherId
+    } (₹${(settledVoucher as any)?.amount}) via ${paymentMode} [Ref: ${paymentReference || creditNoteNumber || 'N/A'}] by ${settledBy}`;
+
+    const audit: AuditLog = {
+      id: `aud-${Date.now()}`,
+      userId: 'emp-admin-samir',
+      userName: settledBy,
+      role: 'ADMIN',
+      action: 'VOUCHER_SETTLED',
+      entityType: 'REWARD',
+      entityId: voucherId,
+      details: desc,
+      timestamp
+    };
 
     globalState = {
       ...globalState,
-      rewardVouchers: updatedVouchers
+      rewardVouchers: updatedVouchers,
+      auditLogs: [audit, ...(globalState.auditLogs || [])]
     };
     notify();
+
+    if (typeof window !== 'undefined') {
+      fetch('/api/data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'SETTLE_VOUCHER',
+          payload: {
+            voucherId,
+            voucherNumber: (settledVoucher as any)?.voucherNumber,
+            amount: (settledVoucher as any)?.amount,
+            paymentMode,
+            paymentReference,
+            creditNoteNumber,
+            settledBy,
+            notes
+          }
+        })
+      }).catch((err) => console.warn('PostgreSQL settle voucher failed:', err));
+    }
   },
 
   // Add new plumber by dealer

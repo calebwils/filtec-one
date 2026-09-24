@@ -17,7 +17,8 @@ export async function GET() {
       rewardLedger,
       auditLogs,
       integrationEvents,
-      users
+      users,
+      rewardVouchers
     ] = await Promise.all([
       prisma.product.findMany({
         include: { variants: true }
@@ -36,7 +37,8 @@ export async function GET() {
       prisma.rewardTransaction.findMany({ orderBy: { createdAt: 'desc' } }),
       prisma.auditLog.findMany({ orderBy: { timestamp: 'desc' }, take: 100 }),
       prisma.integrationEvent.findMany({ orderBy: { timestamp: 'desc' }, take: 100 }),
-      prisma.user.findMany()
+      prisma.user.findMany(),
+      prisma.rewardVoucher.findMany({ orderBy: { createdAt: 'desc' } })
     ]);
 
     // Parse JSON fields into proper JS objects/arrays
@@ -87,7 +89,8 @@ export async function GET() {
         dailyAttendance: parsedDailyAttendance,
         rewardLedger,
         auditLogs,
-        integrationEvents
+        integrationEvents,
+        rewardVouchers
       }
     });
   } catch (error: any) {
@@ -750,12 +753,49 @@ export async function POST(req: Request) {
               }
             });
           }
+
+          if (voucher) {
+            await prisma.rewardVoucher.upsert({
+              where: { voucherNumber: voucher.voucherNumber },
+              update: {
+                status: voucher.status || 'ISSUED',
+                points: Number(voucher.points) || points,
+                amount: Number(voucher.amount) || points,
+                dealerId: dealer.id,
+                dealerName: dealer.name,
+                dealerCode: dealer.code,
+                plumberId: plumber.id,
+                plumberName: plumber.name,
+                plumberPhone: plumber.phone,
+                dateRedeemed: voucher.dateRedeemed || new Date().toISOString().split('T')[0],
+                contactNumber: voucher.contactNumber || '+91 94378 60479',
+                instructions: voucher.instructions || null
+              },
+              create: {
+                id: voucher.id || `vouch-p-${Date.now()}`,
+                voucherNumber: voucher.voucherNumber,
+                type: 'PLUMBER',
+                dealerId: dealer.id,
+                dealerName: dealer.name,
+                dealerCode: dealer.code,
+                plumberId: plumber.id,
+                plumberName: plumber.name,
+                plumberPhone: plumber.phone,
+                points: Number(voucher.points) || points,
+                amount: Number(voucher.amount) || points,
+                status: voucher.status || 'ISSUED',
+                dateRedeemed: voucher.dateRedeemed || new Date().toISOString().split('T')[0],
+                contactNumber: voucher.contactNumber || '+91 94378 60479',
+                instructions: voucher.instructions || null
+              }
+            }).catch((err) => console.warn('Failed to upsert plumber reward voucher in DB:', err));
+          }
         }
         return NextResponse.json({ success: true });
       }
 
       case 'DEALER_REDEEM_REWARD': {
-        const { dealerId, points, voucherNumber } = payload;
+        const { dealerId, points, voucherNumber, voucher } = payload;
         const dealer = await prisma.dealer.findFirst({
           where: { OR: [{ id: dealerId }, { code: dealerId }] }
         });
@@ -776,8 +816,100 @@ export async function POST(req: Request) {
               createdAt: new Date()
             }
           });
+
+          const v = voucher;
+          const vNum = v?.voucherNumber || voucherNumber || 'D-001';
+          await prisma.rewardVoucher.upsert({
+            where: { voucherNumber: vNum },
+            update: {
+              status: v?.status || 'ISSUED',
+              points: Number(points),
+              amount: Number(points),
+              dealerId: dealer.id,
+              dealerName: dealer.name,
+              dealerCode: dealer.code,
+              contactNumber: v?.contactNumber || '+91 94378 60479',
+              instructions: v?.instructions || null
+            },
+            create: {
+              id: v?.id || `vouch-d-${Date.now()}`,
+              voucherNumber: vNum,
+              type: 'DEALER',
+              dealerId: dealer.id,
+              dealerName: dealer.name,
+              dealerCode: dealer.code,
+              points: Number(points),
+              amount: Number(points),
+              status: v?.status || 'ISSUED',
+              dateRedeemed: v?.dateRedeemed || new Date().toISOString().split('T')[0],
+              contactNumber: v?.contactNumber || '+91 94378 60479',
+              instructions: v?.instructions || `Present this voucher to your FILTEC Area Sales Executive or contact Head Office (+91 94378 60479) to settle as Credit Note.`
+            }
+          }).catch((err) => console.warn('Failed to upsert dealer reward voucher in DB:', err));
         }
         return NextResponse.json({ success: true });
+      }
+
+      case 'SETTLE_VOUCHER': {
+        const { voucherId, voucherNumber, paymentMode, paymentReference, creditNoteNumber, settledBy, notes } = payload;
+        const now = new Date();
+        const settledAt = now.toISOString();
+
+        const existing = await prisma.rewardVoucher.findFirst({
+          where: {
+            OR: [
+              { id: voucherId },
+              ...(voucherNumber ? [{ voucherNumber }] : [])
+            ]
+          }
+        });
+
+        let updatedVoucher;
+        if (existing) {
+          updatedVoucher = await prisma.rewardVoucher.update({
+            where: { id: existing.id },
+            data: {
+              status: 'SETTLED',
+              paymentMode: paymentMode || 'CREDIT_NOTE',
+              paymentReference: paymentReference || creditNoteNumber || null,
+              creditNoteNumber: creditNoteNumber || (paymentMode === 'CREDIT_NOTE' ? paymentReference : null),
+              settledAt,
+              settledBy: settledBy || 'Admin'
+            }
+          });
+        }
+
+        const desc = `Settled ${existing?.type || 'Reward'} Voucher ${existing?.voucherNumber || voucherNumber} (₹${existing?.amount || payload.amount}) via ${paymentMode || 'Credit Note'} [Ref: ${paymentReference || creditNoteNumber || 'N/A'}] by ${settledBy || 'Admin'}`;
+
+        await prisma.rewardTransaction.create({
+          data: {
+            id: `rew-settle-${Date.now()}`,
+            dealerId: existing?.dealerId || 'admin',
+            plumberId: existing?.plumberId || null,
+            plumberName: existing?.plumberName || null,
+            type: 'SETTLEMENT_PAYOUT',
+            amount: 0,
+            balanceAfter: 0,
+            description: desc,
+            createdAt: now
+          }
+        }).catch((err) => console.warn('Settlement reward transaction log error:', err));
+
+        await prisma.auditLog.create({
+          data: {
+            id: `aud-${Date.now()}`,
+            userId: 'admin',
+            userName: settledBy || 'Admin',
+            role: 'ADMIN',
+            action: 'VOUCHER_SETTLED',
+            entityType: 'REWARD',
+            entityId: existing?.id || voucherId,
+            details: desc,
+            timestamp: settledAt
+          }
+        }).catch((err) => console.warn('Settlement audit log error:', err));
+
+        return NextResponse.json({ success: true, voucher: updatedVoucher });
       }
 
       default:

@@ -131,11 +131,8 @@ export async function generateVirtualCardBlob(voucher: RewardVoucher): Promise<B
     ctx.drawImage(logoImage, 57, 40, logoW, logoH);
   } else {
     ctx.fillStyle = '#DC2626';
-    ctx.font = 'bold 24px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
-    ctx.fillText('f |', 62, 74);
-    ctx.fillStyle = '#111827';
-    ctx.font = '800 24px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
-    ctx.fillText('ONE', 95, 74);
+    ctx.font = '900 28px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+    ctx.fillText('filtec™', 62, 75);
   }
   ctx.restore();
 
