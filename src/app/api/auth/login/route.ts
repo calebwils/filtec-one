@@ -127,12 +127,29 @@ export async function POST(req: Request) {
           ];
         }
 
+        let avatarUrl: string | undefined = undefined;
+        try {
+          const userRec = await prisma.user.findFirst({
+            where: {
+              OR: [
+                { id: `user-${matchedEmployee.id}` },
+                { employeeCode: matchedEmployee.code },
+                { phone: matchedEmployee.phone }
+              ]
+            }
+          });
+          if (userRec?.avatarUrl) {
+            avatarUrl = userRec.avatarUrl;
+          }
+        } catch {}
+
         const authenticatedUser: User = {
           id: `user-${matchedEmployee.id}`,
           name: matchedEmployee.name,
           email: matchedEmployee.email || `${matchedEmployee.code.toLowerCase().replace(/[^a-z0-9]/g, '')}@filtec.in`,
           phone: matchedEmployee.phone,
           role,
+          avatarUrl,
           employeeCode: matchedEmployee.code,
           allowedPages,
           mustChangePassword
@@ -187,12 +204,29 @@ export async function POST(req: Request) {
 
         const mustChangePassword = matchedDealer.mustChangePassword ?? !hasCustomPassword;
 
+        let avatarUrl: string | undefined = undefined;
+        try {
+          const userRec = await prisma.user.findFirst({
+            where: {
+              OR: [
+                { id: `user-${matchedDealer.id}` },
+                { dealerId: matchedDealer.id },
+                { phone: matchedDealer.phone }
+              ]
+            }
+          });
+          if (userRec?.avatarUrl) {
+            avatarUrl = userRec.avatarUrl;
+          }
+        } catch {}
+
         const authenticatedUser: User = {
           id: `user-${matchedDealer.id}`,
           name: matchedDealer.name,
           email: matchedDealer.email || `${matchedDealer.code.toLowerCase()}@filtec-dealers.in`,
           phone: matchedDealer.phone,
           role: 'DEALER',
+          avatarUrl,
           dealerId: matchedDealer.id,
           allowedPages: [
             '/dealer',
@@ -200,7 +234,8 @@ export async function POST(req: Request) {
             '/dealer/orders',
             '/dealer/rewards',
             '/dealer/plumbers',
-            '/dealer/invoices'
+            '/dealer/invoices',
+            '/dealer/profile'
           ],
           mustChangePassword
         };

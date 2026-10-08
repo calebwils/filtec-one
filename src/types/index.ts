@@ -37,6 +37,7 @@ export interface Employee {
   allowedPages?: string[];
   password?: string;
   mustChangePassword?: boolean;
+  avatarUrl?: string;
 }
 
 export interface Dealer {
@@ -61,6 +62,7 @@ export interface Dealer {
   assignedRepId?: string;
   password?: string;
   mustChangePassword?: boolean;
+  avatarUrl?: string;
 }
 
 export interface Plumber {

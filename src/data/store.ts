@@ -520,6 +520,115 @@ export const store = {
     notify();
   },
 
+  // Update current user profile and sync with employee/dealer records and backend
+  updateUserProfile(data: { name?: string; phone?: string; email?: string; avatarUrl?: string }): User {
+    const prev = globalState.currentUser;
+    let phone = data.phone !== undefined ? data.phone.trim() : prev.phone;
+    if (phone && phone !== '-') {
+      const clean = phone.replace(/^\+91[\s-]*/, '').replace(/^91(?=\d{10})/, '').replace(/\D/g, '').slice(-10);
+      phone = clean.length === 10 ? `+91 ${clean.slice(0, 5)} ${clean.slice(5)}` : phone;
+    }
+
+    const updatedUser: User = {
+      ...prev,
+      name: data.name !== undefined && data.name.trim() ? data.name.trim() : prev.name,
+      phone,
+      email: data.email !== undefined && data.email.trim() ? data.email.trim() : prev.email,
+      avatarUrl: data.avatarUrl !== undefined ? data.avatarUrl : prev.avatarUrl
+    };
+
+    // If currentUser is an employee or admin, update employees list
+    let updatedEmployees = globalState.employees;
+    if (prev.role === 'EMPLOYEE' || prev.role === 'ADMIN') {
+      updatedEmployees = globalState.employees.map((emp) => {
+        if (
+          emp.id === prev.id ||
+          emp.code === prev.employeeCode ||
+          emp.phone === prev.phone ||
+          emp.name === prev.name
+        ) {
+          return {
+            ...emp,
+            name: updatedUser.name,
+            phone: updatedUser.phone,
+            email: updatedUser.email,
+            avatarUrl: updatedUser.avatarUrl
+          };
+        }
+        return emp;
+      });
+    }
+
+    // If currentUser is a dealer, update dealers list
+    let updatedDealers = globalState.dealers;
+    if (prev.role === 'DEALER') {
+      updatedDealers = globalState.dealers.map((dlr) => {
+        if (
+          dlr.id === prev.dealerId ||
+          dlr.id === prev.id ||
+          dlr.code === prev.dealerId ||
+          dlr.phone === prev.phone
+        ) {
+          return {
+            ...dlr,
+            name: updatedUser.name,
+            ownerName: updatedUser.name,
+            phone: updatedUser.phone,
+            email: updatedUser.email,
+            avatarUrl: updatedUser.avatarUrl
+          };
+        }
+        return dlr;
+      });
+    }
+
+    const audit: AuditLog = {
+      id: `aud-${Date.now()}`,
+      userId: updatedUser.id,
+      userName: updatedUser.name,
+      role: updatedUser.role,
+      action: 'USER_PROFILE_UPDATED' as any,
+      entityType: updatedUser.role as any,
+      entityId: updatedUser.id,
+      details: `User ${updatedUser.name} (${updatedUser.role}) updated their profile details (Phone: ${updatedUser.phone}, Avatar updated: ${Boolean(data.avatarUrl)})`,
+      timestamp: new Date().toISOString()
+    };
+
+    globalState = {
+      ...globalState,
+      currentUser: updatedUser,
+      employees: updatedEmployees,
+      dealers: updatedDealers,
+      auditLogs: [audit, ...globalState.auditLogs]
+    };
+
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(globalState));
+      } catch (e) {}
+    }
+    notify();
+
+    // Async sync with backend database
+    if (typeof window !== 'undefined') {
+      const entityId = prev.id.replace(/^user-/, '') || prev.employeeCode || prev.dealerId || prev.id;
+      fetch('/api/profile/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          entityId,
+          type: prev.role,
+          name: updatedUser.name,
+          phone: updatedUser.phone,
+          email: updatedUser.email,
+          avatarUrl: updatedUser.avatarUrl
+        })
+      }).catch((err) => console.warn('Backend profile update failed:', err));
+    }
+
+    return updatedUser;
+  },
+
   // Terminate session and clear persisted credentials
   signOut() {
     globalState = {
