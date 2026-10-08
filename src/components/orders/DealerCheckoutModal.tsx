@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAppStore, store } from '@/data/store';
 import { Order, OrderItem } from '@/types';
 import {
@@ -39,15 +39,19 @@ export function DealerCheckoutModal({ isOpen, onClose }: DealerCheckoutModalProp
     dealers.find((d) => d.id === currentUser.dealerId || d.code === currentUser.dealerId) ||
     dealers[0];
 
+  const wasOpenRef = useRef(false);
+
   useEffect(() => {
-    if (isOpen) {
+    // Only reset when the modal transitions from closed → open
+    if (isOpen && !wasOpenRef.current) {
       setSubmittedOrder(null);
       setIsSubmitting(false);
       if (currentDealer) {
         store.setCartDealer(currentDealer.id);
       }
     }
-  }, [isOpen, currentDealer]);
+    wasOpenRef.current = isOpen;
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -294,7 +298,7 @@ export function DealerCheckoutModal({ isOpen, onClose }: DealerCheckoutModalProp
         </div>
 
         {/* Content */}
-        <div className="p-5 space-y-4 max-h-[75vh] overflow-y-auto text-xs">
+        <div className="p-5 space-y-4 text-xs">
           {/* Dealer Info Banner */}
           <div className="p-3 bg-neutral-50 rounded-xl border border-neutral-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
             <div>
@@ -329,7 +333,7 @@ export function DealerCheckoutModal({ isOpen, onClose }: DealerCheckoutModalProp
             </div>
 
             {cart.items.length > 0 ? (
-              <div className="border border-neutral-200 rounded-xl overflow-hidden divide-y divide-neutral-150">
+              <div className="border border-neutral-200 rounded-xl divide-y divide-neutral-100 max-h-[38vh] overflow-y-auto">
                 {cart.items.map((item) => (
                   <div key={item.id} className="p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-neutral-50/60 transition-colors">
                     <div className="flex-1">

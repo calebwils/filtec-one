@@ -78,7 +78,7 @@ export default function AdminCataloguePage() {
 
   return (
     <div className="min-h-screen bg-[#F8F9FA] pb-mobile-nav">
-      <TopContextBar title="Catalogue Management" subtitle="Products Master" />
+      <TopContextBar title="Catalogue Management" />
       <DesktopSubNav />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-5 space-y-5">
@@ -101,9 +101,6 @@ export default function AdminCataloguePage() {
             <h2 className="text-lg font-bold text-[#111827]">
               Product Catalogue & Warehouse Stock
             </h2>
-            <p className="text-xs text-[#6B7280]">
-              Control real-time product availability for field sales reps and authorized dealers
-            </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">

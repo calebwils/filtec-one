@@ -101,8 +101,17 @@ export default function AdminOrdersPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#E5E7EB]">
-                {filteredOrders.map((order) => (
-                  <tr key={order.id} className="hover:bg-neutral-50/60 transition-colors">
+                {filteredOrders.map((order) => {
+                  const isCompleted = order.status === 'COMPLETED';
+                  return (
+                    <tr
+                      key={order.id}
+                      className={`transition-colors ${
+                        isCompleted
+                          ? 'bg-emerald-50/50 hover:bg-emerald-50/80 border-b border-emerald-100'
+                          : 'hover:bg-neutral-50/60'
+                      }`}
+                    >
                     <td className="py-3 px-4">
                       <span className="tech-code font-bold text-xs text-[#111827]">
                         {order.orderNumber}
@@ -183,7 +192,8 @@ export default function AdminOrdersPage() {
                       </div>
                     </td>
                   </tr>
-                ))}
+                );
+              })}
               </tbody>
             </table>
           </div>

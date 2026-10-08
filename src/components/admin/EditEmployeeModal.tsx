@@ -105,11 +105,12 @@ export function EditEmployeeModal({
           ? ALL_ADMIN_PAGES
           : ALL_EMPLOYEE_PAGES;
 
-      const rawPhone = isSamir ? '+91 9437505814' : (employee.phone || '');
-      const clean = rawPhone.replace(/^\+91[\s-]*/, '').replace(/^91(?=\d{10})/, '').replace(/\s+/g, '').trim();
-      const formattedPhone = isSamir
-        ? '+91 9437505814'
-        : (clean && clean !== '-' && clean !== '(-)' ? `+91 ${clean}` : rawPhone);
+      const rawPhone = employee.phone || '';
+      const digits = rawPhone.replace(/\D/g, '');
+      const last10 = digits.slice(-10);
+      const formattedPhone = last10.length === 10
+        ? `+91 ${last10.slice(0, 5)} ${last10.slice(5)}`
+        : rawPhone;
 
       setFormData({
         name: employee.name || '',
@@ -243,11 +244,11 @@ export function EditEmployeeModal({
     setIsSubmitting(true);
 
     setTimeout(() => {
-      const isSamir = (employee.name || '').toLowerCase() === 'samir' || employee.code === 'FPPL/ADM-001';
-      const cleanVal = formData.phone.trim().replace(/^\+91[\s-]*/, '').replace(/^91(?=\d{10})/, '').replace(/\s+/g, '').trim();
-      const finalPhone = isSamir
-        ? '+91 9437505814'
-        : (cleanVal && cleanVal !== '-' ? `+91 ${cleanVal}` : formData.phone.trim());
+      const digits = formData.phone.trim().replace(/\D/g, '');
+      const last10 = digits.slice(-10);
+      const finalPhone = last10.length === 10
+        ? `+91 ${last10.slice(0, 5)} ${last10.slice(5)}`
+        : formData.phone.trim();
 
       const updated = store.updateEmployee(employee.id, {
         name: formData.name.trim(),

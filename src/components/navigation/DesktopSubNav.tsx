@@ -19,8 +19,7 @@ import {
   UserCheck,
   Settings,
   Shield,
-  ArrowLeft,
-  BarChart3
+  ArrowLeft
 } from 'lucide-react';
 
 export function DesktopSubNav() {
@@ -30,6 +29,10 @@ export function DesktopSubNav() {
   const pendingRewardsSettlementCount = (rewardVouchers || []).filter((v) => v.status === 'ISSUED').length;
 
   const isPageAllowed = (path: string) => {
+    // Full system access for Admins without restrictions
+    if (currentUser.role === 'ADMIN') {
+      return true;
+    }
     if (!currentUser.allowedPages || currentUser.allowedPages.length === 0) {
       return true;
     }
@@ -38,7 +41,6 @@ export function DesktopSubNav() {
 
   const adminNavItems = [
     { path: '/admin', label: 'Control Center', icon: Activity },
-    { path: '/dashboard', label: '⚡ Executive Cockpit', icon: BarChart3 },
     {
       path: '/admin/orders',
       label: 'Orders',

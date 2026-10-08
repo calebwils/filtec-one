@@ -32,6 +32,7 @@ export default function DealerRewardsPage() {
 
   const dealerLedger = rewardLedger.filter((t) => t.dealerId === currentDealer.id || t.dealerId === currentDealer.code);
   const dealerPlumbers = plumbers.filter((p) => p.dealerId === currentDealer.id || p.dealerName === currentDealer.name);
+  // totalAllocatedToPlumbers = sum of remaining plumber balances (totalAllocatedRewards is decremented on voucher issuance)
   const totalAllocatedToPlumbers = dealerPlumbers.reduce((s, p) => s + (p.totalAllocatedRewards || 0), 0);
   const pendingPlumberRewards = currentDealer.pendingPlumberRewards || 0;
   const totalPlumberRewards = Number((totalAllocatedToPlumbers + pendingPlumberRewards).toFixed(2));
@@ -48,7 +49,7 @@ export default function DealerRewardsPage() {
 
   return (
     <div className="min-h-screen bg-[#F8F9FA] pb-mobile-nav">
-      <TopContextBar title="Reward Ledger" subtitle={currentDealer.name} />
+      <TopContextBar title="Reward Ledger" />
       <DesktopSubNav />
 
       <main className="max-w-4xl mx-auto px-4 sm:px-6 py-5 space-y-5">

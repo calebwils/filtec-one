@@ -63,10 +63,7 @@ export default function DealerCataloguePage() {
 
   return (
     <div className="min-h-screen bg-[#F8F9FA] pb-mobile-nav">
-      <TopContextBar
-        title="Product Catalogue"
-        subtitle={`Official FILTEC Reference • ${currentDealer?.name || 'Authorized Dealer'}`}
-      />
+      <TopContextBar title="Product Catalogue" />
       <DesktopSubNav />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-5 space-y-5">

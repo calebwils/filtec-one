@@ -59,7 +59,7 @@ export const INITIAL_USERS: User[] = [
     id: 'user-admin-samir',
     name: 'Samir',
     email: 'samir@filtec.in',
-    phone: '+91 9437505814',
+    phone: '+91 94375 05814',
     role: 'ADMIN',
     department: 'Operations Administrator',
     allowedPages: ALL_ADMIN_PAGES
@@ -92,7 +92,7 @@ export const INITIAL_EMPLOYEES: Employee[] = [
     name: 'Samir',
     designation: 'Operations Admin',
     systemRole: 'ADMIN',
-    phone: '+91 9437505814',
+    phone: '+91 94375 05814',
     email: 'samir@filtec.in',
     territory: 'All Hubs & Branches',
     targetMonthly: 0,
@@ -1876,8 +1876,8 @@ export const INITIAL_PLUMBERS: Plumber[] = [
     name: 'PLUMBER 1',
     phone: '+91 0000011111',
     status: 'ACTIVE',
-    totalAllocatedRewards: 418.96,
-    rewardHistoryCount: 3,
+    totalAllocatedRewards: 0,
+    rewardHistoryCount: 0,
     dateAdded: '2026-09-20'
   }
 ];
@@ -1958,9 +1958,9 @@ export const INITIAL_SETTINGS: AppSettings = {
     legalName: 'FILTEC Polyplast Pvt Ltd',
     brandName: 'FILTEC ONE',
     plantAddress: 'Water Park Rd, Kurangsasan, Odisha 754002, India',
-    supportWhatsApp: '+91 9437505814',
+    supportWhatsApp: '+91 94375 05814',
     supportEmail: 'care@filtec.in',
-    phone: '+91 9437505814',
+    phone: '+91 94375 05814',
     gstin: '21AAGCF5549N1ZC',
     defaultGstPercent: 18,
     currency: '₹ INR',

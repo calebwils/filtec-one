@@ -38,7 +38,9 @@ export async function GET() {
       prisma.auditLog.findMany({ orderBy: { timestamp: 'desc' }, take: 100 }),
       prisma.integrationEvent.findMany({ orderBy: { timestamp: 'desc' }, take: 100 }),
       prisma.user.findMany(),
-      prisma.rewardVoucher.findMany({ orderBy: { createdAt: 'desc' } })
+      (prisma as any).rewardVoucher
+        ? (prisma as any).rewardVoucher.findMany({ orderBy: { createdAt: 'desc' } })
+        : Promise.resolve([])
     ]);
 
     // Parse JSON fields into proper JS objects/arrays

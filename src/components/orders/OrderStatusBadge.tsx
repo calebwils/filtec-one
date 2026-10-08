@@ -13,8 +13,8 @@ export function OrderStatusBadge({ status }: { status: OrderStatus }) {
       );
     case 'COMPLETED':
       return (
-        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-mono font-medium bg-neutral-100 text-neutral-800 border border-neutral-200">
-          <span className="w-1.5 h-1.5 rounded-full bg-neutral-600"></span>
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-mono font-bold bg-emerald-100/80 text-emerald-800 border border-emerald-300">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
           Completed
         </span>
       );

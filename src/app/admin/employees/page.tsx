@@ -383,12 +383,12 @@ export default function AdminEmployeesPage() {
                           {/* Contact */}
                           <td className="py-3 px-4">
                             {(() => {
-                              const isSamir = emp.name.toLowerCase() === 'samir' || emp.code === 'FPPL/ADM-001';
-                              const rawPhone = isSamir ? '+91 9437505814' : (emp.phone || '');
-                              const clean = rawPhone.replace(/^\+91[\s-]*/, '').replace(/^91(?=\d{10})/, '').replace(/\s+/g, '').trim();
-                              const formattedPhone = isSamir
-                                ? '+91 9437505814'
-                                : (clean && clean !== '-' && clean !== '(-)' ? `+91 ${clean}` : (emp.phone || '(-)'));
+                              const p = (emp.phone || '').trim();
+                              const digits = p.replace(/\D/g, '');
+                              const last10 = digits.slice(-10);
+                              const formattedPhone = last10.length === 10
+                                ? `+91 ${last10.slice(0, 5)} ${last10.slice(5)}`
+                                : (p || '(-)');
 
                               return (
                                 <>

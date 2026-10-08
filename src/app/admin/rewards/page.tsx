@@ -37,7 +37,7 @@ import {
 } from 'lucide-react';
 
 export default function AdminRewardsPage() {
-  const { rewardConfig, rewardLedger, rewardVouchers, dealers } = useAppStore();
+  const { rewardConfig, rewardLedger, rewardVouchers, dealers, plumbers } = useAppStore();
 
   const [rate, _setRate] = useState(rewardConfig.ratePercent);
   const [dealerShare, _setDealerShare] = useState(rewardConfig.dealerSharePercent);
@@ -161,6 +161,28 @@ export default function AdminRewardsPage() {
     .filter((t) => t.type === 'DEBIT_PLUMBER_ALLOCATION')
     .reduce((acc, t) => acc + Math.abs(t.amount), 0);
 
+  // Real values of available rewards for dealer and plumber
+  const totalDealerAvailable = (dealers || []).reduce(
+    (sum, d) => sum + (d.availableRewards || 0),
+    0
+  );
+  const plumberAllocatedTotal = (plumbers || []).reduce(
+    (sum, p) => sum + (p.totalAllocatedRewards || 0),
+    0
+  );
+  const plumberEscrowTotal = (dealers || []).reduce(
+    (sum, d) => sum + (d.pendingPlumberRewards || 0),
+    0
+  );
+  const totalPlumberAvailable = Number((plumberAllocatedTotal + plumberEscrowTotal).toFixed(2));
+  const totalAvailableRewards = Number((totalDealerAvailable + totalPlumberAvailable).toFixed(2));
+
+  // Actual value distribution percentages for the circle
+  const dealerRealPct = totalAvailableRewards > 0
+    ? Math.round((totalDealerAvailable / totalAvailableRewards) * 100)
+    : Number(dealerShare);
+  const plumberRealPct = 100 - dealerRealPct;
+
   const issuedVouchersCount = (rewardVouchers || []).length;
   const pendingVouchersCount = (rewardVouchers || []).filter((v) => v.status === 'ISSUED').length;
   const settledVouchersCount = (rewardVouchers || []).filter((v) => v.status === 'SETTLED').length;
@@ -280,26 +302,101 @@ export default function AdminRewardsPage() {
               </p>
             </div>
 
-            {/* Split */}
+            {/* Distribution Split - Circle with Real Values */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <label className="text-xs font-bold text-[#111827]">Distribution Split (Dealer vs Plumber):</label>
-                <span className="font-mono text-xs font-bold text-[#DC2626]">
-                  {dealerShare}% / {100 - dealerShare}%
+                <span className="font-mono text-xs font-bold text-[#111827] bg-neutral-100 border border-neutral-200 px-2 py-0.5 rounded">
+                  {dealerShare}% / {100 - dealerShare}% Policy
                 </span>
               </div>
-              <input
-                type="range"
-                min="0"
-                max="100"
-                step="5"
-                value={dealerShare}
-                onChange={(e) => setDealerShare(Number(e.target.value))}
-                className="w-full accent-[#DC2626] cursor-pointer"
-              />
-              <div className="flex justify-between text-[11px] font-mono text-[#6B7280]">
-                <span>Dealer: {dealerShare}%</span>
-                <span>Plumber Pool: {100 - dealerShare}%</span>
+
+              {/* Circle Donut Chart + Real Value Breakdown */}
+              <div className="flex items-center gap-4 bg-[#F9FAFB] p-3 rounded-xl border border-[#E5E7EB]">
+                {/* SVG Donut Circle */}
+                <div className="relative w-24 h-24 shrink-0 flex items-center justify-center">
+                  <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
+                    {/* Background ring */}
+                    <circle
+                      cx="50"
+                      cy="50"
+                      r="38"
+                      fill="transparent"
+                      stroke="#E5E7EB"
+                      strokeWidth="11"
+                    />
+                    {/* Dealer Share Arc (Red) */}
+                    <circle
+                      cx="50"
+                      cy="50"
+                      r="38"
+                      fill="transparent"
+                      stroke="#DC2626"
+                      strokeWidth="11"
+                      strokeDasharray={`${(dealerRealPct / 100) * 238.76} 238.76`}
+                      strokeDashoffset="0"
+                      strokeLinecap="round"
+                      className="transition-all duration-500 ease-out"
+                    />
+                    {/* Plumber Share Arc (Blue) */}
+                    <circle
+                      cx="50"
+                      cy="50"
+                      r="38"
+                      fill="transparent"
+                      stroke="#2563EB"
+                      strokeWidth="11"
+                      strokeDasharray={`${(plumberRealPct / 100) * 238.76} 238.76`}
+                      strokeDashoffset={`${-((dealerRealPct / 100) * 238.76)}`}
+                      strokeLinecap="round"
+                      className="transition-all duration-500 ease-out"
+                    />
+                  </svg>
+                  {/* Center Label */}
+                  <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none">
+                    <span className="text-[8px] uppercase font-mono text-[#6B7280] font-semibold leading-none">Total</span>
+                    <span className="text-[11px] font-mono font-bold text-[#111827] mt-0.5 leading-tight">
+                      ₹{totalAvailableRewards >= 100000 ? `${(totalAvailableRewards / 1000).toFixed(0)}k` : totalAvailableRewards.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Real Value Metrics Breakdown */}
+                <div className="flex-1 space-y-2 min-w-0">
+                  {/* Dealer Reward Available */}
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className="w-2.5 h-2.5 rounded-full bg-[#DC2626] shrink-0" />
+                      <span className="text-[11px] font-semibold text-neutral-700 truncate">Dealer Available:</span>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <div className="text-xs font-mono font-bold text-[#DC2626]">
+                        ₹{totalDealerAvailable.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      </div>
+                      <span className="text-[10px] font-mono text-neutral-400">
+                        {dealerRealPct}% of pool
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Plumber Reward Available */}
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className="w-2.5 h-2.5 rounded-full bg-blue-600 shrink-0" />
+                      <span className="text-[11px] font-semibold text-neutral-700 truncate">Plumber Available:</span>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <div className="text-xs font-mono font-bold text-blue-700">
+                        ₹{totalPlumberAvailable.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      </div>
+                      <span className="text-[10px] font-mono text-neutral-400">
+                        {plumberRealPct}% of pool
+                      </span>
+                    </div>
+                  </div>
+
+
+                </div>
               </div>
             </div>
           </div>

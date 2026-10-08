@@ -48,7 +48,7 @@ import { calculateDistanceMeters, formatDistanceToFiltec } from '@/utils/distanc
 import { useEffect, useState } from 'react';
 import { sortProductsNaturally } from '@/lib/catalogueUtils';
 
-const STORAGE_KEY = 'filtec_pretech1_state_v9';
+const STORAGE_KEY = 'filtec_pretech1_state_v10';
 
 export interface AppState {
   currentUser: User;
@@ -197,6 +197,10 @@ export const store = {
     if (hasInitializedFromStorage && !force) return;
     try {
       hasInitializedFromStorage = true;
+      try {
+        localStorage.removeItem('filtec_pretech1_state_v9');
+        localStorage.removeItem('filtec_pretech1_state_v8');
+      } catch {}
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
@@ -214,18 +218,19 @@ export const store = {
           }
         }
 
-        // Normalize phone numbers to include +91 prefix
+        // Normalize phone numbers to include +91 prefix with standard 5-5 spacing (+91 94375 05814)
         const normalizePhone = (p: string | undefined | null) => {
           if (!p || p === '-' || p === '(-)') return p || '(-)';
-          const clean = p.replace(/^\+91[\s-]*/, '').replace(/^91(?=\d{10})/, '').replace(/\s+/g, '').trim();
-          return clean ? `+91 ${clean}` : p;
+          const digits = p.replace(/\D/g, '');
+          const last10 = digits.slice(-10);
+          return last10.length === 10 ? `+91 ${last10.slice(0, 5)} ${last10.slice(5)}` : p.trim();
         };
 
-        // Migrate all employees to have systemRole, allowedPages, and +91 phone prefix
+        // Migrate all employees to have systemRole, allowedPages, and normalized phone
         existingEmployees = existingEmployees.map((e) => {
           const isSamir = e.name.toLowerCase() === 'samir' || e.code === 'FPPL/ADM-001' || e.id === 'emp-admin-samir';
           const systemRole: Role = e.systemRole || (isSamir ? 'ADMIN' : 'EMPLOYEE');
-          const phone = isSamir ? '+91 9437505814' : normalizePhone(e.phone);
+          const phone = normalizePhone(e.phone);
           const allowedPages =
             e.allowedPages && e.allowedPages.length > 0
               ? e.allowedPages
@@ -247,12 +252,11 @@ export const store = {
           };
         });
 
-        // Ensure current user is valid and has corrected phone
+        // Ensure current user is valid and has normalized phone
         let currentUser: User = parsed.currentUser || INITIAL_USERS[0];
-        const isSamirUser = currentUser.name?.toLowerCase() === 'samir' || currentUser.id === 'user-admin-samir';
         currentUser = {
           ...currentUser,
-          phone: isSamirUser ? '+91 9437505814' : normalizePhone(currentUser.phone),
+          phone: normalizePhone(currentUser.phone),
           allowedPages: currentUser.role === 'ADMIN' && !currentUser.allowedPages ? ALL_ADMIN_PAGES : currentUser.allowedPages
         };
 
@@ -382,12 +386,15 @@ export const store = {
                 : globalState.dealers,
               employees: d.employees?.length
                 ? d.employees.map((emp: Employee) => {
-                    const isSamir = emp.name.toLowerCase() === 'samir' || emp.code === 'FPPL/ADM-001';
                     const p = (emp.phone || '').trim();
-                    const clean = p.replace(/^\+91[\s-]*/, '').replace(/^91(?=\d{10})/, '').replace(/\s+/g, '').trim();
+                    const digits = p.replace(/\D/g, '');
+                    const last10 = digits.slice(-10);
+                    const formattedPhone = last10.length === 10
+                      ? `+91 ${last10.slice(0, 5)} ${last10.slice(5)}`
+                      : (p || '(-)');
                     return {
                       ...emp,
-                      phone: isSamir ? '+91 9437505814' : (clean && clean !== '-' && clean !== '(-)' ? `+91 ${clean}` : emp.phone),
+                      phone: formattedPhone,
                       checkInStatus: emp.checkInStatus || 'CHECKED_OUT',
                       lastCheckInTime: emp.lastCheckInTime || null,
                       lastLocation: emp.lastLocation || null,
@@ -418,23 +425,16 @@ export const store = {
               auditLogs: Array.isArray(d.auditLogs) ? d.auditLogs : [],
               integrationEvents: Array.isArray(d.integrationEvents) ? d.integrationEvents : [],
               rewardVouchers: Array.isArray(d.rewardVouchers)
-                ? (() => {
-                    const map = new Map<string, RewardVoucher>();
-                    d.rewardVouchers.forEach((v: any) => {
-                      map.set(v.id, {
-                        ...v,
-                        points: Number(v.points),
-                        amount: Number(v.amount)
-                      });
-                    });
-                    (globalState.rewardVouchers || []).forEach((v) => {
-                      if (!map.has(v.id)) map.set(v.id, v);
-                    });
-                    return Array.from(map.values()).sort(
-                      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-                    );
-                  })()
-                : globalState.rewardVouchers,
+                ? d.rewardVouchers
+                    .map((v: any) => ({
+                      ...v,
+                      points: Number(v.points),
+                      amount: Number(v.amount)
+                    }))
+                    .sort(
+                      (a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+                    )
+                : [],
               settings: d.settings?.company
                 ? {
                     company: {
@@ -1161,11 +1161,8 @@ export const store = {
       globalState.dealers = [dealer, ...globalState.dealers];
     }
 
-    // Calculate plumber's existing vouchers safely
-    const issuedTotal = (globalState.rewardVouchers || [])
-      .filter((v) => v.plumberId === plumber.id && v.type === 'PLUMBER')
-      .reduce((s, v) => s + (v.amount || 0), 0);
-    const plumberAvailable = Math.max(0, Number((plumber.totalAllocatedRewards - issuedTotal).toFixed(2)));
+    // totalAllocatedRewards is decremented on each voucher issuance, so it IS the remaining available balance
+    const plumberAvailable = Math.max(0, Number((plumber.totalAllocatedRewards || 0).toFixed(2)));
 
     // Verify balance availability depending on source (with auto-fallback if source has insufficient)
     if (source === 'DEALER_ACCOUNT' && dealer.availableRewards < points) {
@@ -1276,6 +1273,16 @@ export const store = {
     } else {
       // PLUMBER_POOL: Issued directly from plumber's earned 25% order reward share
       const remainingPlumberBalance = Math.max(0, Number((plumberAvailable - points).toFixed(2)));
+      // Deduct from plumber's totalAllocatedRewards so the pool balance decreases
+      updatedPlumbers = globalState.plumbers.map((p) =>
+        p.id === plumber.id
+          ? {
+              ...p,
+              totalAllocatedRewards: Math.max(0, Number((p.totalAllocatedRewards - points).toFixed(2))),
+              rewardHistoryCount: p.rewardHistoryCount + 1
+            }
+          : p
+      );
       tx = {
         id: `rew-${Date.now()}`,
         dealerId: dealer.id,
@@ -2074,13 +2081,9 @@ export const store = {
     const current = globalState.employees[empIndex];
     if (data.phone) {
       const p = data.phone.trim();
-      const isSamir = current.name.toLowerCase() === 'samir' || current.code === 'FPPL/ADM-001';
-      if (isSamir) {
-        data.phone = '+91 9437505814';
-      } else if (p && p !== '-' && p !== '(-)') {
-        const clean = p.replace(/^\+91[\s-]*/, '').replace(/^91(?=\d{10})/, '').replace(/\s+/g, '').trim();
-        data.phone = clean ? `+91 ${clean}` : p;
-      }
+      const digits = p.replace(/\D/g, '');
+      const last10 = digits.slice(-10);
+      data.phone = last10.length === 10 ? `+91 ${last10.slice(0, 5)} ${last10.slice(5)}` : p;
     }
     const updatedEmployee: Employee = {
       ...current,

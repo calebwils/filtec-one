@@ -69,7 +69,7 @@ export default function DealerOrdersPage() {
 
   return (
     <div className="min-h-screen bg-[#F8F9FA] pb-mobile-nav">
-      <TopContextBar title="Order Tracking" subtitle={currentDealer.name} />
+      <TopContextBar title="Order Tracking" />
       <DesktopSubNav />
 
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-5 space-y-4">

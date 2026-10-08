@@ -17,7 +17,7 @@ export default function DealerInvoicesPage() {
 
   return (
     <div className="min-h-screen bg-[#F8F9FA] pb-mobile-nav">
-      <TopContextBar title="Billing Invoices" subtitle={currentDealer.name} />
+      <TopContextBar title="Billing Invoices" />
       <DesktopSubNav />
 
       <main className="max-w-5xl mx-auto px-4 sm:px-6 py-5 space-y-4">

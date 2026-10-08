@@ -19,6 +19,8 @@ model User {
   employeeCode String?
   dealerId     String?
   allowedPages String   @default("[]") // JSON string array of routes
+  password     String?
+  mustChangePassword Boolean @default(true)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 }
@@ -43,6 +45,8 @@ model Employee {
   remarks            String?
   systemRole         String    @default("EMPLOYEE") // "ADMIN" | "EMPLOYEE" | "DEALER"
   allowedPages       String    @default("[]") // JSON string array
+  password           String?
+  mustChangePassword Boolean   @default(true)
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
 }
@@ -67,6 +71,8 @@ model Dealer {
   pendingPlumberRewards Float @default(0)
   plumbersCount      Int      @default(0)
   assignedRepId      String?
+  password           String?
+  mustChangePassword Boolean  @default(true)
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 }

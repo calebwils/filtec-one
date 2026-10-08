@@ -103,31 +103,58 @@ export default function AdminControlCenterPage() {
 
         {/* OPERATIONS & MANAGEMENT CENTERS */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {/* 1. Catalogue & Stock Management */}
+          {/* 1. GPS & Biometric Attendance */}
           <Link
-            href="/admin/catalogue"
+            href="/admin/attendance"
             className="bg-white border border-[#E5E7EB] hover:border-neutral-400 rounded-xl p-4 shadow-2xs transition-all flex flex-col justify-between group"
           >
             <div>
               <div className="flex items-center justify-between mb-2">
-                <div className="w-8 h-8 rounded-lg bg-red-50 text-[#DC2626] flex items-center justify-center">
-                  <BookOpen className="w-4 h-4" />
+                <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center">
+                  <Radio className="w-4 h-4" />
                 </div>
               </div>
               <h3 className="font-bold text-sm text-[#111827] group-hover:text-[#DC2626] transition-colors">
-                Catalogue
+                Attendance & Tracking
               </h3>
               <p className="text-[11px] text-[#6B7280] mt-1 line-clamp-2">
-                Browse F-1..F-99+ products, variants, and packaging details.
+                Daily, weekly & monthly attendance audits, reverse-geocoded coordinates & selfie proofs.
               </p>
             </div>
-            <div className="mt-3 pt-2.5 border-t border-[#F3F4F6] flex items-center justify-between text-xs font-semibold text-[#DC2626]">
-              <span>View Catalogue</span>
+            <div className="mt-3 pt-2.5 border-t border-[#F3F4F6] flex items-center justify-between text-xs font-semibold text-neutral-800 group-hover:text-[#DC2626]">
+              <span>View Roster & Ledger</span>
               <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-1" />
             </div>
           </Link>
 
-          {/* 2. Employee Directory & Onboarding */}
+          {/* 2. Order Authorizations & Management */}
+          <Link
+            href="/admin/orders"
+            className="bg-white border border-[#E5E7EB] hover:border-neutral-400 rounded-xl p-4 shadow-2xs transition-all flex flex-col justify-between group"
+          >
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-700 flex items-center justify-center">
+                  <FileCheck className="w-4 h-4" />
+                </div>
+                <span className="text-[10px] font-mono font-bold uppercase px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200">
+                  {recentOrders.length} Orders
+                </span>
+              </div>
+              <h3 className="font-bold text-sm text-[#111827] group-hover:text-[#DC2626] transition-colors">
+                Order Management
+              </h3>
+              <p className="text-[11px] text-[#6B7280] mt-1 line-clamp-2">
+                Central verification, dealer balance checks, ERP invoice dispatch and WhatsApp alerts.
+              </p>
+            </div>
+            <div className="mt-3 pt-2.5 border-t border-[#F3F4F6] flex items-center justify-between text-xs font-semibold text-neutral-800 group-hover:text-[#DC2626]">
+              <span>Authorizations Queue</span>
+              <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-1" />
+            </div>
+          </Link>
+
+          {/* 3. Employee Directory & Onboarding */}
           <Link
             href="/admin/employees"
             className="bg-white border border-[#E5E7EB] hover:border-neutral-400 rounded-xl p-4 shadow-2xs transition-all flex flex-col justify-between group"
@@ -154,53 +181,26 @@ export default function AdminControlCenterPage() {
             </div>
           </Link>
 
-          {/* 3. GPS & Biometric Attendance */}
+          {/* 4. Catalogue & Stock Management */}
           <Link
-            href="/admin/attendance"
+            href="/admin/catalogue"
             className="bg-white border border-[#E5E7EB] hover:border-neutral-400 rounded-xl p-4 shadow-2xs transition-all flex flex-col justify-between group"
           >
             <div>
               <div className="flex items-center justify-between mb-2">
-                <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center">
-                  <Radio className="w-4 h-4" />
+                <div className="w-8 h-8 rounded-lg bg-red-50 text-[#DC2626] flex items-center justify-center">
+                  <BookOpen className="w-4 h-4" />
                 </div>
               </div>
               <h3 className="font-bold text-sm text-[#111827] group-hover:text-[#DC2626] transition-colors">
-                Attendance & Tracking
+                Catalogue
               </h3>
               <p className="text-[11px] text-[#6B7280] mt-1 line-clamp-2">
-                Daily, weekly & monthly attendance audits, reverse-geocoded coordinates & selfie proofs.
+                Browse F-1..F-99+ products, variants, and packaging details.
               </p>
             </div>
-            <div className="mt-3 pt-2.5 border-t border-[#F3F4F6] flex items-center justify-between text-xs font-semibold text-neutral-800 group-hover:text-[#DC2626]">
-              <span>View Roster & Ledger</span>
-              <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-1" />
-            </div>
-          </Link>
-
-          {/* 4. Order Authorizations */}
-          <Link
-            href="/admin/orders"
-            className="bg-white border border-[#E5E7EB] hover:border-neutral-400 rounded-xl p-4 shadow-2xs transition-all flex flex-col justify-between group"
-          >
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-700 flex items-center justify-center">
-                  <FileCheck className="w-4 h-4" />
-                </div>
-                <span className="text-[10px] font-mono font-bold uppercase px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200">
-                  {recentOrders.length} Orders
-                </span>
-              </div>
-              <h3 className="font-bold text-sm text-[#111827] group-hover:text-[#DC2626] transition-colors">
-                Order Management
-              </h3>
-              <p className="text-[11px] text-[#6B7280] mt-1 line-clamp-2">
-                Central verification, dealer balance checks, ERP invoice dispatch and WhatsApp alerts.
-              </p>
-            </div>
-            <div className="mt-3 pt-2.5 border-t border-[#F3F4F6] flex items-center justify-between text-xs font-semibold text-neutral-800 group-hover:text-[#DC2626]">
-              <span>Authorizations Queue</span>
+            <div className="mt-3 pt-2.5 border-t border-[#F3F4F6] flex items-center justify-between text-xs font-semibold text-[#DC2626]">
+              <span>View Catalogue</span>
               <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-1" />
             </div>
           </Link>

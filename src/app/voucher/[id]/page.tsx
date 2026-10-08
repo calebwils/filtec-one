@@ -240,8 +240,8 @@ function VirtualCardContent() {
             <div className="flex items-center gap-3">
               <div className="bg-white px-3 py-1.5 rounded-lg shadow-sm flex items-center justify-center">
                 <img
-                  src="/brand/filtec-one-logo.png"
-                  alt="f | ONE"
+                  src="/brand/filtec-logo.png"
+                  alt="FILTEC"
                   className="h-6 sm:h-7 w-auto object-contain"
                 />
               </div>

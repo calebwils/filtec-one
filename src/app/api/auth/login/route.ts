@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { User, Role } from '@/types';
 
-// Helper to extract clean digits
+// Helper to extract clean digits from phone
 function extractDigits(str: string): string {
   return (str || '').replace(/\D/g, '');
 }
@@ -10,125 +10,90 @@ function extractDigits(str: string): string {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { type, phone, password, employeeId, dealerId } = body;
+    const { phone, password, type } = body;
 
-    // 1. DEALER LOGIN (1-Click Identity Selection by dealerId OR Phone + Password)
-    if (type === 'DEALER') {
-      let matchedDealer = null;
+    if (!phone || !phone.trim()) {
+      return NextResponse.json(
+        { success: false, error: 'Phone number is required.' },
+        { status: 400 }
+      );
+    }
 
-      if (dealerId) {
-        matchedDealer = await prisma.dealer.findUnique({
-          where: { id: dealerId }
-        });
-        if (!matchedDealer) {
+    if (!password || !password.trim()) {
+      return NextResponse.json(
+        { success: false, error: 'Password is required.' },
+        { status: 400 }
+      );
+    }
+
+    const inputDigits = extractDigits(phone);
+    if (inputDigits.length < 5) {
+      return NextResponse.json(
+        { success: false, error: 'Please enter a valid phone number.' },
+        { status: 400 }
+      );
+    }
+    const inputLast10 = inputDigits.slice(-10);
+    const trimmedPassword = password.trim();
+
+    // 1. Check EMPLOYEE (or ADMIN) if type is EMPLOYEE or ADMIN or not specified
+    if (!type || type === 'EMPLOYEE' || type === 'ADMIN') {
+      const allEmployees = await prisma.employee.findMany();
+      const matchedEmployee = allEmployees.find((e) => {
+        const empDigits = extractDigits(e.phone);
+        return (
+          empDigits === inputDigits ||
+          empDigits.slice(-10) === inputLast10 ||
+          empDigits.endsWith(inputDigits) ||
+          inputDigits.endsWith(empDigits)
+        );
+      });
+
+      if (matchedEmployee) {
+        // Enforce role filter if explicitly requested ADMIN
+        if (type === 'ADMIN' && matchedEmployee.systemRole !== 'ADMIN') {
           return NextResponse.json(
-            { success: false, error: 'Selected dealer was not found in the database.' },
-            { status: 404 }
+            { success: false, error: 'This phone number does not have Admin access.' },
+            { status: 403 }
           );
         }
-      } else {
-        if (!phone) {
-          return NextResponse.json(
-            { success: false, error: 'Phone number is required' },
-            { status: 400 }
-          );
-        }
 
-        const inputDigits = extractDigits(phone);
-        if (inputDigits.length < 5) {
-          return NextResponse.json(
-            { success: false, error: 'Please enter a valid phone number' },
-            { status: 400 }
-          );
-        }
+        const phoneDigits = extractDigits(matchedEmployee.phone);
+        const defaultLast5 = phoneDigits.slice(-5);
 
-        // Query all dealers from PostgreSQL
-        const dealers = await prisma.dealer.findMany();
-        matchedDealer = dealers.find((d) => {
-          const dealerDigits = extractDigits(d.phone);
-          return (
-            dealerDigits === inputDigits ||
-            dealerDigits.endsWith(inputDigits) ||
-            inputDigits.endsWith(dealerDigits)
-          );
-        });
+        // Password check: custom password if set, or default last 5 digits of phone
+        const hasCustomPassword = Boolean(matchedEmployee.password && matchedEmployee.password.trim());
+        const isDefaultPasswordMatch = trimmedPassword === defaultLast5;
+        const isCustomPasswordMatch = hasCustomPassword && trimmedPassword === matchedEmployee.password?.trim();
 
-        if (!matchedDealer) {
+        if (!isCustomPasswordMatch && !isDefaultPasswordMatch) {
           return NextResponse.json(
             {
               success: false,
-              error: 'No registered dealer found with this phone number. Please check the number.'
-            },
-            { status: 404 }
-          );
-        }
-
-        // Validate password: Must be the last 5 digits of the dealer's phone number
-        const dealerDigits = extractDigits(matchedDealer.phone);
-        const expectedLast5 = dealerDigits.slice(-5);
-
-        if (password && password.trim() !== expectedLast5) {
-          return NextResponse.json(
-            {
-              success: false,
-              error: 'Incorrect password. Default password is the last 5 digits of your phone number.'
+              error: hasCustomPassword
+                ? 'Incorrect password. Please verify and try again.'
+                : 'Incorrect password. Default password is the last 5 digits of your phone number.'
             },
             { status: 401 }
           );
         }
-      }
 
-      // Construct authenticated dealer User session
-      const authenticatedUser: User = {
-        id: `user-${matchedDealer.id}`,
-        name: matchedDealer.name,
-        email: `${matchedDealer.code.toLowerCase()}@filtec-dealers.in`,
-        phone: matchedDealer.phone,
-        role: 'DEALER',
-        dealerId: matchedDealer.id,
-        allowedPages: [
-          '/dealer',
-          '/dealer/catalogue',
-          '/dealer/orders',
-          '/dealer/rewards',
-          '/dealer/plumbers',
-          '/dealer/invoices'
-        ]
-      };
+        // Determine if first-time password change is required
+        // Required if mustChangePassword is true OR if they logged in with default password and haven't set a custom password
+        const mustChangePassword = matchedEmployee.mustChangePassword ?? !hasCustomPassword;
 
-      return NextResponse.json({
-        success: true,
-        user: authenticatedUser,
-        dealer: matchedDealer
-      });
-    }
+        const role: Role = (matchedEmployee.systemRole as Role) || 'EMPLOYEE';
+        let allowedPages: string[] = [];
+        try {
+          allowedPages = matchedEmployee.allowedPages ? JSON.parse(matchedEmployee.allowedPages) : [];
+        } catch {
+          allowedPages = [];
+        }
 
-    // 2. EMPLOYEE LOGIN (Direct Identity Selection by employeeId)
-    if (type === 'EMPLOYEE') {
-      if (!employeeId) {
-        return NextResponse.json(
-          { success: false, error: 'Employee ID is required' },
-          { status: 400 }
-        );
-      }
-
-      const employee = await prisma.employee.findUnique({
-        where: { id: employeeId }
-      });
-
-      if (!employee) {
-        return NextResponse.json(
-          { success: false, error: 'Employee not found in database' },
-          { status: 404 }
-        );
-      }
-
-      const role: Role = (employee.systemRole as Role) || 'EMPLOYEE';
-      const allowedPages = employee.allowedPages
-        ? JSON.parse(employee.allowedPages)
-        : role === 'ADMIN'
-        ? [
+        if (role === 'ADMIN') {
+          allowedPages = [
             '/admin',
+            '/dashboard',
             '/admin/orders',
             '/admin/attendance',
             '/admin/catalogue',
@@ -136,69 +101,117 @@ export async function POST(req: Request) {
             '/admin/employees',
             '/admin/rewards',
             '/admin/settings'
-          ]
-        : [
+          ];
+        } else if (allowedPages.length === 0) {
+          allowedPages = [
             '/employee',
             '/employee/dealers',
             '/employee/catalogue',
             '/employee/orders',
             '/employee/attendance'
           ];
+        }
 
-      const authenticatedUser: User = {
-        id: `user-${employee.id}`,
-        name: employee.name,
-        email: employee.email || `${employee.code.toLowerCase().replace(/[^a-z0-9]/g, '')}@filtec.in`,
-        phone: employee.phone,
-        role,
-        allowedPages
-      };
+        const authenticatedUser: User = {
+          id: `user-${matchedEmployee.id}`,
+          name: matchedEmployee.name,
+          email: matchedEmployee.email || `${matchedEmployee.code.toLowerCase().replace(/[^a-z0-9]/g, '')}@filtec.in`,
+          phone: matchedEmployee.phone,
+          role,
+          employeeCode: matchedEmployee.code,
+          allowedPages,
+          mustChangePassword
+        };
 
-      return NextResponse.json({
-        success: true,
-        user: authenticatedUser,
-        employee
-      });
+        return NextResponse.json({
+          success: true,
+          mustChangePassword,
+          role,
+          type: role === 'ADMIN' ? 'ADMIN' : 'EMPLOYEE',
+          entityId: matchedEmployee.id,
+          user: authenticatedUser,
+          employee: matchedEmployee
+        });
+      }
     }
 
-    // 3. ADMIN LOGIN
-    if (type === 'ADMIN') {
-      const adminEmployee = await prisma.employee.findFirst({
-        where: { systemRole: 'ADMIN' }
+    // 2. Check DEALER if type is DEALER or not specified
+    if (!type || type === 'DEALER') {
+      const allDealers = await prisma.dealer.findMany();
+      const matchedDealer = allDealers.find((d) => {
+        const dlrDigits = extractDigits(d.phone);
+        return (
+          dlrDigits === inputDigits ||
+          dlrDigits.slice(-10) === inputLast10 ||
+          dlrDigits.endsWith(inputDigits) ||
+          inputDigits.endsWith(dlrDigits)
+        );
       });
 
-      const authenticatedUser: User = {
-        id: adminEmployee ? `user-${adminEmployee.id}` : 'user-admin-samir',
-        name: adminEmployee?.name || 'Samir',
-        email: adminEmployee?.email || 'samir@filtec.in',
-        phone: adminEmployee?.phone || '+91 9437505814',
-        role: 'ADMIN',
-        allowedPages: [
-          '/admin',
-          '/admin/orders',
-          '/admin/attendance',
-          '/admin/catalogue',
-          '/admin/dealers',
-          '/admin/employees',
-          '/admin/rewards',
-          '/admin/settings'
-        ]
-      };
+      if (matchedDealer) {
+        const phoneDigits = extractDigits(matchedDealer.phone);
+        const defaultLast5 = phoneDigits.slice(-5);
 
-      return NextResponse.json({
-        success: true,
-        user: authenticatedUser
-      });
+        const hasCustomPassword = Boolean(matchedDealer.password && matchedDealer.password.trim());
+        const isDefaultPasswordMatch = trimmedPassword === defaultLast5;
+        const isCustomPasswordMatch = hasCustomPassword && trimmedPassword === matchedDealer.password?.trim();
+
+        if (!isCustomPasswordMatch && !isDefaultPasswordMatch) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: hasCustomPassword
+                ? 'Incorrect password. Please verify and try again.'
+                : 'Incorrect password. Default password is the last 5 digits of your phone number.'
+            },
+            { status: 401 }
+          );
+        }
+
+        const mustChangePassword = matchedDealer.mustChangePassword ?? !hasCustomPassword;
+
+        const authenticatedUser: User = {
+          id: `user-${matchedDealer.id}`,
+          name: matchedDealer.name,
+          email: matchedDealer.email || `${matchedDealer.code.toLowerCase()}@filtec-dealers.in`,
+          phone: matchedDealer.phone,
+          role: 'DEALER',
+          dealerId: matchedDealer.id,
+          allowedPages: [
+            '/dealer',
+            '/dealer/catalogue',
+            '/dealer/orders',
+            '/dealer/rewards',
+            '/dealer/plumbers',
+            '/dealer/invoices'
+          ],
+          mustChangePassword
+        };
+
+        return NextResponse.json({
+          success: true,
+          mustChangePassword,
+          role: 'DEALER',
+          type: 'DEALER',
+          entityId: matchedDealer.id,
+          user: authenticatedUser,
+          dealer: matchedDealer
+        });
+      }
     }
 
+    // 3. Not found in either
     return NextResponse.json(
-      { success: false, error: 'Invalid login type specified' },
-      { status: 400 }
+      {
+        success: false,
+        error: `No registered account found with phone number ${phone}. Please verify your phone number or create an account.`
+      },
+      { status: 404 }
     );
   } catch (error: any) {
-    console.error('Login error:', error);
+    console.error('Login API error:', error);
     return NextResponse.json(
-      { success: false, error: error.message || 'Internal server error' },
+      { success: false, error: error.message || 'Internal server error during authentication.' },
       { status: 500 }
     );
   }

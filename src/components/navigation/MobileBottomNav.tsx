@@ -30,6 +30,9 @@ export function MobileBottomNav() {
   const cartItemsCount = cart.items.length;
 
   const isPageAllowed = (path: string) => {
+    if (currentUser.role === 'ADMIN') {
+      return true;
+    }
     if (!currentUser.allowedPages || currentUser.allowedPages.length === 0) {
       return true;
     }

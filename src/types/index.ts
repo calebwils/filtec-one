@@ -11,6 +11,8 @@ export interface User {
   employeeCode?: string;
   dealerId?: string;
   allowedPages?: string[];
+  password?: string;
+  mustChangePassword?: boolean;
 }
 
 export interface Employee {
@@ -33,6 +35,8 @@ export interface Employee {
   remarks?: string;
   systemRole?: Role;
   allowedPages?: string[];
+  password?: string;
+  mustChangePassword?: boolean;
 }
 
 export interface Dealer {
@@ -55,6 +59,8 @@ export interface Dealer {
   plumbersCount: number;
   gstin?: string;
   assignedRepId?: string;
+  password?: string;
+  mustChangePassword?: boolean;
 }
 
 export interface Plumber {

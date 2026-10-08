@@ -53,8 +53,8 @@ export async function GET(req: NextRequest) {
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src={`${new URL(req.url).origin}/brand/filtec-one-logo.png`}
-                  alt="f | ONE"
+                  src={`${new URL(req.url).origin}/brand/filtec-logo.png`}
+                  alt="FILTEC"
                   style={{ height: '32px', width: '96px', objectFit: 'contain' }}
                 />
               </div>

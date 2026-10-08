@@ -4,82 +4,87 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useAppStore, store } from '@/data/store';
-import { Role, Employee, Dealer } from '@/types';
 import {
-  Bell,
   ShieldCheck,
-  RefreshCw,
-  Smartphone,
-  ChevronRight,
   LogOut,
-  Users,
-  Building2,
+  KeyRound,
   Shield,
-  Search,
-  X
+  X,
+  Lock,
+  Eye,
+  EyeOff,
+  AlertCircle,
+  CheckCircle2,
+  Loader2
 } from 'lucide-react';
-import { useRouter, usePathname } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 
 export function TopContextBar({ title, subtitle }: { title?: string; subtitle?: string }) {
-  const { currentUser, orders, employees, dealers } = useAppStore();
+  const { currentUser } = useAppStore();
   const router = useRouter();
-  const pathname = usePathname();
 
-  const [isEmployeeModalOpen, setIsEmployeeModalOpen] = useState(false);
-  const [isDealerModalOpen, setIsDealerModalOpen] = useState(false);
-  const [dealerSearch, setDealerSearch] = useState('');
+  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [isSubmittingPassword, setIsSubmittingPassword] = useState(false);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [passwordSuccess, setPasswordSuccess] = useState<string | null>(null);
 
-  const pendingApprovalsCount = orders.filter((o) => o.status === 'SUBMITTED' || o.status === 'PENDING_ADMIN_APPROVAL').length;
   const allowedAdminPages = (currentUser.allowedPages || []).filter((p) => p.startsWith('/admin'));
 
-  const handleAdminSwitch = () => {
-    store.syncWithDatabase(true);
-    store.switchUser('ADMIN');
-    router.push('/admin');
+  const handleSignOut = () => {
+    // Reset to login
+    router.push('/');
   };
 
-  const handleSwitchToEmployee = (emp: Employee) => {
-    store.syncWithDatabase(true);
-    const role: Role = (emp.systemRole as Role) || 'EMPLOYEE';
-    store.setUser({
-      id: `user-${emp.id}`,
-      name: emp.name,
-      email: emp.email || `${emp.code.toLowerCase().replace(/[^a-z0-9]/g, '')}@filtec.in`,
-      phone: emp.phone,
-      role,
-      employeeCode: emp.code,
-      allowedPages: emp.allowedPages || (role === 'ADMIN'
-        ? ['/admin', '/admin/orders', '/admin/attendance', '/admin/catalogue', '/admin/dealers', '/admin/employees', '/admin/rewards', '/admin/settings']
-        : ['/employee', '/employee/dealers', '/employee/catalogue', '/employee/orders', '/employee/attendance'])
-    });
-    setIsEmployeeModalOpen(false);
-    if (role === 'ADMIN') {
-      router.push('/admin');
-    } else {
-      router.push('/employee');
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPasswordError(null);
+    setPasswordSuccess(null);
+
+    if (!newPassword || newPassword.trim().length < 5) {
+      setPasswordError('New password must be at least 5 characters.');
+      return;
     }
-  };
+    if (newPassword !== confirmPassword) {
+      setPasswordError('Passwords do not match.');
+      return;
+    }
 
-  const handleSwitchToDealer = (dlr: Dealer) => {
-    store.syncWithDatabase(true);
-    store.setUser({
-      id: `user-${dlr.id}`,
-      name: dlr.name,
-      email: `${dlr.code.toLowerCase()}@filtec-dealers.in`,
-      phone: dlr.phone,
-      role: 'DEALER',
-      dealerId: dlr.id,
-      allowedPages: [
-        '/dealer',
-        '/dealer/catalogue',
-        '/dealer/orders',
-        '/dealer/rewards',
-        '/dealer/plumbers',
-        '/dealer/invoices'
-      ]
-    });
-    setIsDealerModalOpen(false);
-    router.push('/dealer');
+    setIsSubmittingPassword(true);
+
+    try {
+      const entityId = currentUser.id.replace(/^user-/, '') || currentUser.employeeCode || currentUser.dealerId || currentUser.id;
+      const res = await fetch('/api/auth/change-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          entityId,
+          type: currentUser.role,
+          newPassword: newPassword.trim()
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        setPasswordError(data.error || 'Failed to update password.');
+        setIsSubmittingPassword(false);
+        return;
+      }
+
+      setPasswordSuccess('Password updated successfully!');
+      setTimeout(() => {
+        setIsPasswordModalOpen(false);
+        setNewPassword('');
+        setConfirmPassword('');
+        setPasswordSuccess(null);
+      }, 1500);
+    } catch (err: any) {
+      setPasswordError(err.message || 'Error updating password.');
+    } finally {
+      setIsSubmittingPassword(false);
+    }
   };
 
   return (
@@ -94,56 +99,34 @@ export function TopContextBar({ title, subtitle }: { title?: string; subtitle?: 
             <span className="hidden sm:inline-block text-neutral-400">PostgreSQL: Active</span>
           </div>
 
-          {/* Identity Switchers */}
-          <div className="flex items-center gap-1.5">
-            <span className="text-neutral-400 hidden md:inline text-[11px] mr-1">Switch Identity:</span>
+          {/* Authenticated User Status & Actions */}
+          <div className="flex items-center gap-2">
+            <span className="text-neutral-400 hidden md:inline text-[11px]">
+              Logged in: <span className="text-white font-medium">{currentUser.name}</span>
+            </span>
 
             <button
               type="button"
-              onClick={handleAdminSwitch}
-              className={`px-2.5 py-0.5 rounded text-[11px] font-medium transition-all ${
-                currentUser.role === 'ADMIN'
-                  ? 'bg-white text-black font-semibold'
-                  : 'text-neutral-300 hover:text-white bg-neutral-800'
-              }`}
+              onClick={() => {
+                setIsPasswordModalOpen(true);
+                setPasswordError(null);
+                setPasswordSuccess(null);
+              }}
+              title="Change Password"
+              className="flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium text-neutral-300 hover:text-white bg-neutral-800 hover:bg-neutral-700 transition-all cursor-pointer"
             >
-              Admin {pendingApprovalsCount > 0 && `(${pendingApprovalsCount})`}
+              <KeyRound className="w-3 h-3 text-neutral-400" />
+              <span className="hidden sm:inline">Change Password</span>
             </button>
 
             <button
               type="button"
-              onClick={() => setIsEmployeeModalOpen(true)}
-              className={`px-2.5 py-0.5 rounded text-[11px] font-medium transition-all flex items-center gap-1 ${
-                currentUser.role === 'EMPLOYEE'
-                  ? 'bg-white text-black font-semibold'
-                  : 'text-neutral-300 hover:text-white bg-neutral-800'
-              }`}
+              onClick={handleSignOut}
+              title="Sign out of your session"
+              className="flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium text-rose-300 hover:text-rose-200 bg-neutral-800 hover:bg-rose-950/50 transition-all cursor-pointer ml-1"
             >
-              <Users className="w-3 h-3" />
-              <span>Employees ({employees.length})</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setIsDealerModalOpen(true)}
-              className={`px-2.5 py-0.5 rounded text-[11px] font-medium transition-all flex items-center gap-1 ${
-                currentUser.role === 'DEALER'
-                  ? 'bg-white text-black font-semibold'
-                  : 'text-neutral-300 hover:text-white bg-neutral-800'
-              }`}
-            >
-              <Building2 className="w-3 h-3" />
-              <span>Dealers ({dealers.length})</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => router.push('/')}
-              title="Disconnect and return to login portal"
-              className="flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium text-neutral-300 hover:text-rose-300 hover:bg-neutral-800 transition-all border-l border-neutral-700 ml-1.5 pl-2.5"
-            >
-              <LogOut className="w-3 h-3 text-neutral-400 hover:text-rose-300" />
-              <span className="hidden sm:inline">Sign Out</span>
+              <LogOut className="w-3 h-3 text-rose-400" />
+              <span>Sign Out</span>
             </button>
           </div>
         </div>
@@ -219,9 +202,9 @@ export function TopContextBar({ title, subtitle }: { title?: string; subtitle?: 
 
             <button
               type="button"
-              onClick={() => router.push('/')}
+              onClick={handleSignOut}
               title="Sign Out to Login Portal"
-              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border border-[#E5E7EB] hover:bg-neutral-50 text-[#374151] text-xs font-medium transition-all shadow-2xs active:scale-95"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border border-[#E5E7EB] hover:bg-neutral-50 text-[#374151] text-xs font-medium transition-all shadow-2xs active:scale-95 cursor-pointer"
             >
               <LogOut className="w-3.5 h-3.5 text-neutral-500" />
               <span className="hidden sm:inline">Sign Out</span>
@@ -230,11 +213,11 @@ export function TopContextBar({ title, subtitle }: { title?: string; subtitle?: 
         </div>
       </header>
 
-      {/* EMPLOYEE SELECTION MODAL */}
-      {isEmployeeModalOpen && (
+      {/* CHANGE PASSWORD MODAL */}
+      {isPasswordModalOpen && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in"
-          onClick={() => setIsEmployeeModalOpen(false)}
+          onClick={() => setIsPasswordModalOpen(false)}
         >
           <div
             className="w-full max-w-md bg-white rounded-2xl shadow-xl border border-neutral-200 overflow-hidden"
@@ -242,114 +225,98 @@ export function TopContextBar({ title, subtitle }: { title?: string; subtitle?: 
           >
             <div className="flex items-center justify-between px-5 py-4 border-b border-neutral-200 bg-neutral-50">
               <div className="flex items-center gap-2">
-                <Users className="w-4 h-4 text-blue-600" />
-                <h3 className="font-bold text-sm text-neutral-900">Switch Employee Identity</h3>
+                <KeyRound className="w-4 h-4 text-[#DC2626]" />
+                <h3 className="font-bold text-sm text-neutral-900">Change Your Password</h3>
               </div>
               <button
                 type="button"
-                onClick={() => setIsEmployeeModalOpen(false)}
-                className="p-1 text-neutral-400 hover:text-neutral-700 rounded-full"
+                onClick={() => setIsPasswordModalOpen(false)}
+                className="p-1 text-neutral-400 hover:text-neutral-700 rounded-full cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <div className="p-4 max-h-96 overflow-y-auto space-y-2">
-              {employees.map((emp) => (
-                <button
-                  key={emp.id}
-                  type="button"
-                  onClick={() => handleSwitchToEmployee(emp)}
-                  className="w-full text-left p-3 rounded-xl border border-neutral-200 hover:border-blue-500 hover:bg-blue-50/30 transition-all flex items-center justify-between text-xs group"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-neutral-100 group-hover:bg-blue-600 group-hover:text-white flex items-center justify-center font-bold text-neutral-700 transition-colors">
-                      {emp.name.charAt(0)}
-                    </div>
-                    <div>
-                      <div className="font-bold text-neutral-900 flex items-center gap-1.5">
-                        <span>{emp.name}</span>
-                        <span className="text-[10px] font-mono text-neutral-500">{emp.code}</span>
-                      </div>
-                      <div className="text-[11px] text-neutral-600 mt-0.5">
-                        {emp.designation || 'Field Officer'} • {emp.phone}
-                      </div>
-                    </div>
-                  </div>
-                  <ChevronRight className="w-4 h-4 text-neutral-400 group-hover:text-blue-600" />
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
+            <form onSubmit={handleChangePassword} className="p-5 space-y-4">
+              {passwordError && (
+                <div className="bg-rose-50 border border-rose-200 text-rose-800 text-xs p-3 rounded-xl flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
+                  <span>{passwordError}</span>
+                </div>
+              )}
 
-      {/* DEALER SELECTION MODAL */}
-      {isDealerModalOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in"
-          onClick={() => setIsDealerModalOpen(false)}
-        >
-          <div
-            className="w-full max-w-md bg-white rounded-2xl shadow-xl border border-neutral-200 overflow-hidden"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between px-5 py-4 border-b border-neutral-200 bg-neutral-50">
-              <div className="flex items-center gap-2">
-                <Building2 className="w-4 h-4 text-[#DC2626]" />
-                <h3 className="font-bold text-sm text-neutral-900">Switch Dealer Partner</h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsDealerModalOpen(false)}
-                className="p-1 text-neutral-400 hover:text-neutral-700 rounded-full"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
+              {passwordSuccess && (
+                <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs p-3 rounded-xl flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
+                  <span>{passwordSuccess}</span>
+                </div>
+              )}
 
-            <div className="p-3 border-b border-neutral-200 bg-neutral-50/50">
-              <div className="relative">
-                <Search className="w-3.5 h-3.5 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  value={dealerSearch}
-                  onChange={(e) => setDealerSearch(e.target.value)}
-                  placeholder="Search dealer by name, city, or phone..."
-                  className="w-full pl-8 pr-3 py-2 text-xs rounded-lg border border-neutral-200 bg-white focus:outline-none focus:ring-1 focus:ring-[#DC2626]"
-                />
-              </div>
-            </div>
-
-            <div className="p-4 max-h-96 overflow-y-auto space-y-2">
-              {dealers
-                .filter(
-                  (dlr) =>
-                    dlr.name.toLowerCase().includes(dealerSearch.toLowerCase()) ||
-                    dlr.city.toLowerCase().includes(dealerSearch.toLowerCase()) ||
-                    dlr.phone.includes(dealerSearch) ||
-                    dlr.code.toLowerCase().includes(dealerSearch.toLowerCase())
-                )
-                .map((dlr) => (
+              <div>
+                <label className="text-xs font-semibold text-[#374151] block mb-1">
+                  New Password *
+                </label>
+                <div className="relative">
+                  <Lock className="w-4 h-4 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    required
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    placeholder="Min 5 characters"
+                    className="w-full pl-9 pr-10 py-2.5 text-xs rounded-xl border border-[#D1D5DB] bg-white focus:outline-none focus:ring-2 focus:ring-[#DC2626] font-mono"
+                  />
                   <button
-                    key={dlr.id}
                     type="button"
-                    onClick={() => {
-                      handleSwitchToDealer(dlr);
-                      setDealerSearch('');
-                    }}
-                    className="w-full text-left p-3 rounded-xl border border-neutral-200 hover:border-[#DC2626] hover:bg-neutral-50 transition-all flex items-center justify-between text-xs group"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-700 cursor-pointer"
                   >
-                    <div>
-                      <span className="font-bold text-neutral-900 block">{dlr.name}</span>
-                      <span className="text-[11px] font-mono text-neutral-600">
-                        {dlr.code} • {dlr.city} • 📞 {dlr.phone}
-                      </span>
-                    </div>
-                    <ChevronRight className="w-4 h-4 text-neutral-400 group-hover:text-[#DC2626]" />
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
-                ))}
-            </div>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-[#374151] block mb-1">
+                  Confirm New Password *
+                </label>
+                <div className="relative">
+                  <Lock className="w-4 h-4 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    required
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    placeholder="Re-enter password"
+                    className="w-full pl-9 pr-3 py-2.5 text-xs rounded-xl border border-[#D1D5DB] bg-white focus:outline-none focus:ring-2 focus:ring-[#DC2626] font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsPasswordModalOpen(false)}
+                  className="flex-1 py-2 px-3 rounded-xl border border-neutral-300 text-neutral-700 text-xs font-semibold hover:bg-neutral-50 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingPassword || !newPassword || !confirmPassword}
+                  className="flex-1 py-2 px-3 rounded-xl bg-[#DC2626] hover:bg-[#B91C1C] text-white text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-1.5 disabled:opacity-50 cursor-pointer"
+                >
+                  {isSubmittingPassword ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>Saving...</span>
+                    </>
+                  ) : (
+                    <span>Update Password</span>
+                  )}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

@@ -101,7 +101,7 @@ export async function generateVirtualCardBlob(voucher: RewardVoucher): Promise<B
     try {
       logoImage = new window.Image();
       logoImage.crossOrigin = 'anonymous';
-      logoImage.src = '/brand/filtec-one-logo.png';
+      logoImage.src = '/brand/filtec-logo.png';
       await new Promise<void>((resolve) => {
         if (logoImage!.complete && logoImage!.naturalWidth > 0) {
           resolve();
