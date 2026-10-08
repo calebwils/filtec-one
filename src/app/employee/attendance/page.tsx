@@ -30,15 +30,38 @@ export default function AttendancePage() {
   const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false);
   const [mode, setMode] = useState<'CHECK_IN' | 'CHECK_OUT'>('CHECK_IN');
 
-  const todayStr = new Date().toISOString().split('T')[0];
-  const myRecords = attendanceRecords.filter(
-    (r) =>
-      r.employeeId === currentUser.id ||
-      r.employeeId === currentUser.employeeCode ||
-      r.employeeName === currentUser.name
-  );
-  const myTodayRecord = myRecords.find((r) => r.timestamp.startsWith(todayStr));
-  const latestRecord = myTodayRecord || myRecords[0];
+  const isTodayDate = (timestamp: string) => {
+    if (!timestamp) return false;
+    try {
+      const d = new Date(timestamp);
+      const now = new Date();
+      return (
+        d.getFullYear() === now.getFullYear() &&
+        d.getMonth() === now.getMonth() &&
+        d.getDate() === now.getDate()
+      );
+    } catch {
+      return timestamp.startsWith(new Date().toISOString().split('T')[0]);
+    }
+  };
+
+  const cleanUserId = (currentUser.id || '').replace(/^user-/, '');
+  const myRecords = attendanceRecords
+    .filter((r) => {
+      const cleanRecordEmpId = (r.employeeId || '').replace(/^user-/, '');
+      return (
+        r.employeeId === currentUser.id ||
+        cleanRecordEmpId === cleanUserId ||
+        (currentUser.employeeCode && (r.employeeId === currentUser.employeeCode || cleanRecordEmpId === currentUser.employeeCode)) ||
+        (currentUser.name && r.employeeName && r.employeeName.trim().toLowerCase() === currentUser.name.trim().toLowerCase())
+      );
+    })
+    .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+  const todayRecords = myRecords.filter((r) => isTodayDate(r.timestamp));
+  const todayCheckIn = todayRecords.find((r) => r.type === 'CHECK_IN');
+  const todayCheckOut = todayRecords.find((r) => r.type === 'CHECK_OUT');
+  const myTodayRecord = todayRecords[0];
 
   const myLeaves = leaveRequests.filter(
     (l) => l.employeeId === currentUser.id || l.employeeName === currentUser.name
@@ -122,10 +145,14 @@ export default function AttendancePage() {
                       setMode('CHECK_IN');
                       setIsModalOpen(true);
                     }}
-                    className="flex-1 sm:flex-initial bg-[#111827] hover:bg-black text-white text-xs font-semibold px-4 py-2.5 rounded-lg flex items-center justify-center gap-1.5 transition-all shadow-xs"
+                    className={`flex-1 sm:flex-initial text-xs font-semibold px-4 py-2.5 rounded-lg flex items-center justify-center gap-1.5 transition-all shadow-xs ${
+                      todayCheckIn
+                        ? 'bg-neutral-100 hover:bg-neutral-200 text-[#111827] border border-[#E5E7EB]'
+                        : 'bg-[#111827] hover:bg-black text-white'
+                    }`}
                   >
                     <Camera className="w-3.5 h-3.5" />
-                    <span>Record Check-In</span>
+                    <span>{todayCheckIn ? 'Re-Punch In' : 'Record Check-In'}</span>
                   </button>
 
                   <button
@@ -134,10 +161,14 @@ export default function AttendancePage() {
                       setMode('CHECK_OUT');
                       setIsModalOpen(true);
                     }}
-                    className="flex-1 sm:flex-initial border border-[#E5E7EB] hover:bg-neutral-50 text-[#111827] text-xs font-semibold px-4 py-2.5 rounded-lg flex items-center justify-center gap-1.5 transition-all"
+                    className={`flex-1 sm:flex-initial text-xs font-semibold px-4 py-2.5 rounded-lg flex items-center justify-center gap-1.5 transition-all ${
+                      todayCheckIn && !todayCheckOut
+                        ? 'bg-[#111827] hover:bg-black text-white shadow-xs'
+                        : 'border border-[#E5E7EB] hover:bg-neutral-50 text-[#111827]'
+                    }`}
                   >
                     <Clock className="w-3.5 h-3.5" />
-                    <span>Check-Out</span>
+                    <span>{todayCheckOut ? 'Re-Punch Out' : 'Check-Out'}</span>
                   </button>
                 </div>
               </div>
@@ -147,29 +178,52 @@ export default function AttendancePage() {
                 <div className="bg-[#F9FAFB] p-3 rounded-lg border border-[#E5E7EB]">
                   <span className="text-[10px] uppercase font-mono text-[#6B7280] block">Employee</span>
                   <div className="font-semibold text-xs text-[#111827] mt-0.5">{currentUser.name}</div>
-                  <span className="text-[10px] font-mono text-[#6B7280]">{currentUser.employeeCode || 'FPPL/OD-002'}</span>
+                  <span className="text-[10px] font-mono text-[#6B7280]">{currentUser.employeeCode || 'FPPL/OD-004'}</span>
                 </div>
 
                 <div className="bg-[#F9FAFB] p-3 rounded-lg border border-[#E5E7EB] flex items-center justify-between">
                   <div>
                     <span className="text-[10px] uppercase font-mono text-[#6B7280] block">Today Status</span>
-                    <div className={`font-semibold text-xs mt-0.5 ${myTodayRecord ? 'text-[#111827]' : 'text-rose-700'}`}>
-                      {myTodayRecord ? (myTodayRecord.type === 'CHECK_IN' ? 'Checked In' : 'Checked Out') : 'Absent / Not Checked In'}
+                    <div className={`font-semibold text-xs mt-0.5 ${
+                      todayCheckOut
+                        ? 'text-sky-800'
+                        : todayCheckIn
+                        ? 'text-emerald-700'
+                        : 'text-rose-700'
+                    }`}>
+                      {todayCheckOut
+                        ? 'Checked Out (Shift Done)'
+                        : todayCheckIn
+                        ? 'Checked In (Active on Field)'
+                        : 'Absent / Not Checked In'}
                     </div>
                     <span className="text-[10px] font-mono text-[#6B7280]">
-                      {myTodayRecord ? `Today at ${new Date(myTodayRecord.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'No punch recorded today'}
+                      {todayCheckIn && todayCheckOut
+                        ? `In: ${new Date(todayCheckIn.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} • Out: ${new Date(todayCheckOut.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+                        : todayCheckIn
+                        ? `Checked In at ${new Date(todayCheckIn.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+                        : todayCheckOut
+                        ? `Checked Out at ${new Date(todayCheckOut.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+                        : 'No punch recorded today'}
                     </span>
                   </div>
-                  {myTodayRecord?.photoUrl && (
+                  {(todayRecords[0]?.photoUrl || myRecords[0]?.photoUrl) && (
                     <div className="w-10 h-10 rounded-lg overflow-hidden border border-[#E5E7EB] bg-neutral-900 shrink-0">
-                      <img src={myTodayRecord.photoUrl} alt="Verified Selfie" className="w-full h-full object-cover" />
+                      <img
+                        src={todayRecords[0]?.photoUrl || myRecords[0]?.photoUrl}
+                        alt="Verified Selfie"
+                        className="w-full h-full object-cover"
+                      />
                     </div>
                   )}
                 </div>
 
                 <div className="bg-[#F9FAFB] p-3 rounded-lg border border-[#E5E7EB]">
                   <span className="text-[10px] uppercase font-mono text-[#6B7280] block">Today Verified Location</span>
-                  <div className={`font-semibold text-xs mt-0.5 truncate ${myTodayRecord ? 'text-[#111827]' : 'text-rose-700'}`} title={myTodayRecord?.locationName}>
+                  <div
+                    className={`font-semibold text-xs mt-0.5 truncate ${myTodayRecord ? 'text-[#111827]' : 'text-rose-700'}`}
+                    title={myTodayRecord?.locationName}
+                  >
                     {myTodayRecord ? myTodayRecord.locationName : 'Absent (No GPS Punch Today)'}
                   </div>
                   {myTodayRecord && (
@@ -186,7 +240,7 @@ export default function AttendancePage() {
                   )}
                   <span className={`text-[10px] font-mono font-medium block mt-0.5 ${myTodayRecord ? 'text-emerald-700' : 'text-rose-600'}`}>
                     {myTodayRecord
-                      ? `GPS Precision: ±${myTodayRecord.accuracy || 14.5}m (10-25m Target)`
+                      ? `GPS Precision: ±${myTodayRecord.accuracy || 14.5}m (Optimal Fix)`
                       : 'Tap Record Check-In'}
                   </span>
                 </div>
@@ -195,9 +249,11 @@ export default function AttendancePage() {
 
             {/* Verification History Log */}
             <div className="bg-white border border-[#E5E7EB] rounded-xl p-5 shadow-2xs">
-              <h3 className="text-xs font-bold uppercase font-mono text-[#111827] mb-3">
-                My Attendance Records ({myRecords.length})
-              </h3>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-xs font-bold uppercase font-mono text-[#111827]">
+                  My Attendance Records ({myRecords.length})
+                </h3>
+              </div>
 
               <div className="divide-y divide-[#F3F4F6]">
                 {myRecords.length === 0 ? (

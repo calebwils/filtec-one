@@ -433,8 +433,22 @@ export const store = {
               plumbers: Array.isArray(d.plumbers) ? d.plumbers : [],
               orders: Array.isArray(d.orders) ? d.orders : [],
               leaveRequests: d.leaveRequests?.length ? d.leaveRequests : globalState.leaveRequests,
-              dailyAttendance: Array.isArray(d.dailyAttendance) ? d.dailyAttendance : [],
-              attendanceRecords: Array.isArray(d.attendanceRecords) ? d.attendanceRecords : [],
+              dailyAttendance: Array.isArray(d.dailyAttendance) && d.dailyAttendance.length > 0
+                ? (() => {
+                    const remote = d.dailyAttendance;
+                    const remoteIds = new Set(remote.map((item: any) => item.id));
+                    const unsyncedLocal = globalState.dailyAttendance.filter((item) => !remoteIds.has(item.id));
+                    return [...unsyncedLocal, ...remote];
+                  })()
+                : globalState.dailyAttendance,
+              attendanceRecords: Array.isArray(d.attendanceRecords) && d.attendanceRecords.length > 0
+                ? (() => {
+                    const remote = d.attendanceRecords;
+                    const remoteIds = new Set(remote.map((r: any) => r.id));
+                    const unsyncedLocal = globalState.attendanceRecords.filter((r) => !remoteIds.has(r.id));
+                    return [...unsyncedLocal, ...remote];
+                  })()
+                : globalState.attendanceRecords,
               rewardLedger: Array.isArray(d.rewardLedger) ? d.rewardLedger : [],
               auditLogs: Array.isArray(d.auditLogs) ? d.auditLogs : [],
               integrationEvents: Array.isArray(d.integrationEvents) ? d.integrationEvents : [],
@@ -1780,12 +1794,6 @@ export const store = {
         ? record.distanceFromOffice
         : calculateDistanceMeters(record.latitude, record.longitude);
 
-    const newRecord: AttendanceRecord = {
-      ...record,
-      distanceFromOffice,
-      id: `att-${Date.now()}`
-    };
-
     const currentTimeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     const todayDateStr = new Date().toISOString().split('T')[0];
 
@@ -1806,6 +1814,14 @@ export const store = {
     const empName = matchedEmp?.name || record.employeeName;
     const empTerritory = matchedEmp?.territory || 'Central Operations';
     const empPhone = matchedEmp?.phone || '+91 9437860619';
+
+    const newRecord: AttendanceRecord = {
+      ...record,
+      employeeId: empCode,
+      employeeName: empName,
+      distanceFromOffice,
+      id: `att-${Date.now()}`
+    };
 
     // 2. Update employee check-in status in staff directory
     const updatedEmployees = globalState.employees.map((e) => {
@@ -1938,7 +1954,11 @@ export const store = {
             summary: summaryRecord
           }
         })
-      }).catch((err) => console.warn('PostgreSQL record attendance failed:', err));
+      })
+        .then(() => {
+          store.syncWithDatabase(true);
+        })
+        .catch((err) => console.warn('PostgreSQL record attendance failed:', err));
     }
   },
 

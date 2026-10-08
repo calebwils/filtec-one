@@ -33,15 +33,39 @@ export default function EmployeeHomePage() {
   const employeeOrders = orders.filter((o) => o.employeeName === currentUser.name || o.employeeId === currentUser.employeeCode);
   const todaySales = employeeOrders.reduce((acc, o) => acc + o.totalAmount, 0);
 
-  const todayStr = new Date().toISOString().split('T')[0];
-  const myRecords = attendanceRecords.filter(
-    (r) =>
-      r.employeeId === currentUser.id ||
-      r.employeeId === currentUser.employeeCode ||
-      r.employeeName === currentUser.name
-  );
-  const myTodayAttendance = myRecords.find((r) => r.timestamp.startsWith(todayStr));
-  const isCheckedInToday = myTodayAttendance?.type === 'CHECK_IN';
+  const isTodayDate = (timestamp: string) => {
+    if (!timestamp) return false;
+    try {
+      const d = new Date(timestamp);
+      const now = new Date();
+      return (
+        d.getFullYear() === now.getFullYear() &&
+        d.getMonth() === now.getMonth() &&
+        d.getDate() === now.getDate()
+      );
+    } catch {
+      return timestamp.startsWith(new Date().toISOString().split('T')[0]);
+    }
+  };
+
+  const cleanUserId = (currentUser.id || '').replace(/^user-/, '');
+  const myRecords = attendanceRecords
+    .filter((r) => {
+      const cleanRecordEmpId = (r.employeeId || '').replace(/^user-/, '');
+      return (
+        r.employeeId === currentUser.id ||
+        cleanRecordEmpId === cleanUserId ||
+        (currentUser.employeeCode && (r.employeeId === currentUser.employeeCode || cleanRecordEmpId === currentUser.employeeCode)) ||
+        (currentUser.name && r.employeeName && r.employeeName.trim().toLowerCase() === currentUser.name.trim().toLowerCase())
+      );
+    })
+    .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+  const todayRecords = myRecords.filter((r) => isTodayDate(r.timestamp));
+  const myTodayAttendance = todayRecords[0];
+  const todayCheckIn = todayRecords.find((r) => r.type === 'CHECK_IN');
+  const todayCheckOut = todayRecords.find((r) => r.type === 'CHECK_OUT');
+  const isCheckedInToday = Boolean(todayCheckIn && !todayCheckOut);
 
   const myAssignedDealers = dealers.filter(
     (d) =>
@@ -71,10 +95,10 @@ export default function EmployeeHomePage() {
                 </span>
                 <span className="text-neutral-300">•</span>
                 <span className="text-xs text-[#6B7280] font-mono">
-                  {myTodayAttendance
-                    ? isCheckedInToday
-                      ? 'Status: On Field • Checked In'
-                      : 'Status: Shift Completed'
+                  {todayCheckOut
+                    ? 'Status: Shift Completed (Checked Out)'
+                    : todayCheckIn
+                    ? 'Status: On Field • Checked In'
                     : 'Status: Absent (Not Checked In)'}
                 </span>
               </div>

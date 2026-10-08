@@ -76,6 +76,15 @@ export async function GET() {
       checkOut: d.checkOutJson ? JSON.parse(d.checkOutJson) : undefined
     }));
 
+    const parsedAttendanceRecords = attendanceRecords.map((r) => ({
+      ...r,
+      timestamp: r.timestamp instanceof Date ? r.timestamp.toISOString() : String(r.timestamp),
+      distanceFromOffice: r.distanceFromOffice !== null && r.distanceFromOffice !== undefined ? Number(r.distanceFromOffice) : undefined,
+      accuracy: 14.5,
+      accuracyBand: 'OPTIMAL' as const,
+      verified: r.verified !== false
+    }));
+
     const settingsMap: Record<string, any> = {};
     for (const s of settingsRows) {
       try {
@@ -97,6 +106,7 @@ export async function GET() {
         settings: settingsMap,
         leaveRequests,
         dailyAttendance: parsedDailyAttendance,
+        attendanceRecords: parsedAttendanceRecords,
         rewardLedger,
         auditLogs,
         integrationEvents,
@@ -590,12 +600,14 @@ export async function POST(req: Request) {
         const { record, employeeId, checkInStatus, lastCheckInTime, lastLocation, summary } = payload;
         try {
           if (record) {
+            const recordTimestamp = record.timestamp ? new Date(record.timestamp) : new Date();
             await prisma.attendanceRecord.upsert({
               where: { id: record.id },
               update: {
                 employeeId: record.employeeId,
                 employeeName: record.employeeName,
                 type: record.type,
+                timestamp: recordTimestamp,
                 latitude: record.latitude || 0,
                 longitude: record.longitude || 0,
                 locationName: record.locationName || '',
@@ -608,6 +620,7 @@ export async function POST(req: Request) {
                 employeeId: record.employeeId,
                 employeeName: record.employeeName,
                 type: record.type,
+                timestamp: recordTimestamp,
                 latitude: record.latitude || 0,
                 longitude: record.longitude || 0,
                 locationName: record.locationName || '',
@@ -629,6 +642,9 @@ export async function POST(req: Request) {
               where: { id: summary.id },
               update: {
                 date: summary.date,
+                employeeId: summary.employeeId,
+                employeeCode: summary.employeeCode,
+                employeeName: summary.employeeName,
                 status: summary.status,
                 checkInJson: checkInJson || undefined,
                 checkOutJson: checkOutJson || undefined,
@@ -683,7 +699,7 @@ export async function POST(req: Request) {
           console.warn('Could not update employee status in DB:', empErr);
         }
 
-        return NextResponse.json({ success: true, summary });
+        return NextResponse.json({ success: true, record, summary });
       }
 
       case 'ALLOCATE_PLUMBER_REWARD': {
