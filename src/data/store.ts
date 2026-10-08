@@ -243,12 +243,19 @@ export const store = {
             ? e.baseSalary
             : (seedMatch?.baseSalary || (systemRole === 'ADMIN' ? 55000 : 30000));
 
+          const cleanLastLocation = (e.lastLocation && e.lastLocation.includes('Benin')) ? undefined : (e.lastLocation || undefined);
+          const cleanLastCheckIn = (e.lastCheckInTime && e.lastCheckInTime.includes('02:28 PM')) ? undefined : (e.lastCheckInTime || undefined);
+          const cleanCheckInStatus = (!cleanLastCheckIn && e.checkInStatus === 'CHECKED_OUT') ? 'CHECKED_OUT' : (e.checkInStatus || 'CHECKED_OUT');
+
           return {
             ...e,
             phone,
             systemRole,
             allowedPages,
-            baseSalary
+            baseSalary,
+            checkInStatus: cleanCheckInStatus,
+            lastCheckInTime: cleanLastCheckIn,
+            lastLocation: cleanLastLocation
           };
         });
 
@@ -264,11 +271,26 @@ export const store = {
           ? parsed.dealers
           : INITIAL_DEALERS;
 
+        const rawPlumbers: Plumber[] = Array.isArray(parsed.plumbers)
+          ? parsed.plumbers.filter((p: any) => {
+              const isTest =
+                p.id === 'plumb-1789905107508' ||
+                p.id === 'plumb-1790271232392' ||
+                p.id === 'plumb-1790325073700' ||
+                p.name === 'PLUMBER 1' ||
+                p.name === 'Plumber 2' ||
+                p.name === 'Ramesh Prajapati';
+              return !isTest;
+            })
+          : [];
+        const normalizedPlumbers = [...rawPlumbers];
+
         const normalizedDealers = rawDealers.map((d: Dealer) => ({
           ...d,
           phone: normalizePhone(d.phone),
           creditLimit: 0,
-          outstandingBalance: 0
+          outstandingBalance: 0,
+          plumbersCount: normalizedPlumbers.filter((p) => p.dealerId === d.id).length
         }));
 
         for (const initD of INITIAL_DEALERS) {
@@ -277,26 +299,32 @@ export const store = {
           }
         }
 
-        const rawPlumbers: Plumber[] = Array.isArray(parsed.plumbers) && parsed.plumbers.length > 0
-          ? parsed.plumbers
-          : INITIAL_PLUMBERS;
-        const normalizedPlumbers = [...rawPlumbers];
-        for (const initP of INITIAL_PLUMBERS) {
-          if (!normalizedPlumbers.some((p) => p.id === initP.id)) {
-            normalizedPlumbers.push(initP);
-          }
-        }
-
         const cleanDailyAttendance: DailyAttendanceSummary[] = Array.isArray(parsed.dailyAttendance)
           ? parsed.dailyAttendance.filter((d: DailyAttendanceSummary) => {
-              const isMock = d.id === 'att-sum-1' || d.id === 'att-sum-2' || d.id === 'att-sum-3' || d.id === 'att-sum-4' || d.id === 'att-sum-5' || d.date === '2026-09-11';
+              const isMock =
+                d.id === 'att-sum-1' ||
+                d.id === 'att-sum-2' ||
+                d.id === 'att-sum-3' ||
+                d.id === 'att-sum-4' ||
+                d.id === 'att-sum-5' ||
+                d.id === 'att-sum-emp-1-2026-10-01' ||
+                d.date === '2026-09-11' ||
+                d.date === '2026-10-01';
               return !isMock;
             })
           : [];
 
         const cleanAttendanceRecords = Array.isArray(parsed.attendanceRecords)
           ? parsed.attendanceRecords.filter((r: any) => {
-              const isMock = r.id === 'att-1' || r.id === 'att-2' || r.id === 'att-3' || r.id === 'att-4' || r.id === 'att-5' || (r.timestamp && r.timestamp.startsWith('2026-09-11'));
+              const isMock =
+                r.id === 'att-1' ||
+                r.id === 'att-2' ||
+                r.id === 'att-3' ||
+                r.id === 'att-4' ||
+                r.id === 'att-5' ||
+                r.id === 'att-1790861294717' ||
+                r.id === 'att-1790861301898' ||
+                (r.timestamp && (r.timestamp.startsWith('2026-09-11') || r.timestamp.startsWith('2026-10-01')));
               return !isMock;
             })
           : [];
@@ -402,21 +430,7 @@ export const store = {
                     };
                   })
                 : globalState.employees,
-              plumbers: (() => {
-                const fetched = Array.isArray(d.plumbers) ? d.plumbers : [];
-                const merged = [...fetched];
-                for (const initP of INITIAL_PLUMBERS) {
-                  if (!merged.some((p: Plumber) => p.id === initP.id)) {
-                    merged.push(initP);
-                  }
-                }
-                for (const curP of globalState.plumbers) {
-                  if (!merged.some((p: Plumber) => p.id === curP.id)) {
-                    merged.push(curP);
-                  }
-                }
-                return merged;
-              })(),
+              plumbers: Array.isArray(d.plumbers) ? d.plumbers : [],
               orders: Array.isArray(d.orders) ? d.orders : [],
               leaveRequests: d.leaveRequests?.length ? d.leaveRequests : globalState.leaveRequests,
               dailyAttendance: Array.isArray(d.dailyAttendance) ? d.dailyAttendance : [],
@@ -487,6 +501,28 @@ export const store = {
     if (typeof window !== 'undefined') {
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(globalState));
+      } catch (e) {}
+    }
+    notify();
+  },
+
+  // Terminate session and clear persisted credentials
+  signOut() {
+    globalState = {
+      ...globalState,
+      currentUser: {
+        id: 'guest',
+        name: 'Guest',
+        email: '',
+        phone: '',
+        role: 'EMPLOYEE',
+        allowedPages: [],
+        isGuest: true
+      } as any
+    };
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.removeItem(STORAGE_KEY);
       } catch (e) {}
     }
     notify();
@@ -1110,6 +1146,47 @@ export const store = {
     }
   },
 
+  // Permanently delete order (for cancellations or purge before go-live)
+  deleteOrder(orderId: string) {
+    const existingOrder = globalState.orders.find((o) => o.id === orderId || o.orderNumber === orderId);
+    if (!existingOrder) return;
+
+    const updatedOrders = globalState.orders.filter((o) => o.id !== existingOrder.id && o.orderNumber !== existingOrder.orderNumber);
+    const timestamp = new Date().toISOString();
+    const audit: AuditLog = {
+      id: `audit-${Date.now()}`,
+      userId: globalState.currentUser?.id || 'sys',
+      userName: globalState.currentUser?.name || 'Administrator',
+      role: globalState.currentUser?.role || 'ADMIN',
+      action: 'CANCEL_ORDER',
+      entityType: 'ORDER',
+      entityId: existingOrder.id,
+      details: `Purged order ${existingOrder.orderNumber} for ${existingOrder.dealerName} (₹${existingOrder.totalAmount})`,
+      timestamp
+    };
+
+    globalState = {
+      ...globalState,
+      orders: updatedOrders,
+      auditLogs: [audit, ...globalState.auditLogs]
+    };
+
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(globalState));
+      } catch (e) {}
+      fetch('/api/data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'DELETE_ORDER',
+          payload: { orderId: existingOrder.id }
+        })
+      }).catch((err) => console.warn('PostgreSQL delete order failed:', err));
+    }
+    notify();
+  },
+
   // Dealer allocates reward to plumber (Generates Plumber Voucher P-001, P-002...)
   allocateRewardToPlumber(
     dealerId: string,
@@ -1123,15 +1200,11 @@ export const store = {
       plumber = plumberOrId;
     } else if (typeof plumberOrId === 'string') {
       plumber = globalState.plumbers.find((p) => p.id === plumberOrId)
-        || globalState.plumbers.find((p) => p.name?.toLowerCase() === plumberOrId?.toLowerCase())
-        || INITIAL_PLUMBERS.find((p) => p.id === plumberOrId || p.name?.toLowerCase() === plumberOrId?.toLowerCase());
+        || globalState.plumbers.find((p) => p.name?.toLowerCase() === plumberOrId?.toLowerCase());
     }
 
     if (!plumber && globalState.plumbers.length > 0) {
       plumber = globalState.plumbers[0];
-    }
-    if (!plumber && INITIAL_PLUMBERS.length > 0) {
-      plumber = INITIAL_PLUMBERS[0];
     }
     if (!plumber) {
       console.error('allocateRewardToPlumber: Plumber not found', plumberOrId);

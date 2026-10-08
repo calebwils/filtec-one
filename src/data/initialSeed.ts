@@ -1868,19 +1868,7 @@ export const INITIAL_DEALERS: Dealer[] = [
   }
 ];
 
-export const INITIAL_PLUMBERS: Plumber[] = [
-  {
-    id: 'plumb-1789905107508',
-    dealerId: 'dlr-012',
-    dealerName: 'Maa Tarini',
-    name: 'PLUMBER 1',
-    phone: '+91 0000011111',
-    status: 'ACTIVE',
-    totalAllocatedRewards: 0,
-    rewardHistoryCount: 0,
-    dateAdded: '2026-09-20'
-  }
-];
+export const INITIAL_PLUMBERS: Plumber[] = [];
 
 export const INITIAL_REWARD_CONFIG: RewardConfig = {
   ratePercent: 1.0,

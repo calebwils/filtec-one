@@ -1,11 +1,25 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { User, Role } from '@/types';
+import { checkRateLimit } from '@/lib/rateLimit';
 
 export async function POST(req: Request) {
   try {
+    const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
     const body = await req.json();
     const { entityId, type, newPassword } = body;
+
+    // Rate limit: 8 attempts per minute
+    const rl = checkRateLimit(`pwd:${ip}:${entityId || 'anon'}`, 8, 60000);
+    if (!rl.allowed) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: `Too many password update requests. Please wait ${rl.resetInSec} seconds before trying again.`
+        },
+        { status: 429 }
+      );
+    }
 
     if (!entityId) {
       return NextResponse.json(

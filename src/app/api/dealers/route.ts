@@ -7,9 +7,11 @@ export async function GET() {
       orderBy: { name: 'asc' }
     });
 
+    const sanitizedDealers = dealers.map(({ password: _p, ...safeDealer }) => safeDealer);
+
     return NextResponse.json({
       success: true,
-      dealers
+      dealers: sanitizedDealers
     });
   } catch (error: any) {
     console.error('Error fetching dealers:', error);

@@ -31,10 +31,17 @@ export function TopContextBar({ title, subtitle }: { title?: string; subtitle?: 
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [passwordSuccess, setPasswordSuccess] = useState<string | null>(null);
 
-  const allowedAdminPages = (currentUser.allowedPages || []).filter((p) => p.startsWith('/admin'));
+  const allowedAdminPages = (currentUser?.allowedPages || []).filter((p) => p.startsWith('/admin'));
+
+  React.useEffect(() => {
+    // If signed out or guest, redirect to login
+    if (!currentUser || (currentUser as any).isGuest) {
+      router.push('/');
+    }
+  }, [currentUser, router]);
 
   const handleSignOut = () => {
-    // Reset to login
+    store.signOut();
     router.push('/');
   };
 

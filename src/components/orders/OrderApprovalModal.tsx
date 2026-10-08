@@ -18,7 +18,8 @@ import {
   MessageSquare,
   Copy,
   Check,
-  ExternalLink
+  ExternalLink,
+  Trash2
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
@@ -38,6 +39,7 @@ export function OrderApprovalModal({
   const [isRejecting, setIsRejecting] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [copiedWhatsApp, setCopiedWhatsApp] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   if (!isOpen || !order) return null;
 
@@ -303,6 +305,39 @@ export function OrderApprovalModal({
               <MessageSquare className="w-4 h-4 text-neutral-600" />
               <span>Dealer WhatsApp</span>
             </a>
+
+            {showDeleteConfirm ? (
+              <div className="flex items-center gap-1.5 bg-rose-50 border border-rose-200 px-2.5 py-1 rounded-lg">
+                <span className="text-[11px] text-rose-700 font-medium">Delete permanently?</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    store.deleteOrder(order.id);
+                    onClose();
+                  }}
+                  className="px-2 py-1 text-[11px] font-semibold bg-rose-600 hover:bg-rose-700 text-white rounded cursor-pointer transition-colors"
+                >
+                  Yes, Delete
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowDeleteConfirm(false)}
+                  className="px-2 py-1 text-[11px] text-neutral-600 hover:bg-neutral-100 rounded cursor-pointer transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setShowDeleteConfirm(true)}
+                className="px-2.5 py-2 rounded-lg text-xs font-medium text-rose-600 hover:text-rose-700 hover:bg-rose-50 border border-rose-200 flex items-center gap-1 transition-all cursor-pointer"
+                title="Purge / Delete Order"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Delete</span>
+              </button>
+            )}
           </div>
 
           {order.status === 'PENDING_ADMIN_APPROVAL' || order.status === 'SUBMITTED' ? (

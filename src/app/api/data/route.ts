@@ -51,16 +51,24 @@ export async function GET() {
       }))
     );
 
-    const parsedEmployees = employees.map((e) => ({
-      ...e,
-      assignedDealerIds: e.assignedDealerIds ? JSON.parse(e.assignedDealerIds) : [],
-      allowedPages: e.allowedPages ? JSON.parse(e.allowedPages) : []
-    }));
+    const sanitizedDealers = dealers.map(({ password: _p, ...d }) => d);
 
-    const parsedUsers = users.map((u) => ({
-      ...u,
-      allowedPages: u.allowedPages ? JSON.parse(u.allowedPages) : []
-    }));
+    const parsedEmployees = employees.map((e) => {
+      const { password: _p, ...safeEmployee } = e;
+      return {
+        ...safeEmployee,
+        assignedDealerIds: safeEmployee.assignedDealerIds ? JSON.parse(safeEmployee.assignedDealerIds) : [],
+        allowedPages: safeEmployee.allowedPages ? JSON.parse(safeEmployee.allowedPages) : []
+      };
+    });
+
+    const parsedUsers = users.map((u) => {
+      const { password: _p, ...safeUser } = u;
+      return {
+        ...safeUser,
+        allowedPages: safeUser.allowedPages ? JSON.parse(safeUser.allowedPages) : []
+      };
+    });
 
     const parsedDailyAttendance = dailyAttendance.map((d) => ({
       ...d,
@@ -81,7 +89,7 @@ export async function GET() {
       success: true,
       data: {
         products: parsedProducts,
-        dealers,
+        dealers: sanitizedDealers,
         employees: parsedEmployees,
         users: parsedUsers,
         plumbers,
@@ -526,6 +534,25 @@ export async function POST(req: Request) {
           }
         });
         return NextResponse.json({ success: true, order: updated });
+      }
+
+      case 'DELETE_ORDER': {
+        const { orderId } = payload;
+        if (!orderId) {
+          return NextResponse.json({ success: false, error: 'Order ID is required' }, { status: 400 });
+        }
+        await prisma.orderItem.deleteMany({
+          where: { orderId }
+        });
+        await prisma.order.deleteMany({
+          where: {
+            OR: [
+              { id: orderId },
+              { orderNumber: orderId }
+            ]
+          }
+        });
+        return NextResponse.json({ success: true, message: 'Order successfully deleted' });
       }
 
       case 'CREATE_LEAVE_REQUEST': {

@@ -194,6 +194,19 @@ export default function AdminOrdersPage() {
                   </tr>
                 );
               })}
+              {filteredOrders.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="py-12 text-center text-neutral-400">
+                    <div className="flex flex-col items-center justify-center gap-2">
+                      <FileText className="w-8 h-8 text-neutral-300 stroke-[1.5]" />
+                      <span className="text-sm font-semibold text-neutral-600">No Orders Found</span>
+                      <p className="text-xs text-neutral-400 max-w-sm">
+                        There are currently no active orders matching this view. All test orders have been purged for production. New orders will appear here in real time.
+                      </p>
+                    </div>
+                  </td>
+                </tr>
+              )}
               </tbody>
             </table>
           </div>

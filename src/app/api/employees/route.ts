@@ -7,11 +7,14 @@ export async function GET() {
       orderBy: { code: 'asc' }
     });
 
-    const parsed = employees.map((e) => ({
-      ...e,
-      assignedDealerIds: e.assignedDealerIds ? JSON.parse(e.assignedDealerIds) : [],
-      allowedPages: e.allowedPages ? JSON.parse(e.allowedPages) : []
-    }));
+    const parsed = employees.map((e) => {
+      const { password: _p, ...safeEmployee } = e;
+      return {
+        ...safeEmployee,
+        assignedDealerIds: safeEmployee.assignedDealerIds ? JSON.parse(safeEmployee.assignedDealerIds) : [],
+        allowedPages: safeEmployee.allowedPages ? JSON.parse(safeEmployee.allowedPages) : []
+      };
+    });
 
     return NextResponse.json({
       success: true,

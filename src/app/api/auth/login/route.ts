@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { User, Role } from '@/types';
+import { checkRateLimit } from '@/lib/rateLimit';
 
 // Helper to extract clean digits from phone
 function extractDigits(str: string): string {
@@ -9,8 +10,22 @@ function extractDigits(str: string): string {
 
 export async function POST(req: Request) {
   try {
+    const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
     const body = await req.json();
     const { phone, password, type } = body;
+
+    // Rate limiting: 10 attempts per minute per IP / phone
+    const rateLimitKey = `login:${ip}:${extractDigits(phone) || 'unknown'}`;
+    const rl = checkRateLimit(rateLimitKey, 10, 60000);
+    if (!rl.allowed) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: `Too many login attempts. Please wait ${rl.resetInSec} seconds before trying again.`
+        },
+        { status: 429 }
+      );
+    }
 
     if (!phone || !phone.trim()) {
       return NextResponse.json(
@@ -123,6 +138,8 @@ export async function POST(req: Request) {
           mustChangePassword
         };
 
+        const { password: _empPass, ...safeEmployee } = matchedEmployee;
+
         return NextResponse.json({
           success: true,
           mustChangePassword,
@@ -130,7 +147,7 @@ export async function POST(req: Request) {
           type: role === 'ADMIN' ? 'ADMIN' : 'EMPLOYEE',
           entityId: matchedEmployee.id,
           user: authenticatedUser,
-          employee: matchedEmployee
+          employee: safeEmployee
         });
       }
     }
@@ -188,6 +205,8 @@ export async function POST(req: Request) {
           mustChangePassword
         };
 
+        const { password: _dlrPass, ...safeDealer } = matchedDealer;
+
         return NextResponse.json({
           success: true,
           mustChangePassword,
@@ -195,7 +214,7 @@ export async function POST(req: Request) {
           type: 'DEALER',
           entityId: matchedDealer.id,
           user: authenticatedUser,
-          dealer: matchedDealer
+          dealer: safeDealer
         });
       }
     }

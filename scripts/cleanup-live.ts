@@ -37,15 +37,16 @@ async function main() {
   const deletedIntegrationEvents = await prisma.integrationEvent.deleteMany({});
   console.log(`✓ Deleted ${deletedIntegrationEvents.count} IntegrationEvents.`);
 
-  // 5. Reset Dealer Purchase Totals & Rewards to 0
+  // 5. Reset Dealer Purchase Totals, Rewards & Plumbers Count to 0
   const resetDealers = await prisma.dealer.updateMany({
     data: {
       totalPurchases: 0,
       availableRewards: 0,
-      pendingPlumberRewards: 0
+      pendingPlumberRewards: 0,
+      plumbersCount: 0
     }
   });
-  console.log(`✓ Reset purchase and reward balances for ${resetDealers.count} Dealers to 0.`);
+  console.log(`✓ Reset purchase, reward balances, and plumbersCount for ${resetDealers.count} Dealers to 0.`);
 
   // 6. Reset Employee Attendance status
   const resetEmployees = await prisma.employee.updateMany({
@@ -59,14 +60,9 @@ async function main() {
   });
   console.log(`✓ Reset checkInStatus and location for ${resetEmployees.count} Employees to clean CHECKED_OUT state.`);
 
-  // 7. Reset Plumber Rewards
-  const resetPlumbers = await prisma.plumber.updateMany({
-    data: {
-      totalAllocatedRewards: 0,
-      rewardHistoryCount: 0
-    }
-  });
-  console.log(`✓ Reset rewards for ${resetPlumbers.count} Plumbers to 0.`);
+  // 7. Delete all Plumbers
+  const deletedPlumbers = await prisma.plumber.deleteMany({});
+  console.log(`✓ Deleted ${deletedPlumbers.count} Plumbers.`);
 
   console.log('✨ Cleanup complete! Database is 100% clean and ready for real live records.');
 }

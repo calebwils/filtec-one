@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { User, Role } from '@/types';
+import { checkRateLimit } from '@/lib/rateLimit';
 
 function extractDigits(str: string): string {
   return (str || '').replace(/\D/g, '');
@@ -8,6 +9,19 @@ function extractDigits(str: string): string {
 
 export async function POST(req: Request) {
   try {
+    const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+    // Rate limit: 6 registration attempts per minute per IP
+    const rl = checkRateLimit(`register:${ip}`, 6, 60000);
+    if (!rl.allowed) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: `Too many registration attempts. Please wait ${rl.resetInSec} seconds before trying again.`
+        },
+        { status: 429 }
+      );
+    }
+
     const body = await req.json();
     const {
       role,
@@ -128,11 +142,13 @@ export async function POST(req: Request) {
         mustChangePassword: false
       };
 
+      const { password: _dlrPass, ...safeDealer } = newDealer;
+
       return NextResponse.json({
         success: true,
         message: 'Dealership account successfully created!',
         user: authenticatedUser,
-        dealer: newDealer
+        dealer: safeDealer
       });
     }
 
@@ -209,11 +225,13 @@ export async function POST(req: Request) {
         mustChangePassword: false
       };
 
+      const { password: _empPass, ...safeEmployee } = newEmployee;
+
       return NextResponse.json({
         success: true,
         message: 'Employee account successfully created!',
         user: authenticatedUser,
-        employee: newEmployee
+        employee: safeEmployee
       });
     }
 
