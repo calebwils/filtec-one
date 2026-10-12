@@ -29,6 +29,10 @@ export function DesktopSubNav() {
   const pendingRewardsSettlementCount = (rewardVouchers || []).filter((v) => v.status === 'ISSUED').length;
 
   const isPageAllowed = (path: string) => {
+    // Profile pages are always accessible to authenticated users
+    if (path.endsWith('/profile')) {
+      return true;
+    }
     // Full system access for Admins without restrictions
     if (currentUser.role === 'ADMIN') {
       return true;

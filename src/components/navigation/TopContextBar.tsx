@@ -31,6 +31,20 @@ export function TopContextBar({ title, subtitle }: { title?: string; subtitle?: 
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [passwordSuccess, setPasswordSuccess] = useState<string | null>(null);
 
+  const profileUrl =
+    currentUser?.role === 'ADMIN'
+      ? '/admin/profile'
+      : currentUser?.role === 'EMPLOYEE'
+      ? '/employee/profile'
+      : '/dealer/profile';
+
+  const getInitials = (fullName?: string) => {
+    if (!fullName) return 'U';
+    const parts = fullName.trim().split(/\s+/);
+    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  };
+
   const allowedAdminPages = (currentUser?.allowedPages || []).filter((p) => p.startsWith('/admin'));
 
   React.useEffect(() => {
@@ -97,47 +111,6 @@ export function TopContextBar({ title, subtitle }: { title?: string; subtitle?: 
   return (
     <>
       <header className="sticky top-0 z-40 bg-white border-b border-[#E5E7EB] shadow-xs">
-        {/* Top micro bar */}
-        <div className="bg-[#111827] text-white px-3 sm:px-6 py-1.5 flex items-center justify-between text-xs">
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-            <span className="font-mono font-medium tracking-tight text-neutral-300">PRE-TECH 1 • DATABASE CONNECTED</span>
-            <span className="hidden sm:inline-block text-neutral-500">|</span>
-            <span className="hidden sm:inline-block text-neutral-400">PostgreSQL: Active</span>
-          </div>
-
-          {/* Authenticated User Status & Actions */}
-          <div className="flex items-center gap-2">
-            <span className="text-neutral-400 hidden md:inline text-[11px]">
-              Logged in: <span className="text-white font-medium">{currentUser.name}</span>
-            </span>
-
-            <button
-              type="button"
-              onClick={() => {
-                setIsPasswordModalOpen(true);
-                setPasswordError(null);
-                setPasswordSuccess(null);
-              }}
-              title="Change Password"
-              className="flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium text-neutral-300 hover:text-white bg-neutral-800 hover:bg-neutral-700 transition-all cursor-pointer"
-            >
-              <KeyRound className="w-3 h-3 text-neutral-400" />
-              <span className="hidden sm:inline">Change Password</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={handleSignOut}
-              title="Sign out of your session"
-              className="flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium text-rose-300 hover:text-rose-200 bg-neutral-800 hover:bg-rose-950/50 transition-all cursor-pointer ml-1"
-            >
-              <LogOut className="w-3 h-3 text-rose-400" />
-              <span>Sign Out</span>
-            </button>
-          </div>
-        </div>
-
         {/* Main Bar */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -173,28 +146,49 @@ export function TopContextBar({ title, subtitle }: { title?: string; subtitle?: 
 
           {/* User Context, Role Pill & Sign Out */}
           <div className="flex items-center gap-2 sm:gap-2.5">
-            <div className="text-right hidden sm:block">
-              <div className="text-xs font-semibold text-[#111827]">{currentUser.name}</div>
-              <div className="text-[10px] text-[#6B7280] font-mono">
-                {currentUser.role === 'ADMIN'
-                  ? 'Operations Control'
-                  : currentUser.role === 'EMPLOYEE'
-                  ? `${currentUser.employeeCode || 'Field Staff'}`
-                  : 'Dealer Partner'}
-              </div>
-            </div>
-
-            <span
-              className={`px-2 py-0.5 rounded text-[10px] font-mono uppercase font-semibold border ${
-                currentUser.role === 'ADMIN'
-                  ? 'bg-neutral-100 text-neutral-800 border-neutral-300'
-                  : currentUser.role === 'EMPLOYEE'
-                  ? 'bg-blue-50 text-blue-800 border-blue-200'
-                  : 'bg-emerald-50 text-emerald-800 border-emerald-200'
-              }`}
+            <Link
+              href={profileUrl}
+              title="Click to view & edit your profile"
+              className="flex items-center gap-2 sm:gap-2.5 p-1 rounded-xl hover:bg-neutral-100 transition-all group cursor-pointer"
             >
-              {currentUser.role}
-            </span>
+              {/* Profile Avatar / Photo */}
+              <div className="w-8 h-8 rounded-full overflow-hidden shrink-0 border border-neutral-300 bg-neutral-900 flex items-center justify-center text-white text-[11px] font-mono font-bold group-hover:ring-2 group-hover:ring-[#DC2626] transition-all">
+                {currentUser.avatarUrl ? (
+                  <img
+                    src={currentUser.avatarUrl}
+                    alt={currentUser.name}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <span>{getInitials(currentUser.name)}</span>
+                )}
+              </div>
+
+              <div className="text-right hidden sm:block">
+                <div className="text-xs font-semibold text-[#111827] group-hover:text-[#DC2626] transition-colors">
+                  {currentUser.name}
+                </div>
+                <div className="text-[10px] text-[#6B7280] font-mono">
+                  {currentUser.role === 'ADMIN'
+                    ? 'Operations Control'
+                    : currentUser.role === 'EMPLOYEE'
+                    ? `${currentUser.employeeCode || 'Field Staff'}`
+                    : 'Dealer Partner'}
+                </div>
+              </div>
+
+              <span
+                className={`px-2 py-0.5 rounded text-[10px] font-mono uppercase font-semibold border ${
+                  currentUser.role === 'ADMIN'
+                    ? 'bg-neutral-100 text-neutral-800 border-neutral-300'
+                    : currentUser.role === 'EMPLOYEE'
+                    ? 'bg-blue-50 text-blue-800 border-blue-200'
+                    : 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                }`}
+              >
+                {currentUser.role}
+              </span>
+            </Link>
 
             {currentUser.role === 'EMPLOYEE' && allowedAdminPages.length > 0 && (
               <Link

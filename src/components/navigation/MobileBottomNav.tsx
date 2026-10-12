@@ -30,6 +30,10 @@ export function MobileBottomNav() {
   const cartItemsCount = cart.items.length;
 
   const isPageAllowed = (path: string) => {
+    // Profile pages are always allowed
+    if (path.endsWith('/profile')) {
+      return true;
+    }
     if (currentUser.role === 'ADMIN') {
       return true;
     }

@@ -19,9 +19,37 @@ import {
   AlertCircle,
   XCircle,
   FileText,
-  Navigation
+  Navigation,
+  ChevronLeft,
+  ChevronRight,
+  Filter,
+  Eye,
+  X,
+  ExternalLink,
+  RefreshCw
 } from 'lucide-react';
 import { calculateDistanceMeters, formatDistanceToFiltec, formatDistanceShort } from '@/utils/distance';
+
+// ── helpers ───────────────────────────────────────────────────────────────────
+function todayStr() {
+  return new Date().toISOString().split('T')[0];
+}
+
+function getMonthStart(dateStr: string) {
+  return dateStr.substring(0, 8) + '01';
+}
+
+function getMonthEnd(dateStr: string) {
+  const [year, month] = dateStr.split('-').map(Number);
+  const lastDay = new Date(year, month, 0).getDate();
+  return `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+}
+
+function addDays(dateStr: string, n: number): string {
+  const d = new Date(dateStr + 'T00:00:00');
+  d.setDate(d.getDate() + n);
+  return d.toISOString().split('T')[0];
+}
 
 export default function AttendancePage() {
   const { attendanceRecords, currentUser, leaveRequests, settings } = useAppStore();
@@ -29,6 +57,70 @@ export default function AttendancePage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false);
   const [mode, setMode] = useState<'CHECK_IN' | 'CHECK_OUT'>('CHECK_IN');
+
+  const today = todayStr();
+  const thisMonthStart = getMonthStart(today);
+  const thisMonthEnd = getMonthEnd(today);
+
+  // Month navigation and range filters
+  const [startDate, setStartDate] = useState(thisMonthStart);
+  const [endDate, setEndDate] = useState(thisMonthEnd);
+  const [datePreset, setDatePreset] = useState<'THIS_MONTH' | 'LAST_MONTH' | 'LAST_7' | 'TODAY' | 'ALL' | 'CUSTOM'>('THIS_MONTH');
+  const [punchTypeFilter, setPunchTypeFilter] = useState<'ALL' | 'CHECK_IN' | 'CHECK_OUT'>('ALL');
+  const [currentMonthAnchor, setCurrentMonthAnchor] = useState<Date>(new Date());
+  const [selectedSelfieUrl, setSelectedSelfieUrl] = useState<string | null>(null);
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  const handleSync = async () => {
+    setIsSyncing(true);
+    try {
+      await store.syncWithDatabase(true);
+    } finally {
+      setTimeout(() => setIsSyncing(false), 500);
+    }
+  };
+
+  const handlePrevMonth = () => {
+    const prev = new Date(currentMonthAnchor.getFullYear(), currentMonthAnchor.getMonth() - 1, 1);
+    setCurrentMonthAnchor(prev);
+    const startStr = `${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, '0')}-01`;
+    setStartDate(startStr);
+    setEndDate(getMonthEnd(startStr));
+    setDatePreset('CUSTOM');
+  };
+
+  const handleNextMonth = () => {
+    const next = new Date(currentMonthAnchor.getFullYear(), currentMonthAnchor.getMonth() + 1, 1);
+    setCurrentMonthAnchor(next);
+    const startStr = `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}-01`;
+    setStartDate(startStr);
+    setEndDate(getMonthEnd(startStr));
+    setDatePreset('CUSTOM');
+  };
+
+  const handlePreset = (preset: 'THIS_MONTH' | 'LAST_MONTH' | 'LAST_7' | 'TODAY' | 'ALL') => {
+    setDatePreset(preset);
+    if (preset === 'THIS_MONTH') {
+      setCurrentMonthAnchor(new Date());
+      setStartDate(thisMonthStart);
+      setEndDate(thisMonthEnd);
+    } else if (preset === 'LAST_MONTH') {
+      const prev = new Date(new Date().getFullYear(), new Date().getMonth() - 1, 1);
+      setCurrentMonthAnchor(prev);
+      const startStr = `${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, '0')}-01`;
+      setStartDate(startStr);
+      setEndDate(getMonthEnd(startStr));
+    } else if (preset === 'LAST_7') {
+      setStartDate(addDays(today, -6));
+      setEndDate(today);
+    } else if (preset === 'TODAY') {
+      setStartDate(today);
+      setEndDate(today);
+    } else if (preset === 'ALL') {
+      setStartDate('2024-01-01');
+      setEndDate('2099-12-31');
+    }
+  };
 
   const isTodayDate = (timestamp: string) => {
     if (!timestamp) return false;
@@ -58,6 +150,31 @@ export default function AttendancePage() {
     })
     .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
+  // Filtered attendance records according to selected month or date range
+  const filteredRecords = myRecords.filter((r) => {
+    const rDate = (r.timestamp || '').split('T')[0];
+    const inRange = (!startDate || rDate >= startDate) && (!endDate || rDate <= endDate);
+    if (!inRange) return false;
+    if (punchTypeFilter === 'ALL') return true;
+    return r.type === punchTypeFilter;
+  });
+
+  const rangeCheckInCount = myRecords.filter((r) => {
+    const rDate = (r.timestamp || '').split('T')[0];
+    return (!startDate || rDate >= startDate) && (!endDate || rDate <= endDate) && r.type === 'CHECK_IN';
+  }).length;
+
+  const rangeCheckOutCount = myRecords.filter((r) => {
+    const rDate = (r.timestamp || '').split('T')[0];
+    return (!startDate || rDate >= startDate) && (!endDate || rDate <= endDate) && r.type === 'CHECK_OUT';
+  }).length;
+
+  const currentMonthLabel = currentMonthAnchor.toLocaleDateString('en-IN', {
+    month: 'long',
+    year: 'numeric'
+  });
+
+  // Today specific calculations for top status cards (independent of bottom filter)
   const todayRecords = myRecords.filter((r) => isTodayDate(r.timestamp));
   const todayCheckIn = todayRecords.find((r) => r.type === 'CHECK_IN');
   const todayCheckOut = todayRecords.find((r) => r.type === 'CHECK_OUT');
