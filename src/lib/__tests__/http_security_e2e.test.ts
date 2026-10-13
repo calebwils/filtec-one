@@ -479,4 +479,46 @@ describe('Live HTTP Endpoints End-to-End Security Verification', () => {
       assert.ok(!decodedStr.includes('password'), 'Session token payload must never contain password field');
     });
   });
+
+  // 7. Administrative Audit Trail & Data Integrity Verification
+  describe('7. Administrative Audit Trail & Data Integrity Verification', () => {
+    it('captures audit log entry when admin updates settings and isolates audit logs from non-admins', async () => {
+      const testAuditKey = `test_setting_${Date.now()}`;
+      const mutateRes = await fetch(`${BASE_URL}/api/data`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: `filtec_session=${adminToken}`
+        },
+        body: JSON.stringify({
+          action: 'UPDATE_SETTINGS',
+          payload: {
+            key: testAuditKey,
+            value: 'verified_audit_trail_value'
+          }
+        })
+      });
+      assert.equal(mutateRes.status, 200);
+
+      // Verify Admin receives audit logs
+      const adminGetRes = await fetch(`${BASE_URL}/api/data`, {
+        headers: { Cookie: `filtec_session=${adminToken}` }
+      });
+      assert.equal(adminGetRes.status, 200);
+      const adminData = await adminGetRes.json();
+      assert.ok(Array.isArray(adminData.data.auditLogs));
+      const foundAudit = adminData.data.auditLogs.find(
+        (a: any) => a.action === 'UPDATE_SETTINGS' && a.entityId === testAuditKey
+      );
+      assert.ok(foundAudit, `Audit log entry for ${testAuditKey} was not found!`);
+      assert.equal(foundAudit.role, 'ADMIN');
+
+      // Verify Dealer receives empty auditLogs (cannot inspect or tamper with audit trail)
+      const dealerGetRes = await fetch(`${BASE_URL}/api/data`, {
+        headers: { Cookie: `filtec_session=${dealerAToken}` }
+      });
+      const dealerData = await dealerGetRes.json();
+      assert.deepEqual(dealerData.data.auditLogs, [], 'Audit trail must be completely hidden from dealers');
+    });
+  });
 });

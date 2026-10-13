@@ -259,6 +259,32 @@ export async function GET(req: Request) {
   }
 }
 
+async function recordAudit(
+  session: { userId: string; role: string; name?: string },
+  action: string,
+  entityType: string,
+  entityId: string,
+  details: string
+) {
+  try {
+    await prisma.auditLog.create({
+      data: {
+        id: `aud-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        userId: session.userId,
+        userName: session.name || session.userId,
+        role: session.role,
+        action,
+        entityType,
+        entityId,
+        details,
+        timestamp: new Date().toISOString()
+      }
+    });
+  } catch (err) {
+    console.warn(`[AUDIT WARNING] Failed to record audit log for ${action}:`, err);
+  }
+}
+
 // Handler to persist changes directly to PostgreSQL
 export async function POST(req: Request) {
   try {
@@ -469,6 +495,7 @@ export async function POST(req: Request) {
             );
           }
           await Promise.all(updates);
+          await recordAudit(session, 'UPDATE_SETTINGS', 'SYSTEM_SETTINGS', 'global', `Updated settings: ${Object.keys(payload.settings).join(', ')}`);
           return NextResponse.json({ success: true });
         }
         const { key, value } = payload;
@@ -477,6 +504,7 @@ export async function POST(req: Request) {
           update: { value: JSON.stringify(value) },
           create: { key, value: JSON.stringify(value) }
         });
+        await recordAudit(session, 'UPDATE_SETTINGS', 'SYSTEM_SETTINGS', key, `Updated setting ${key}`);
         return NextResponse.json({ success: true, setting: updated });
       }
 
@@ -504,6 +532,7 @@ export async function POST(req: Request) {
             assignedRepId: dealerData.assignedRepId || null
           }
         });
+        await recordAudit(session, 'CREATE_DEALER', 'DEALER', created.id, `Created dealership ${created.name} (${created.code}) in ${created.city}`);
         return NextResponse.json({ success: true, dealer: created });
       }
 
@@ -518,6 +547,7 @@ export async function POST(req: Request) {
           where: { id },
           data: dataToUpdate
         });
+        await recordAudit(session, 'UPDATE_DEALER', 'DEALER', updated.id, `Updated dealership ${updated.name} (${updated.code})`);
         return NextResponse.json({ success: true, dealer: updated });
       }
 
@@ -564,6 +594,7 @@ export async function POST(req: Request) {
             ...rest
           }
         });
+        await recordAudit(session, 'CREATE_EMPLOYEE', 'EMPLOYEE', created.id, `Created employee ${created.name} (${created.code})`);
         return NextResponse.json({ success: true, employee: created });
       }
 
@@ -585,6 +616,7 @@ export async function POST(req: Request) {
           if (emp.email && emp.email !== '(-)') {
             await prisma.user.deleteMany({ where: { email: emp.email } });
           }
+          await recordAudit(session, 'DELETE_EMPLOYEE', 'EMPLOYEE', emp.id, `Deleted employee ${emp.name} (${emp.code})`);
         }
         return NextResponse.json({ success: true, deletedId: id || code });
       }
@@ -681,6 +713,7 @@ export async function POST(req: Request) {
           },
           include: { variants: true }
         });
+        await recordAudit(session, 'CREATE_PRODUCT', 'PRODUCT', created.id, `Created product ${created.name} (${created.category})`);
         return NextResponse.json({ success: true, product: created });
       }
 
@@ -689,6 +722,7 @@ export async function POST(req: Request) {
         await prisma.product.delete({
           where: { id: productId }
         });
+        await recordAudit(session, 'DELETE_PRODUCT', 'PRODUCT', productId, `Deleted product ${productId}`);
         return NextResponse.json({ success: true });
       }
 
@@ -732,6 +766,7 @@ export async function POST(req: Request) {
             invoicedAt: new Date().toISOString()
           }
         });
+        await recordAudit(session, 'APPROVE_ORDER', 'ORDER', updatedOrder.id, `Approved order ${updatedOrder.orderNumber} for dealer ${dealerId}`);
 
         if (dealerId) {
           const currentDealer = await prisma.dealer.findUnique({ where: { id: dealerId } });
@@ -880,6 +915,7 @@ export async function POST(req: Request) {
           }).catch(() => null);
         }
 
+        await recordAudit(session, 'RELEASE_ORDER', 'ORDER', orderId, `Released order ${orderId} with invoice ${invoiceNumber}`);
         return NextResponse.json({ success: true, order: updatedOrder });
       }
 
@@ -892,6 +928,7 @@ export async function POST(req: Request) {
             rejectionReason
           }
         });
+        await recordAudit(session, 'REJECT_ORDER', 'ORDER', orderId, `Rejected order ${orderId}. Reason: ${rejectionReason || 'No reason specified'}`);
         return NextResponse.json({ success: true, order: updated });
       }
 
@@ -911,6 +948,7 @@ export async function POST(req: Request) {
             ]
           }
         });
+        await recordAudit(session, 'DELETE_ORDER', 'ORDER', orderId, `Deleted order ${orderId}`);
         return NextResponse.json({ success: true, message: 'Order successfully deleted' });
       }
 
@@ -942,6 +980,7 @@ export async function POST(req: Request) {
             rejectionReason: rejectionReason || null
           }
         });
+        await recordAudit(session, 'UPDATE_LEAVE_REQUEST', 'LEAVE_REQUEST', id, `Updated leave request status to ${status}`);
         return NextResponse.json({ success: true, leaveRequest: updated });
       }
 
