@@ -1,8 +1,17 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { getSessionFromRequest } from '@/lib/security';
 
 export async function POST(req: Request) {
   try {
+    const session = getSessionFromRequest(req);
+    if (!session) {
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized: Valid session required.' },
+        { status: 401 }
+      );
+    }
+
     const body = await req.json();
     const {
       orderId,

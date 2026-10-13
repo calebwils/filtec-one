@@ -63,7 +63,7 @@ export default function AdminControlCenterPage() {
               className="inline-flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-cyan-400 border border-cyan-500/30 text-xs font-semibold px-3.5 py-2 rounded-lg transition-all shadow-xs"
             >
               <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
-              <span>⚡ Executive Live Dashboard</span>
+              <span>⚡ Executive Cockpit</span>
             </Link>
             <Link
               href="/admin/orders"

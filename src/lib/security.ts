@@ -1,7 +1,27 @@
 import crypto from 'crypto';
 
-// Secret key for HMAC token signing (falls back to secure machine-derived seed if not in env)
-const JWT_SECRET = process.env.AUTH_SECRET || process.env.JWT_SECRET || 'filtec_one_enterprise_secure_token_secret_2026';
+/**
+ * Retrieves the cryptographic secret for HMAC session signing.
+ * Strictly requires a high-entropy secret in production and fails safely if missing.
+ */
+export function getAuthSecret(): string {
+  const secret = process.env.AUTH_SECRET || process.env.JWT_SECRET || process.env.SESSION_SECRET;
+  if (!secret) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error(
+        'CRITICAL SECURITY CONFIGURATION ERROR: AUTH_SECRET environment variable is missing in production. Refusing to operate with fallback secret.'
+      );
+    }
+    // Development/test fallback with clear identifier
+    return 'filtec_local_dev_ephemeral_auth_secret_do_not_use_in_prod_x92!';
+  }
+  if (secret.length < 32 && process.env.NODE_ENV === 'production') {
+    throw new Error(
+      'CRITICAL SECURITY CONFIGURATION ERROR: AUTH_SECRET must be at least 32 characters (256-bit entropy) in production.'
+    );
+  }
+  return secret;
+}
 
 /**
  * Hash a password using PBKDF2 with 100,000 iterations and SHA-512.
@@ -67,6 +87,7 @@ export function verifyPassword(
 export interface SessionPayload {
   userId: string;
   role: 'ADMIN' | 'EMPLOYEE' | 'DEALER';
+  dealerId?: string;
   employeeCode?: string;
   phone?: string;
   name?: string;
@@ -80,7 +101,8 @@ export function createSessionToken(data: Omit<SessionPayload, 'exp'>, expiresInH
   const exp = Math.floor(Date.now() / 1000) + expiresInHours * 3600;
   const payload: SessionPayload = { ...data, exp };
   const encodedPayload = Buffer.from(JSON.stringify(payload)).toString('base64url');
-  const signature = crypto.createHmac('sha256', JWT_SECRET).update(encodedPayload).digest('base64url');
+  const secret = getAuthSecret();
+  const signature = crypto.createHmac('sha256', secret).update(encodedPayload).digest('base64url');
   return `${encodedPayload}.${signature}`;
 }
 
@@ -94,7 +116,8 @@ export function verifySessionToken(token: string | null | undefined): SessionPay
     const [encodedPayload, signature] = token.split('.');
     if (!encodedPayload || !signature) return null;
 
-    const expectedSig = crypto.createHmac('sha256', JWT_SECRET).update(encodedPayload).digest('base64url');
+    const secret = getAuthSecret();
+    const expectedSig = crypto.createHmac('sha256', secret).update(encodedPayload).digest('base64url');
 
     const sigBuf = Buffer.from(signature);
     const expectedBuf = Buffer.from(expectedSig);

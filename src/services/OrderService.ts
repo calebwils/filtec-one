@@ -1,4 +1,4 @@
-import { Order, OrderItem, OrderStatus, RewardConfig } from '@/types';
+import { OrderItem, OrderStatus, RewardConfig } from '@/types';
 import { store } from '@/data/store';
 
 export class OrderService {

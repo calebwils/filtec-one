@@ -45,7 +45,7 @@ import {
   ALL_DEALER_PAGES
 } from './initialSeed';
 import { calculateDistanceMeters, formatDistanceToFiltec } from '@/utils/distance';
-import { useEffect, useState } from 'react';
+import { useEffect, useSyncExternalStore } from 'react';
 import { sortProductsNaturally } from '@/lib/catalogueUtils';
 
 const STORAGE_KEY = 'filtec_pretech1_state_v10';
@@ -1954,7 +1954,7 @@ export const store = {
     });
 
     // 3. Synchronize to dailyAttendance for Admin visibility (matched strictly on today's date)
-    let updatedDaily = [...globalState.dailyAttendance];
+    const updatedDaily = [...globalState.dailyAttendance];
     const dailyIndex = updatedDaily.findIndex(
       (d) =>
         d.date === todayDateStr &&
@@ -3143,19 +3143,14 @@ export const store = {
 
 // React hook for consuming state in client components
 export function useAppStore(): AppState {
-  const [state, setState] = useState<AppState>(store.getState());
-
   useEffect(() => {
     store.initializeFromStorage();
     store.syncWithDatabase();
-    setState(store.getState());
-    const unsubscribe = store.subscribe(() => {
-      setState(store.getState());
-    });
-    return () => {
-      unsubscribe();
-    };
   }, []);
 
-  return state;
+  return useSyncExternalStore(
+    store.subscribe,
+    store.getState,
+    store.getState
+  );
 }

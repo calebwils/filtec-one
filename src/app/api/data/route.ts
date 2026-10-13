@@ -3,8 +3,18 @@ import { prisma } from '@/lib/prisma';
 import { sortProductsNaturally } from '@/lib/catalogueUtils';
 import { getSessionFromRequest } from '@/lib/security';
 
-export async function GET() {
+export const dynamic = 'force-dynamic';
+
+export async function GET(req: Request) {
   try {
+    const session = getSessionFromRequest(req);
+    if (!session) {
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized: Valid session required.' },
+        { status: 401 }
+      );
+    }
+
     const [
       products,
       dealers,
@@ -52,39 +62,165 @@ export async function GET() {
       }))
     );
 
-    const sanitizedDealers = dealers.map(({ password: _p, ...d }) => d);
+    const isCallerAdmin = session.role === 'ADMIN';
+    const isCallerEmployee = session.role === 'EMPLOYEE';
+    const isCallerDealer = session.role === 'DEALER';
 
-    const parsedEmployees = employees.map((e) => {
-      const { password: _p, ...safeEmployee } = e;
-      return {
-        ...safeEmployee,
-        assignedDealerIds: safeEmployee.assignedDealerIds ? JSON.parse(safeEmployee.assignedDealerIds) : [],
-        allowedPages: safeEmployee.allowedPages ? JSON.parse(safeEmployee.allowedPages) : []
-      };
+    // Find current employee if caller is an employee
+    const currentEmp = employees.find(
+      (e) => e.id === session.userId || e.code === session.employeeCode || `user-${e.id}` === session.userId
+    );
+    let assignedDealerIds: string[] = [];
+    if (currentEmp?.assignedDealerIds) {
+      try {
+        assignedDealerIds = JSON.parse(currentEmp.assignedDealerIds);
+      } catch {}
+    }
+
+    // 1. Scoped dealers: Dealers only see their OWN dealership; peers/financials are isolated
+    const scopedDealers = dealers
+      .map(({ password: _p, ...d }) => d)
+      .filter((d) => {
+        if (isCallerAdmin || isCallerEmployee) return true;
+        if (isCallerDealer) {
+          const cleanDealerId = session.dealerId || session.userId.replace(/^user-/, '');
+          return d.id === session.userId || d.id === session.dealerId || d.id === cleanDealerId || d.code === session.userId || (session.phone && d.phone === session.phone);
+        }
+        return false;
+      })
+      .map((d) => {
+        if (isCallerAdmin) return d;
+        if (isCallerDealer) return d;
+        // Employee viewing dealer: hide financial limits unless directly assigned
+        const isAssigned = assignedDealerIds.includes(d.id);
+        return {
+          ...d,
+          creditLimit: isAssigned ? d.creditLimit : 0,
+          outstandingBalance: isAssigned ? d.outstandingBalance : 0
+        };
+      });
+
+    // 2. Scoped employees: Dealers receive [] (cannot see employees); for Employees, peers' salaries masked
+    const scopedEmployees = isCallerDealer
+      ? []
+      : employees.map((e) => {
+          const { password: _p, ...safeEmployee } = e;
+          const isSelf =
+            session.userId === e.id ||
+            session.userId === `user-${e.id}` ||
+            session.employeeCode === e.code;
+          const canViewSalary = isCallerAdmin || isSelf;
+
+          return {
+            ...safeEmployee,
+            baseSalary: canViewSalary ? safeEmployee.baseSalary : 0,
+            phone: isCallerAdmin || isCallerEmployee ? safeEmployee.phone : '-',
+            email: isCallerAdmin || isCallerEmployee ? safeEmployee.email : '-',
+            assignedDealerIds: safeEmployee.assignedDealerIds ? JSON.parse(safeEmployee.assignedDealerIds) : [],
+            allowedPages: isCallerAdmin || isSelf ? (safeEmployee.allowedPages ? JSON.parse(safeEmployee.allowedPages) : []) : []
+          };
+        });
+
+    // 3. Scoped users: Admin ONLY
+    const scopedUsers = isCallerAdmin
+      ? users.map((u) => {
+          const { password: _p, ...safeUser } = u;
+          return {
+            ...safeUser,
+            allowedPages: safeUser.allowedPages ? JSON.parse(safeUser.allowedPages) : []
+          };
+        })
+      : [];
+
+    // 4. Scoped plumbers: Dealer only sees their OWN registered plumbers
+    const scopedPlumbers = plumbers.filter((p) => {
+      if (isCallerAdmin) return true;
+      if (isCallerDealer) {
+        const cleanDealerId = session.dealerId || session.userId.replace(/^user-/, '');
+        return p.dealerId === session.userId || p.dealerId === session.dealerId || p.dealerId === cleanDealerId;
+      }
+      if (isCallerEmployee) {
+        return assignedDealerIds.length === 0 || assignedDealerIds.includes(p.dealerId);
+      }
+      return false;
     });
 
-    const parsedUsers = users.map((u) => {
-      const { password: _p, ...safeUser } = u;
-      return {
-        ...safeUser,
-        allowedPages: safeUser.allowedPages ? JSON.parse(safeUser.allowedPages) : []
-      };
+    // 5. Scoped orders: Dealer only sees their OWN orders
+    const scopedOrders = orders.filter((o) => {
+      if (isCallerAdmin) return true;
+      if (isCallerDealer) {
+        const cleanDealerId = session.dealerId || session.userId.replace(/^user-/, '');
+        return o.dealerId === session.userId || o.dealerId === session.dealerId || o.dealerId === cleanDealerId;
+      }
+      if (isCallerEmployee) {
+        return o.employeeId === session.userId || o.employeeId === session.employeeCode || assignedDealerIds.includes(o.dealerId);
+      }
+      return false;
     });
 
-    const parsedDailyAttendance = dailyAttendance.map((d) => ({
-      ...d,
-      checkIn: d.checkInJson ? JSON.parse(d.checkInJson) : undefined,
-      checkOut: d.checkOutJson ? JSON.parse(d.checkOutJson) : undefined
-    }));
+    // 6. Scoped leave requests: Employee only sees their OWN leaves
+    const scopedLeaveRequests = leaveRequests.filter((lr) => {
+      if (isCallerAdmin) return true;
+      if (isCallerEmployee) {
+        return lr.employeeId === session.userId || lr.employeeId === session.employeeCode || (currentEmp && lr.employeeId === currentEmp.id);
+      }
+      return false;
+    });
 
-    const parsedAttendanceRecords = attendanceRecords.map((r) => ({
-      ...r,
-      timestamp: r.timestamp instanceof Date ? r.timestamp.toISOString() : String(r.timestamp),
-      distanceFromOffice: r.distanceFromOffice !== null && r.distanceFromOffice !== undefined ? Number(r.distanceFromOffice) : undefined,
-      accuracy: 14.5,
-      accuracyBand: 'OPTIMAL' as const,
-      verified: r.verified !== false
-    }));
+    // 7. Scoped daily attendance & GPS records: Employee only sees their OWN attendance
+    const scopedDailyAttendance = dailyAttendance
+      .filter((d) => {
+        if (isCallerAdmin) return true;
+        if (isCallerEmployee) {
+          return d.employeeId === session.userId || d.employeeCode === session.employeeCode || (currentEmp && d.employeeId === currentEmp.id);
+        }
+        return false;
+      })
+      .map((d) => ({
+        ...d,
+        checkIn: d.checkInJson ? JSON.parse(d.checkInJson) : undefined,
+        checkOut: d.checkOutJson ? JSON.parse(d.checkOutJson) : undefined
+      }));
+
+    const scopedAttendanceRecords = attendanceRecords
+      .filter((r) => {
+        if (isCallerAdmin) return true;
+        if (isCallerEmployee) {
+          return r.employeeId === session.userId || (currentEmp && r.employeeId === currentEmp.id);
+        }
+        return false;
+      })
+      .map((r) => ({
+        ...r,
+        timestamp: r.timestamp instanceof Date ? r.timestamp.toISOString() : String(r.timestamp),
+        distanceFromOffice: r.distanceFromOffice !== null && r.distanceFromOffice !== undefined ? Number(r.distanceFromOffice) : undefined,
+        accuracy: 14.5,
+        accuracyBand: 'OPTIMAL' as const,
+        verified: r.verified !== false
+      }));
+
+    // 8. Scoped rewards: Dealer only sees their OWN rewards
+    const scopedRewardLedger = rewardLedger.filter((rl) => {
+      if (isCallerAdmin) return true;
+      if (isCallerDealer) {
+        const cleanDealerId = session.dealerId || session.userId.replace(/^user-/, '');
+        return rl.dealerId === session.userId || rl.dealerId === session.dealerId || rl.dealerId === cleanDealerId;
+      }
+      return false;
+    });
+
+    const scopedRewardVouchers = (Array.isArray(rewardVouchers) ? rewardVouchers : []).filter((rv: any) => {
+      if (isCallerAdmin) return true;
+      if (isCallerDealer) {
+        const cleanDealerId = session.dealerId || session.userId.replace(/^user-/, '');
+        return rv.dealerId === session.userId || rv.dealerId === session.dealerId || rv.dealerId === cleanDealerId;
+      }
+      return false;
+    });
+
+    // 9. Audit logs & integration events: ADMIN ONLY
+    const scopedAuditLogs = isCallerAdmin ? auditLogs : [];
+    const scopedIntegrationEvents = isCallerAdmin ? integrationEvents : [];
 
     const settingsMap: Record<string, any> = {};
     for (const s of settingsRows) {
@@ -99,19 +235,19 @@ export async function GET() {
       success: true,
       data: {
         products: parsedProducts,
-        dealers: sanitizedDealers,
-        employees: parsedEmployees,
-        users: parsedUsers,
-        plumbers,
-        orders,
+        dealers: scopedDealers,
+        employees: scopedEmployees,
+        users: scopedUsers,
+        plumbers: scopedPlumbers,
+        orders: scopedOrders,
         settings: settingsMap,
-        leaveRequests,
-        dailyAttendance: parsedDailyAttendance,
-        attendanceRecords: parsedAttendanceRecords,
-        rewardLedger,
-        auditLogs,
-        integrationEvents,
-        rewardVouchers
+        leaveRequests: scopedLeaveRequests,
+        dailyAttendance: scopedDailyAttendance,
+        attendanceRecords: scopedAttendanceRecords,
+        rewardLedger: scopedRewardLedger,
+        auditLogs: scopedAuditLogs,
+        integrationEvents: scopedIntegrationEvents,
+        rewardVouchers: scopedRewardVouchers
       }
     });
   } catch (error: any) {
@@ -129,15 +265,193 @@ export async function POST(req: Request) {
     const body = await req.json();
     const { action, payload } = body;
 
-    // Destructive administrative actions require authenticated admin session
-    const ADMIN_ONLY_ACTIONS = ['DELETE_EMPLOYEE', 'DELETE_PRODUCT', 'DELETE_ORDER', 'UPDATE_SETTINGS'];
-    if (ADMIN_ONLY_ACTIONS.includes(action)) {
-      const session = getSessionFromRequest(req);
-      if (!session || session.role !== 'ADMIN') {
+    const session = getSessionFromRequest(req);
+    if (!session) {
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized: Authentication required.' },
+        { status: 401 }
+      );
+    }
+
+    // Administrative actions require authenticated admin role
+    const ADMIN_ONLY_ACTIONS = [
+      'DELETE_EMPLOYEE',
+      'DELETE_PRODUCT',
+      'DELETE_ORDER',
+      'UPDATE_SETTINGS',
+      'DELETE_DEALER',
+      'CREATE_EMPLOYEE',
+      'CREATE_PRODUCT',
+      'UPDATE_PRODUCT',
+      'TOGGLE_PRODUCT_STOCK',
+      'UPDATE_VARIANT_STOCK',
+      'APPROVE_ORDER',
+      'RELEASE_ORDER',
+      'REJECT_ORDER',
+      'UPDATE_LEAVE_REQUEST',
+      'SETTLE_VOUCHER'
+    ];
+    const isEscalationAttempt = action === 'UPDATE_EMPLOYEE' && payload?.systemRole && payload.systemRole !== 'EMPLOYEE';
+
+    if (ADMIN_ONLY_ACTIONS.includes(action) || isEscalationAttempt) {
+      if (session.role !== 'ADMIN') {
         return NextResponse.json(
-          { success: false, error: 'Unauthorized: Admin credentials required to execute this operation.' },
+          { success: false, error: 'Forbidden: Admin access required to execute this operation.' },
           { status: 403 }
         );
+      }
+    }
+
+    // Role-based restrictions and ownership verification for non-admin callers
+    if (session.role !== 'ADMIN') {
+      const cleanDealerId = session.dealerId || session.userId.replace(/^user-/, '');
+      const cleanEmpId = session.userId.replace(/^user-/, '');
+
+      if (action === 'CREATE_DEALER' && session.role === 'DEALER') {
+        return NextResponse.json(
+          { success: false, error: 'Forbidden: Dealers cannot register new dealerships.' },
+          { status: 403 }
+        );
+      }
+
+      if (action === 'UPDATE_EMPLOYEE') {
+        if (session.role === 'DEALER') {
+          return NextResponse.json(
+            { success: false, error: 'Forbidden: Dealers cannot modify employee records.' },
+            { status: 403 }
+          );
+        }
+        const isSelf = payload.id === session.userId || payload.id === cleanEmpId || payload.code === session.employeeCode;
+        if (!isSelf) {
+          return NextResponse.json(
+            { success: false, error: 'Forbidden: Employees can only update their own profile.' },
+            { status: 403 }
+          );
+        }
+        delete payload.baseSalary;
+        delete payload.systemRole;
+        delete payload.allowedPages;
+        delete payload.assignedDealerIds;
+      }
+
+      if (action === 'RECORD_ATTENDANCE') {
+        if (session.role === 'DEALER') {
+          return NextResponse.json(
+            { success: false, error: 'Forbidden: Dealers cannot submit attendance records.' },
+            { status: 403 }
+          );
+        }
+        const targetEmp = payload.employeeId || payload.record?.employeeId || payload.summary?.employeeId;
+        const isSelf = targetEmp === session.userId || targetEmp === cleanEmpId || targetEmp === session.employeeCode;
+        if (!isSelf) {
+          return NextResponse.json(
+            { success: false, error: 'Forbidden: Cannot submit attendance records for another staff member.' },
+            { status: 403 }
+          );
+        }
+      }
+
+      if (action === 'CREATE_LEAVE_REQUEST') {
+        if (session.role === 'DEALER') {
+          return NextResponse.json(
+            { success: false, error: 'Forbidden: Dealers cannot submit leave requests.' },
+            { status: 403 }
+          );
+        }
+        const isSelf = payload.employeeId === session.userId || payload.employeeId === cleanEmpId || payload.employeeId === session.employeeCode;
+        if (!isSelf) {
+          return NextResponse.json(
+            { success: false, error: 'Forbidden: Cannot submit leave requests for another staff member.' },
+            { status: 403 }
+          );
+        }
+      }
+
+      if (action === 'CREATE_ORDER' && session.role === 'DEALER') {
+        const isOwn = payload.dealerId === session.userId || payload.dealerId === session.dealerId || payload.dealerId === cleanDealerId;
+        if (!isOwn) {
+          return NextResponse.json(
+            { success: false, error: 'Forbidden: Dealers can only create purchase orders for their own account.' },
+            { status: 403 }
+          );
+        }
+      }
+
+      if (action === 'CREATE_PLUMBER' && session.role === 'DEALER') {
+        const isOwn = payload.dealerId === session.userId || payload.dealerId === session.dealerId || payload.dealerId === cleanDealerId;
+        if (!isOwn) {
+          return NextResponse.json(
+            { success: false, error: 'Forbidden: Dealers can only register plumbers for their own dealership.' },
+            { status: 403 }
+          );
+        }
+      }
+
+      if (action === 'UPDATE_PLUMBER' && session.role === 'DEALER') {
+        const plumber = await prisma.plumber.findUnique({ where: { id: payload.id } });
+        const isOwn = plumber && (plumber.dealerId === session.userId || plumber.dealerId === session.dealerId || plumber.dealerId === cleanDealerId);
+        if (!isOwn) {
+          return NextResponse.json(
+            { success: false, error: 'Forbidden: Dealers cannot modify plumbers of other dealerships.' },
+            { status: 403 }
+          );
+        }
+        delete payload.dealerId;
+      }
+
+      if (action === 'ALLOCATE_PLUMBER_REWARD') {
+        if (session.role === 'EMPLOYEE') {
+          return NextResponse.json(
+            { success: false, error: 'Forbidden: Employees cannot allocate dealer rewards.' },
+            { status: 403 }
+          );
+        }
+        const isOwn = payload.dealerId === session.userId || payload.dealerId === session.dealerId || payload.dealerId === cleanDealerId;
+        if (!isOwn) {
+          return NextResponse.json(
+            { success: false, error: 'Forbidden: Cannot allocate rewards from another dealer account.' },
+            { status: 403 }
+          );
+        }
+      }
+
+      if (action === 'DEALER_REDEEM_REWARD') {
+        if (session.role === 'EMPLOYEE') {
+          return NextResponse.json(
+            { success: false, error: 'Forbidden: Employees cannot redeem dealer rewards.' },
+            { status: 403 }
+          );
+        }
+        const isOwn = payload.dealerId === session.userId || payload.dealerId === session.dealerId || payload.dealerId === cleanDealerId;
+        if (!isOwn) {
+          return NextResponse.json(
+            { success: false, error: 'Forbidden: Cannot redeem rewards for another dealer account.' },
+            { status: 403 }
+          );
+        }
+      }
+
+      if (action === 'UPDATE_DEALER') {
+        if (session.role === 'DEALER') {
+          const isOwn = payload.id === session.userId || payload.id === session.dealerId || payload.id === cleanDealerId;
+          if (!isOwn) {
+            return NextResponse.json(
+              { success: false, error: 'Forbidden: Cannot modify another dealership profile.' },
+              { status: 403 }
+            );
+          }
+          // Protect financial attributes from tampering
+          delete payload.creditLimit;
+          delete payload.outstandingBalance;
+          delete payload.tier;
+          delete payload.totalPurchases;
+          delete payload.availableRewards;
+          delete payload.pendingPlumberRewards;
+          delete payload.assignedRepId;
+        } else if (session.role === 'EMPLOYEE') {
+          delete payload.creditLimit;
+          delete payload.tier;
+        }
       }
     }
 

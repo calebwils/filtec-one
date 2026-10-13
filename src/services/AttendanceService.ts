@@ -1,4 +1,3 @@
-import { AttendanceRecord } from '@/types';
 import { store } from '@/data/store';
 import {
   FILTEC_HQ,
@@ -85,7 +84,7 @@ export class AttendanceService {
 
       let hasResolved = false;
       let watchId: number | null = null;
-      let timeoutId: any = null;
+      let timeoutId: ReturnType<typeof setTimeout> | null = null;
 
       const cleanup = () => {
         if (watchId !== null) {
@@ -178,8 +177,9 @@ export class AttendanceService {
           },
           { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
         );
-      } catch (e: any) {
-        handleError({ code: 2, message: e.message } as any);
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : 'GPS Watch failure';
+        handleError({ code: 2, message: msg, PERMISSION_DENIED: 1, POSITION_UNAVAILABLE: 2, TIMEOUT: 3 });
       }
     });
 

@@ -1,4 +1,5 @@
-import { Employee, DailyAttendanceSummary, LeaveRequest } from '@/types';
+import type { Employee, DailyAttendanceSummary, LeaveRequest } from '../types';
+
 
 export interface EmployeePayrollCalculation {
   employeeId: string;

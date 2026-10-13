@@ -148,6 +148,7 @@ export async function POST(req: Request) {
 
       const sessionToken = createSessionToken({
         userId: newDealer.id,
+        dealerId: newDealer.id,
         role: 'DEALER',
         phone: newDealer.phone,
         name: newDealer.name

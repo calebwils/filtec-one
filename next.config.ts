@@ -28,6 +28,7 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  serverExternalPackages: ['pg', '@prisma/adapter-pg'],
   allowedDevOrigins: [
     "*.trycloudflare.com",
     "*.loca.lt",
