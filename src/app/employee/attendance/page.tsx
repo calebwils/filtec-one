@@ -65,10 +65,9 @@ export default function AttendancePage() {
 
   // Month navigation and range filters
   const [startDate, setStartDate] = useState(thisMonthStart);
-  const [endDate, setEndDate] = useState(thisMonthEnd);
-  const [datePreset, setDatePreset] = useState<'THIS_MONTH' | 'LAST_MONTH' | 'LAST_7' | 'TODAY' | 'ALL' | 'CUSTOM'>('THIS_MONTH');
-  const [punchTypeFilter, setPunchTypeFilter] = useState<'ALL' | 'CHECK_IN' | 'CHECK_OUT'>('ALL');
-  const [currentMonthAnchor, setCurrentMonthAnchor] = useState<Date>(new Date());
+  const [endDate, setEndDate] = useState(today);
+  const [datePreset, setDatePreset] = useState<'TODAY' | 'YESTERDAY' | 'LAST_7' | 'THIS_MONTH' | 'ALL' | 'CUSTOM'>('THIS_MONTH');
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'PRESENT' | 'ABSENT' | 'ON_LEAVE'>('ALL');
   const [selectedSelfieUrl, setSelectedSelfieUrl] = useState<string | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
 
@@ -81,41 +80,20 @@ export default function AttendancePage() {
     }
   };
 
-  const handlePrevMonth = () => {
-    const prev = new Date(currentMonthAnchor.getFullYear(), currentMonthAnchor.getMonth() - 1, 1);
-    setCurrentMonthAnchor(prev);
-    const startStr = `${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, '0')}-01`;
-    setStartDate(startStr);
-    setEndDate(getMonthEnd(startStr));
-    setDatePreset('CUSTOM');
-  };
-
-  const handleNextMonth = () => {
-    const next = new Date(currentMonthAnchor.getFullYear(), currentMonthAnchor.getMonth() + 1, 1);
-    setCurrentMonthAnchor(next);
-    const startStr = `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}-01`;
-    setStartDate(startStr);
-    setEndDate(getMonthEnd(startStr));
-    setDatePreset('CUSTOM');
-  };
-
-  const handlePreset = (preset: 'THIS_MONTH' | 'LAST_MONTH' | 'LAST_7' | 'TODAY' | 'ALL') => {
+  const handlePreset = (preset: 'TODAY' | 'YESTERDAY' | 'LAST_7' | 'THIS_MONTH' | 'ALL') => {
     setDatePreset(preset);
-    if (preset === 'THIS_MONTH') {
-      setCurrentMonthAnchor(new Date());
-      setStartDate(thisMonthStart);
-      setEndDate(thisMonthEnd);
-    } else if (preset === 'LAST_MONTH') {
-      const prev = new Date(new Date().getFullYear(), new Date().getMonth() - 1, 1);
-      setCurrentMonthAnchor(prev);
-      const startStr = `${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, '0')}-01`;
-      setStartDate(startStr);
-      setEndDate(getMonthEnd(startStr));
+    if (preset === 'TODAY') {
+      setStartDate(today);
+      setEndDate(today);
+    } else if (preset === 'YESTERDAY') {
+      const y = addDays(today, -1);
+      setStartDate(y);
+      setEndDate(y);
     } else if (preset === 'LAST_7') {
       setStartDate(addDays(today, -6));
       setEndDate(today);
-    } else if (preset === 'TODAY') {
-      setStartDate(today);
+    } else if (preset === 'THIS_MONTH') {
+      setStartDate(thisMonthStart);
       setEndDate(today);
     } else if (preset === 'ALL') {
       setStartDate('2024-01-01');
@@ -151,29 +129,24 @@ export default function AttendancePage() {
     })
     .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
-  // Filtered attendance records according to selected month or date range
-  const filteredRecords = myRecords.filter((r) => {
+  // Filtered attendance records according to selected date range
+  const recordsInRange = myRecords.filter((r) => {
     const rDate = (r.timestamp || '').split('T')[0];
-    const inRange = (!startDate || rDate >= startDate) && (!endDate || rDate <= endDate);
-    if (!inRange) return false;
-    if (punchTypeFilter === 'ALL') return true;
-    return r.type === punchTypeFilter;
+    return (!startDate || rDate >= startDate) && (!endDate || rDate <= endDate);
   });
 
-  const rangeCheckInCount = myRecords.filter((r) => {
-    const rDate = (r.timestamp || '').split('T')[0];
-    return (!startDate || rDate >= startDate) && (!endDate || rDate <= endDate) && r.type === 'CHECK_IN';
-  }).length;
+  const presentCount = recordsInRange.length;
 
-  const rangeCheckOutCount = myRecords.filter((r) => {
-    const rDate = (r.timestamp || '').split('T')[0];
-    return (!startDate || rDate >= startDate) && (!endDate || rDate <= endDate) && r.type === 'CHECK_OUT';
-  }).length;
+  const myLeaves = leaveRequests.filter(
+    (l) => l.employeeId === currentUser.id || l.employeeName === currentUser.name
+  );
+  const pendingLeaves = myLeaves.filter((l) => l.status === 'PENDING');
 
-  const currentMonthLabel = currentMonthAnchor.toLocaleDateString('en-IN', {
-    month: 'long',
-    year: 'numeric'
+  const leavesInRange = myLeaves.filter((l) => {
+    if (l.status !== 'APPROVED') return false;
+    return (!startDate || l.endDate >= startDate) && (!endDate || l.startDate <= endDate);
   });
+  const leaveCount = leavesInRange.length;
 
   // Today specific calculations for top status cards (independent of bottom filter)
   const todayRecords = myRecords.filter((r) => isTodayDate(r.timestamp));
@@ -181,10 +154,16 @@ export default function AttendancePage() {
   const todayCheckOut = todayRecords.find((r) => r.type === 'CHECK_OUT');
   const myTodayRecord = todayRecords[0];
 
-  const myLeaves = leaveRequests.filter(
-    (l) => l.employeeId === currentUser.id || l.employeeName === currentUser.name
-  );
-  const pendingLeaves = myLeaves.filter((l) => l.status === 'PENDING');
+  const isTodayInRange = (!startDate || today >= startDate) && (!endDate || today <= endDate);
+  const hasLeaveToday = myLeaves.some((l) => l.status === 'APPROVED' && l.startDate <= today && l.endDate >= today);
+  const absentCount = (isTodayInRange && !todayCheckIn && !hasLeaveToday) ? 1 : 0;
+
+  const totalInRange = presentCount + absentCount + leaveCount;
+
+  // Records to display based on statusFilter
+  const displayedRecords = statusFilter === 'ALL' || statusFilter === 'PRESENT'
+    ? recordsInRange
+    : [];
 
   return (
     <div className="min-h-screen bg-[#F8F9FA] pb-mobile-nav">
@@ -371,21 +350,143 @@ export default function AttendancePage() {
               </div>
             </div>
 
+            {/* Attendance Filter Card */}
+            <div className="bg-white border border-[#E5E7EB] rounded-xl p-4 shadow-2xs space-y-3 text-xs">
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pb-3 border-b border-[#F3F4F6]">
+                {/* From - To Date Pickers */}
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex items-center gap-1.5 bg-[#F9FAFB] border border-[#E5E7EB] px-2.5 py-1.5 rounded-lg">
+                    <span className="text-[#6B7280] font-mono text-[11px]">From:</span>
+                    <input
+                      type="date"
+                      value={startDate}
+                      onChange={(e) => {
+                        setStartDate(e.target.value);
+                        setDatePreset('CUSTOM');
+                      }}
+                      className="bg-transparent font-mono font-semibold text-[#111827] text-[11px] outline-none cursor-pointer"
+                    />
+                  </div>
+                  <span className="text-[#9CA3AF] font-mono">to</span>
+                  <div className="flex items-center gap-1.5 bg-[#F9FAFB] border border-[#E5E7EB] px-2.5 py-1.5 rounded-lg">
+                    <span className="text-[#6B7280] font-mono text-[11px]">To:</span>
+                    <input
+                      type="date"
+                      value={endDate}
+                      onChange={(e) => {
+                        setEndDate(e.target.value);
+                        setDatePreset('CUSTOM');
+                      }}
+                      className="bg-transparent font-mono font-semibold text-[#111827] text-[11px] outline-none cursor-pointer"
+                    />
+                  </div>
+                </div>
+
+                {/* Presets */}
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="text-[10px] text-[#9CA3AF] font-mono uppercase">Presets:</span>
+                  {(['TODAY', 'YESTERDAY', 'LAST_7', 'THIS_MONTH', 'ALL'] as const).map((p) => (
+                    <button
+                      key={p}
+                      type="button"
+                      onClick={() => handlePreset(p)}
+                      className={`px-2.5 py-1 rounded text-[11px] font-medium transition-all cursor-pointer ${
+                        datePreset === p
+                          ? 'bg-[#111827] text-white font-semibold'
+                          : 'bg-[#F3F4F6] text-[#4B5563] hover:bg-neutral-200'
+                      }`}
+                    >
+                      {p === 'LAST_7' ? 'Last 7 Days' : p === 'THIS_MONTH' ? 'This Month' : p.charAt(0) + p.slice(1).toLowerCase()}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Status Filter Pills */}
+              <div className="flex flex-wrap items-center gap-2">
+                {[
+                  { key: 'ALL', label: `All (${totalInRange})` },
+                  { key: 'PRESENT', label: `Present (${presentCount})` },
+                  { key: 'ABSENT', label: `Absent (${absentCount})` },
+                  { key: 'ON_LEAVE', label: `On Leave (${leaveCount})` },
+                ].map(({ key, label }) => (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => setStatusFilter(key as any)}
+                    className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-all cursor-pointer ${
+                      statusFilter === key
+                        ? 'bg-[#111827] text-white font-semibold'
+                        : 'bg-neutral-100 text-[#4B5563] hover:bg-neutral-200'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             {/* Verification History Log */}
             <div className="bg-white border border-[#E5E7EB] rounded-xl p-5 shadow-2xs">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-xs font-bold uppercase font-mono text-[#111827]">
-                  My Attendance Records ({myRecords.length})
+                  My Attendance Records ({statusFilter === 'ON_LEAVE' ? leavesInRange.length : statusFilter === 'ABSENT' ? absentCount : displayedRecords.length})
                 </h3>
               </div>
 
               <div className="divide-y divide-[#F3F4F6]">
-                {myRecords.length === 0 ? (
+                {statusFilter === 'ON_LEAVE' ? (
+                  leavesInRange.length === 0 ? (
+                    <div className="py-6 text-center text-xs text-neutral-400 font-mono">
+                      No approved leaves found in the selected date range.
+                    </div>
+                  ) : (
+                    leavesInRange.map((l) => (
+                      <div key={l.id} className="py-3 flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-lg bg-purple-50 text-purple-700 flex items-center justify-center font-bold text-xs font-mono border border-purple-200">
+                            LV
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-semibold text-xs text-[#111827]">{l.type} Leave</span>
+                              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 font-semibold">
+                                Approved
+                              </span>
+                            </div>
+                            <div className="text-xs text-[#6B7280] mt-0.5">
+                              {l.startDate} to {l.endDate} • {l.reason || 'Personal Leave'}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )
+                ) : statusFilter === 'ABSENT' ? (
+                  absentCount === 0 ? (
+                    <div className="py-6 text-center text-xs text-emerald-600 font-mono flex items-center justify-center gap-1.5">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                      <span>No absences recorded in this date range. 100% Attendance!</span>
+                    </div>
+                  ) : (
+                    <div className="py-3 flex items-center justify-between bg-rose-50/60 p-3 rounded-lg border border-rose-200">
+                      <div className="flex items-center gap-2.5">
+                        <AlertCircle className="w-4 h-4 text-[#DC2626]" />
+                        <div>
+                          <span className="font-semibold text-xs text-rose-950">Absent — No Check-In Recorded</span>
+                          <p className="text-[11px] text-rose-800 mt-0.5">
+                            You have not marked attendance punch for today ({today}). Tap &quot;Record Check-In&quot; above to punch in.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                ) : displayedRecords.length === 0 ? (
                   <div className="py-6 text-center text-xs text-neutral-400 font-mono">
-                    No attendance records found for this account.
+                    No attendance punch records found in the selected date range.
                   </div>
                 ) : (
-                  myRecords.map((record) => {
+                  displayedRecords.map((record) => {
                     const recordDist =
                       record.distanceFromOffice !== undefined
                         ? record.distanceFromOffice

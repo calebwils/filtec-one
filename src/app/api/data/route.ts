@@ -240,6 +240,28 @@ export async function POST(req: Request) {
         return NextResponse.json({ success: true, employee: created });
       }
 
+      case 'DELETE_EMPLOYEE': {
+        const { id, code, phone, email } = payload || {};
+        const emp = await prisma.employee.findFirst({
+          where: {
+            OR: [
+              ...(id ? [{ id }] : []),
+              ...(code ? [{ code }] : [])
+            ]
+          }
+        });
+        if (emp) {
+          await prisma.employee.delete({ where: { id: emp.id } });
+          if (emp.phone) {
+            await prisma.user.deleteMany({ where: { phone: emp.phone } });
+          }
+          if (emp.email && emp.email !== '(-)') {
+            await prisma.user.deleteMany({ where: { email: emp.email } });
+          }
+        }
+        return NextResponse.json({ success: true, deletedId: id || code });
+      }
+
       case 'UPDATE_PLUMBER': {
         const { id, createdAt, updatedAt, ...data } = payload;
         const updated = await prisma.plumber.update({

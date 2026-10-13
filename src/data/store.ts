@@ -205,8 +205,10 @@ export const store = {
       if (saved) {
         const parsed = JSON.parse(saved);
 
-        // Ensure Samir is in employees list as ADMIN
-        let existingEmployees: Employee[] = parsed.employees || [];
+        // Ensure Samir is in employees list as ADMIN and purge test employee Manoj Kumar Panda
+        let existingEmployees: Employee[] = (parsed.employees || []).filter(
+          (e: any) => e.name !== 'Manoj Kumar Panda' && e.code !== 'FPPL/OD-007' && e.id !== 'emp-1791445022649'
+        );
         const hasSamir = existingEmployees.some(
           (e) => e.name.toLowerCase() === 'samir' || e.id === 'emp-admin-samir'
         );
@@ -238,10 +240,9 @@ export const store = {
               ? ALL_ADMIN_PAGES
               : ALL_EMPLOYEE_PAGES;
 
-          const seedMatch = INITIAL_EMPLOYEES.find((s) => s.id === e.id || s.code === e.code);
-          const baseSalary = typeof e.baseSalary === 'number' && e.baseSalary > 0
+          const baseSalary = typeof e.baseSalary === 'number'
             ? e.baseSalary
-            : (seedMatch?.baseSalary || (systemRole === 'ADMIN' ? 55000 : 30000));
+            : (Number(e.baseSalary) || 0);
 
           const cleanLastLocation = (e.lastLocation && e.lastLocation.includes('Benin')) ? undefined : (e.lastLocation || undefined);
           const cleanLastCheckIn = (e.lastCheckInTime && e.lastCheckInTime.includes('02:28 PM')) ? undefined : (e.lastCheckInTime || undefined);
@@ -413,23 +414,25 @@ export const store = {
                   })()
                 : globalState.dealers,
               employees: d.employees?.length
-                ? d.employees.map((emp: Employee) => {
-                    const p = (emp.phone || '').trim();
-                    const digits = p.replace(/\D/g, '');
-                    const last10 = digits.slice(-10);
-                    const formattedPhone = last10.length === 10
-                      ? `+91 ${last10.slice(0, 5)} ${last10.slice(5)}`
-                      : (p || '(-)');
-                    return {
-                      ...emp,
-                      phone: formattedPhone,
-                      checkInStatus: emp.checkInStatus || 'CHECKED_OUT',
-                      lastCheckInTime: emp.lastCheckInTime || null,
-                      lastLocation: emp.lastLocation || null,
-                      baseSalary: emp.baseSalary || 30000
-                    };
-                  })
-                : globalState.employees,
+                ? d.employees
+                    .filter((emp: Employee) => emp.name !== 'Manoj Kumar Panda' && emp.code !== 'FPPL/OD-007')
+                    .map((emp: Employee) => {
+                      const p = (emp.phone || '').trim();
+                      const digits = p.replace(/\D/g, '');
+                      const last10 = digits.slice(-10);
+                      const formattedPhone = last10.length === 10
+                        ? `+91 ${last10.slice(0, 5)} ${last10.slice(5)}`
+                        : (p || '(-)');
+                      return {
+                        ...emp,
+                        phone: formattedPhone,
+                        checkInStatus: emp.checkInStatus || 'CHECKED_OUT',
+                        lastCheckInTime: emp.lastCheckInTime || null,
+                        lastLocation: emp.lastLocation || null,
+                        baseSalary: typeof emp.baseSalary === 'number' ? emp.baseSalary : (Number(emp.baseSalary) || 0)
+                      };
+                    })
+                : globalState.employees.filter((emp) => emp.name !== 'Manoj Kumar Panda' && emp.code !== 'FPPL/OD-007'),
               plumbers: Array.isArray(d.plumbers) ? d.plumbers : [],
               orders: Array.isArray(d.orders) ? d.orders : [],
               leaveRequests: d.leaveRequests?.length ? d.leaveRequests : globalState.leaveRequests,
@@ -2385,6 +2388,29 @@ export const store = {
     }
 
     return updatedEmployee;
+  },
+
+  deleteEmployee(employeeId: string): boolean {
+    const emp = globalState.employees.find((e) => e.id === employeeId || e.code === employeeId);
+    if (!emp) return false;
+
+    globalState = {
+      ...globalState,
+      employees: globalState.employees.filter((e) => e.id !== emp.id && e.code !== emp.code)
+    };
+    notify();
+
+    if (typeof window !== 'undefined') {
+      fetch('/api/data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'DELETE_EMPLOYEE',
+          payload: { id: emp.id, code: emp.code, phone: emp.phone, email: emp.email }
+        })
+      }).catch((err) => console.warn('PostgreSQL delete employee failed:', err));
+    }
+    return true;
   },
 
   updateDealer(dealerId: string, data: Partial<Dealer>): Dealer | null {

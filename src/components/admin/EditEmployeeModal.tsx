@@ -18,7 +18,8 @@ import {
   CheckSquare,
   Square,
   AlertCircle,
-  Sparkles
+  Sparkles,
+  Trash2
 } from 'lucide-react';
 import { useAppStore, store } from '@/data/store';
 import { Employee, Role } from '@/types';
@@ -904,22 +905,40 @@ export function EditEmployeeModal({
           </div>
 
           {/* Footer Actions */}
-          <div className="pt-3 border-t border-[#E5E7EB] flex items-center justify-end gap-2.5 shrink-0">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 text-xs font-medium text-[#4B5563] hover:bg-neutral-100 rounded-lg transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="bg-[#DC2626] hover:bg-[#B91C1C] disabled:opacity-50 text-white text-xs font-semibold px-5 py-2 rounded-lg transition-all shadow-xs flex items-center gap-1.5"
-            >
-              <Pencil className="w-3.5 h-3.5" />
-              <span>{isSubmitting ? 'Saving...' : 'Save Changes'}</span>
-            </button>
+          <div className="pt-3 border-t border-[#E5E7EB] flex items-center justify-between gap-2.5 shrink-0">
+            {employee.code !== 'FPPL/ADM-001' && employee.name.toLowerCase() !== 'samir' ? (
+              <button
+                type="button"
+                onClick={() => {
+                  if (confirm(`Are you sure you want to permanently delete ${employee.name} (${employee.code}) from the system?`)) {
+                    store.deleteEmployee(employee.id);
+                    onClose();
+                  }
+                }}
+                className="px-3 py-2 text-xs font-semibold text-rose-600 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Delete Employee</span>
+              </button>
+            ) : <div />}
+
+            <div className="flex items-center gap-2.5">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2 text-xs font-medium text-[#4B5563] hover:bg-neutral-100 rounded-lg transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="bg-[#DC2626] hover:bg-[#B91C1C] disabled:opacity-50 text-white text-xs font-semibold px-5 py-2 rounded-lg transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
+              >
+                <Pencil className="w-3.5 h-3.5" />
+                <span>{isSubmitting ? 'Saving...' : 'Save Changes'}</span>
+              </button>
+            </div>
           </div>
         </form>
       </div>
