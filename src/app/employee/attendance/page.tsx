@@ -6,7 +6,7 @@ import { DesktopSubNav } from '@/components/navigation/DesktopSubNav';
 import { MobileBottomNav } from '@/components/navigation/MobileBottomNav';
 import { CameraCaptureModal } from '@/components/attendance/CameraCaptureModal';
 import { ApplyLeaveModal } from '@/components/employee/ApplyLeaveModal';
-import { useAppStore } from '@/data/store';
+import { store, useAppStore } from '@/data/store';
 import {
   Radio,
   MapPin,

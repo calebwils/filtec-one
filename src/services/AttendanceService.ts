@@ -54,6 +54,9 @@ export class AttendanceService {
 
   /**
    * Acquire REAL device GPS fix with high accuracy.
+   * On mobile devices, provides a resilient two-tier strategy:
+   * 1. Attempts high accuracy hardware satellite fix (target 10-25m)
+   * 2. If satellite lock times out indoors, automatically falls back to network/cell positioning
    * Calculates distance to FILTEC HQ automatically.
    */
   static async getCurrentCoordinates(targetAccuracy: number = 25): Promise<CoordinatesResult> {
@@ -66,48 +69,85 @@ export class AttendanceService {
         return;
       }
 
+      if (
+        typeof window !== 'undefined' &&
+        window.isSecureContext === false &&
+        window.location.hostname !== 'localhost' &&
+        window.location.hostname !== '127.0.0.1'
+      ) {
+        reject({
+          code: 'NOT_SUPPORTED',
+          message:
+            'Mobile browsers require a secure connection (HTTPS) for GPS location access. If testing over a local network, please use the Plant GPS fallback.'
+        } as GpsError);
+        return;
+      }
+
+      const processPosition = async (pos: GeolocationPosition) => {
+        const latitude = Number(pos.coords.latitude.toFixed(6));
+        const longitude = Number(pos.coords.longitude.toFixed(6));
+        const rawAccuracy = pos.coords.accuracy ?? 30;
+        const accuracy = Number(rawAccuracy.toFixed(1));
+        const realPlace = await AttendanceService.reverseGeocode(latitude, longitude);
+        const isWithinAcceptableRange = accuracy <= targetAccuracy;
+        const accuracyBand: 'OPTIMAL' | 'ACCEPTABLE' | 'LOW' =
+          accuracy <= 15 ? 'OPTIMAL' : accuracy <= targetAccuracy ? 'ACCEPTABLE' : 'LOW';
+
+        const distanceFromOffice = calculateDistanceMeters(latitude, longitude);
+        const distanceFormatted = formatDistanceToFiltec(distanceFromOffice);
+
+        resolve({
+          latitude,
+          longitude,
+          accuracy,
+          locationName: realPlace,
+          isRealGps: true,
+          isWithinAcceptableRange,
+          accuracyBand,
+          distanceFromOffice,
+          distanceFormatted
+        });
+      };
+
+      // Tier 1: Try high accuracy GPS (satellite / hardware assisted)
       navigator.geolocation.getCurrentPosition(
-        async (pos) => {
-          const latitude = Number(pos.coords.latitude.toFixed(6));
-          const longitude = Number(pos.coords.longitude.toFixed(6));
-          const rawAccuracy = pos.coords.accuracy ?? 30;
-          const accuracy = Number(rawAccuracy.toFixed(1));
-          const realPlace = await AttendanceService.reverseGeocode(latitude, longitude);
-          const isWithinAcceptableRange = accuracy <= targetAccuracy;
-          const accuracyBand: 'OPTIMAL' | 'ACCEPTABLE' | 'LOW' =
-            accuracy <= 15 ? 'OPTIMAL' : accuracy <= targetAccuracy ? 'ACCEPTABLE' : 'LOW';
-
-          const distanceFromOffice = calculateDistanceMeters(latitude, longitude);
-          const distanceFormatted = formatDistanceToFiltec(distanceFromOffice);
-
-          resolve({
-            latitude,
-            longitude,
-            accuracy,
-            locationName: realPlace,
-            isRealGps: true,
-            isWithinAcceptableRange,
-            accuracyBand,
-            distanceFromOffice,
-            distanceFormatted
-          });
-        },
+        processPosition,
         (err) => {
-          let code: GpsError['code'] = 'POSITION_UNAVAILABLE';
-          let message = 'Unable to determine GPS position. Please ensure device GPS is turned on.';
+          // If explicitly denied by the user, do not retry
           if (err.code === 1) {
-            code = 'PERMISSION_DENIED';
-            message = 'GPS location permission was not granted. Please click "Allow" in your browser location prompt.';
-          } else if (err.code === 2) {
-            code = 'POSITION_UNAVAILABLE';
-            message = 'GPS position unavailable. Please ensure GPS / Location Services are enabled on your device.';
-          } else if (err.code === 3) {
-            code = 'TIMEOUT';
-            message = 'GPS satellite lock timed out. Click "Activate GPS / Refine" to retry satellite acquisition.';
+            reject({
+              code: 'PERMISSION_DENIED',
+              message:
+                'GPS location permission was not granted. Tap "Allow GPS Access" and choose "Allow" in your browser prompt.'
+            } as GpsError);
+            return;
           }
-          reject({ code, message } as GpsError);
+
+          // Tier 2: If high accuracy timed out or unavailable indoors on mobile, fallback to network/cell positioning
+          navigator.geolocation.getCurrentPosition(
+            processPosition,
+            (fallbackErr) => {
+              let code: GpsError['code'] = 'POSITION_UNAVAILABLE';
+              let message = 'Unable to determine GPS position. Please ensure device Location Services are turned on.';
+              if (fallbackErr.code === 1) {
+                code = 'PERMISSION_DENIED';
+                message =
+                  'GPS location permission was not granted. Tap "Allow GPS Access" and select "Allow".';
+              } else if (fallbackErr.code === 2) {
+                code = 'POSITION_UNAVAILABLE';
+                message =
+                  'GPS position unavailable. Please ensure GPS / Location Services are enabled on your device.';
+              } else if (fallbackErr.code === 3) {
+                code = 'TIMEOUT';
+                message =
+                  'GPS satellite lock timed out. Click "Activate GPS / Retry" or use the Plant GPS option.';
+              }
+              reject({ code, message } as GpsError);
+            },
+            { timeout: 8000, enableHighAccuracy: false, maximumAge: 60000 }
+          );
         },
-        { timeout: 20000, enableHighAccuracy: true, maximumAge: 0 }
+        { timeout: 8000, enableHighAccuracy: true, maximumAge: 15000 }
       );
     });
   }

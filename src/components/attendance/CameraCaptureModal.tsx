@@ -43,24 +43,16 @@ export function CameraCaptureModal({
   const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Initialize GPS and Camera when modal opens
+  // Initialize Camera stream when modal opens or camera flips
   useEffect(() => {
     if (!isOpen) {
       if (stream) {
         stream.getTracks().forEach((track) => track.stop());
         setStream(null);
       }
-      setCapturedPhoto(null);
-      setCameraError(null);
-      setGpsData(null);
-      setGpsError(null);
       return;
     }
 
-    // 1. Fetch Real GPS from device
-    fetchLocation();
-
-    // 2. Start Live Camera
     startCamera(facingMode);
 
     return () => {
@@ -69,6 +61,25 @@ export function CameraCaptureModal({
       }
     };
   }, [isOpen, facingMode]);
+
+  // Initialize GPS when modal opens (sequenced slightly after camera to avoid mobile permission collision)
+  useEffect(() => {
+    if (!isOpen) {
+      setCapturedPhoto(null);
+      setCameraError(null);
+      setGpsData(null);
+      setGpsError(null);
+      setIsLoadingGps(false);
+      return;
+    }
+
+    // Delay GPS acquisition 400ms to allow camera stream to mount first without permission collision
+    const timer = setTimeout(() => {
+      fetchLocation();
+    }, 400);
+
+    return () => clearTimeout(timer);
+  }, [isOpen]);
 
   const fetchLocation = async () => {
     setIsLoadingGps(true);
@@ -310,40 +321,43 @@ export function CameraCaptureModal({
           )}
 
           {gpsError && (
-            <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-xl flex items-start justify-between gap-3 text-xs text-rose-900">
+            <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-xl space-y-2.5 text-xs text-rose-900">
               <div className="flex items-start gap-2.5">
                 <AlertTriangle className="w-4 h-4 text-[#DC2626] shrink-0 mt-0.5" />
-                <div>
+                <div className="flex-1">
                   <p className="font-semibold text-rose-950">
                     {gpsError.code === 'PERMISSION_DENIED'
                       ? 'GPS Location Access Required'
+                      : gpsError.code === 'NOT_SUPPORTED'
+                      ? 'GPS Connection Required'
                       : 'GPS Satellite Fix Needed'}
                   </p>
                   <p className="text-[11px] text-rose-800 mt-0.5 leading-relaxed">
                     {gpsError.message}
                   </p>
                   {gpsError.code === 'PERMISSION_DENIED' && (
-                    <p className="text-[10px] text-rose-700 mt-1 font-mono">
-                      Tip: Look at the location icon in your browser address bar and select &quot;Always allow&quot;.
+                    <p className="text-[10px] text-rose-700 mt-1">
+                      💡 <strong>Mobile Tip:</strong> Tap <em>Allow / Activate GPS</em> below. If blocked, check your browser address bar (🔒 or aA) → <em>Website Settings → Location → Allow</em>.
                     </p>
                   )}
                 </div>
               </div>
-              <div className="shrink-0 flex flex-col gap-1.5">
+
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-2 pt-1 border-t border-rose-200/60">
                 <button
                   type="button"
                   onClick={fetchLocation}
-                  className="bg-[#DC2626] hover:bg-[#B91C1C] text-white text-[11px] font-semibold px-3 py-1.5 rounded-lg flex items-center justify-center gap-1.5 shadow-xs cursor-pointer transition-all"
+                  className="bg-[#DC2626] hover:bg-[#B91C1C] text-white text-xs font-semibold px-3.5 py-2 rounded-lg flex items-center justify-center gap-1.5 shadow-xs cursor-pointer transition-all"
                 >
-                  <Navigation className="w-3 h-3" />
-                  <span>Activate GPS</span>
+                  <Navigation className="w-3.5 h-3.5" />
+                  <span>Allow / Activate GPS</span>
                 </button>
                 <button
                   type="button"
                   onClick={handleUsePlantLocation}
-                  className="bg-white border border-rose-300 hover:bg-rose-50 text-rose-800 text-[10px] font-semibold px-2.5 py-1 rounded-lg flex items-center justify-center gap-1 cursor-pointer transition-all"
+                  className="bg-white border border-rose-300 hover:bg-rose-50 text-rose-800 text-xs font-semibold px-3 py-2 rounded-lg flex items-center justify-center gap-1.5 cursor-pointer transition-all"
                 >
-                  <MapPin className="w-3 h-3 text-rose-600" />
+                  <MapPin className="w-3.5 h-3.5 text-rose-600" />
                   <span>Use Plant GPS</span>
                 </button>
               </div>
