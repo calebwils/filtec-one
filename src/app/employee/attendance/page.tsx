@@ -347,27 +347,6 @@ Generated via FILTEC ONE Operational Platform.`;
               <span>+ Apply for Leave</span>
             </button>
           )}
-
-          {tab === 'PAYSLIP' && myPayroll && (
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={handleSharePayslip}
-                className="bg-neutral-900 hover:bg-black text-white text-xs font-semibold px-3 py-2 rounded-lg flex items-center gap-1.5 transition-all shadow-xs cursor-pointer"
-              >
-                <Share2 className="w-3.5 h-3.5" />
-                <span>{copiedPayslip ? 'Copied!' : 'Share'}</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setIsPayslipModalOpen(true)}
-                className="bg-[#DC2626] hover:bg-[#B91C1C] text-white text-xs font-semibold px-3.5 py-2 rounded-lg flex items-center gap-1.5 transition-all shadow-xs cursor-pointer"
-              >
-                <Download className="w-3.5 h-3.5" />
-                <span>Download PDF</span>
-              </button>
-            </div>
-          )}
         </div>
 
         {tab === 'PUNCH' ? (
