@@ -52,38 +52,58 @@ export class AttendanceService {
     }
   }
 
+  private static activeLocationPromise: Promise<CoordinatesResult> | null = null;
+  private static cachedResult: CoordinatesResult | null = null;
+  private static lastFetchTime: number = 0;
+
   /**
-   * Acquire REAL device GPS fix with high accuracy.
-   * On mobile devices, provides a resilient two-tier strategy:
-   * 1. Attempts high accuracy hardware satellite fix (target 10-25m)
-   * 2. If satellite lock times out indoors, automatically falls back to network/cell positioning
-   * Calculates distance to FILTEC HQ automatically.
+   * Acquire REAL device GPS fix from the employee's current location.
+   * Uses watchPosition / geolocation to obtain genuine hardware/network coordinates.
+   * Calculates real distance in meters to FILTEC HQ automatically.
    */
-  static async getCurrentCoordinates(targetAccuracy: number = 25): Promise<CoordinatesResult> {
-    return new Promise((resolve, reject) => {
+  static async getCurrentCoordinates(
+    targetAccuracy: number = 50,
+    forceRefresh: boolean = false
+  ): Promise<CoordinatesResult> {
+    const now = Date.now();
+    if (!forceRefresh && AttendanceService.cachedResult && now - AttendanceService.lastFetchTime < 60000) {
+      return AttendanceService.cachedResult;
+    }
+
+    if (AttendanceService.activeLocationPromise && !forceRefresh) {
+      return AttendanceService.activeLocationPromise;
+    }
+
+    const promise = new Promise<CoordinatesResult>((resolve, reject) => {
       if (typeof navigator === 'undefined' || !('geolocation' in navigator)) {
         reject({
           code: 'NOT_SUPPORTED',
-          message: 'GPS geolocation is not supported by this browser or device.'
+          message: 'GPS geolocation is not supported by this device or browser.'
         } as GpsError);
         return;
       }
 
-      if (
-        typeof window !== 'undefined' &&
-        window.isSecureContext === false &&
-        window.location.hostname !== 'localhost' &&
-        window.location.hostname !== '127.0.0.1'
-      ) {
-        reject({
-          code: 'NOT_SUPPORTED',
-          message:
-            'Mobile browsers require a secure connection (HTTPS) for GPS location access. If testing over a local network, please use the Plant GPS fallback.'
-        } as GpsError);
-        return;
-      }
+      let hasResolved = false;
+      let watchId: number | null = null;
+      let timeoutId: any = null;
 
-      const processPosition = async (pos: GeolocationPosition) => {
+      const cleanup = () => {
+        if (watchId !== null) {
+          navigator.geolocation.clearWatch(watchId);
+          watchId = null;
+        }
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+          timeoutId = null;
+        }
+        AttendanceService.activeLocationPromise = null;
+      };
+
+      const handleSuccess = async (pos: GeolocationPosition) => {
+        if (hasResolved) return;
+        hasResolved = true;
+        cleanup();
+
         const latitude = Number(pos.coords.latitude.toFixed(6));
         const longitude = Number(pos.coords.longitude.toFixed(6));
         const rawAccuracy = pos.coords.accuracy ?? 30;
@@ -96,7 +116,7 @@ export class AttendanceService {
         const distanceFromOffice = calculateDistanceMeters(latitude, longitude);
         const distanceFormatted = formatDistanceToFiltec(distanceFromOffice);
 
-        resolve({
+        const result: CoordinatesResult = {
           latitude,
           longitude,
           accuracy,
@@ -106,50 +126,65 @@ export class AttendanceService {
           accuracyBand,
           distanceFromOffice,
           distanceFormatted
-        });
+        };
+
+        AttendanceService.cachedResult = result;
+        AttendanceService.lastFetchTime = Date.now();
+        resolve(result);
       };
 
-      // Tier 1: Try high accuracy GPS (satellite / hardware assisted)
-      navigator.geolocation.getCurrentPosition(
-        processPosition,
-        (err) => {
-          // If explicitly denied by the user, do not retry
-          if (err.code === 1) {
-            reject({
-              code: 'PERMISSION_DENIED',
-              message:
-                'GPS location permission was not granted. Tap "Allow GPS Access" and choose "Allow" in your browser prompt.'
-            } as GpsError);
-            return;
-          }
+      const handleError = (err: GeolocationPositionError) => {
+        if (hasResolved) return;
+        hasResolved = true;
+        cleanup();
 
-          // Tier 2: If high accuracy timed out or unavailable indoors on mobile, fallback to network/cell positioning
-          navigator.geolocation.getCurrentPosition(
-            processPosition,
-            (fallbackErr) => {
-              let code: GpsError['code'] = 'POSITION_UNAVAILABLE';
-              let message = 'Unable to determine GPS position. Please ensure device Location Services are turned on.';
-              if (fallbackErr.code === 1) {
-                code = 'PERMISSION_DENIED';
-                message =
-                  'GPS location permission was not granted. Tap "Allow GPS Access" and select "Allow".';
-              } else if (fallbackErr.code === 2) {
-                code = 'POSITION_UNAVAILABLE';
-                message =
-                  'GPS position unavailable. Please ensure GPS / Location Services are enabled on your device.';
-              } else if (fallbackErr.code === 3) {
-                code = 'TIMEOUT';
-                message =
-                  'GPS satellite lock timed out. Click "Activate GPS / Retry" or use the Plant GPS option.';
-              }
-              reject({ code, message } as GpsError);
-            },
-            { timeout: 8000, enableHighAccuracy: false, maximumAge: 60000 }
-          );
-        },
-        { timeout: 8000, enableHighAccuracy: true, maximumAge: 15000 }
-      );
+        let code: GpsError['code'] = 'POSITION_UNAVAILABLE';
+        let message = 'Unable to determine GPS position. Please ensure device Location Services are turned on.';
+        if (err.code === 1) {
+          code = 'PERMISSION_DENIED';
+          message = 'GPS location permission was not granted. Tap "Activate GPS" and select "Allow While Using App".';
+        } else if (err.code === 2) {
+          code = 'POSITION_UNAVAILABLE';
+          message = 'GPS position unavailable. Please ensure GPS / Location Services are enabled on your phone.';
+        } else if (err.code === 3) {
+          code = 'TIMEOUT';
+          message = 'GPS satellite lock timed out. Tap "Activate GPS" to retry.';
+        }
+        reject({ code, message } as GpsError);
+      };
+
+      // 25 second timeout to allow user to see and tap the system permission prompt
+      timeoutId = setTimeout(() => {
+        if (!hasResolved) {
+          hasResolved = true;
+          cleanup();
+          reject({
+            code: 'TIMEOUT',
+            message: 'GPS satellite lock timed out. Tap "Activate GPS" to retry satellite acquisition.'
+          } as GpsError);
+        }
+      }, 25000);
+
+      try {
+        watchId = navigator.geolocation.watchPosition(
+          handleSuccess,
+          (err) => {
+            // If high accuracy watch fails, attempt standard network positioning before failing
+            navigator.geolocation.getCurrentPosition(
+              handleSuccess,
+              () => handleError(err),
+              { enableHighAccuracy: false, timeout: 8000, maximumAge: 60000 }
+            );
+          },
+          { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
+        );
+      } catch (e: any) {
+        handleError({ code: 2, message: e.message } as any);
+      }
     });
+
+    AttendanceService.activeLocationPromise = promise;
+    return promise;
   }
 
   static recordCheckIn(

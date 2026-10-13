@@ -62,7 +62,7 @@ export function CameraCaptureModal({
     };
   }, [isOpen, facingMode]);
 
-  // Initialize GPS when modal opens (sequenced slightly after camera to avoid mobile permission collision)
+  // Initialize GPS when modal opens
   useEffect(() => {
     if (!isOpen) {
       setCapturedPhoto(null);
@@ -73,19 +73,14 @@ export function CameraCaptureModal({
       return;
     }
 
-    // Delay GPS acquisition 400ms to allow camera stream to mount first without permission collision
-    const timer = setTimeout(() => {
-      fetchLocation();
-    }, 400);
-
-    return () => clearTimeout(timer);
+    fetchLocation();
   }, [isOpen]);
 
-  const fetchLocation = async () => {
+  const fetchLocation = async (force: boolean = false) => {
     setIsLoadingGps(true);
     setGpsError(null);
     try {
-      const coords = await AttendanceService.getCurrentCoordinates(25);
+      const coords = await AttendanceService.getCurrentCoordinates(50, force);
       setGpsData(coords);
       setGpsError(null);
     } catch (err: any) {
@@ -102,22 +97,6 @@ export function CameraCaptureModal({
     } finally {
       setIsLoadingGps(false);
     }
-  };
-
-  const handleUsePlantLocation = () => {
-    setGpsData({
-      latitude: 20.354122,
-      longitude: 85.823611,
-      accuracy: 14.5,
-      locationName: 'Water Park Rd, Kurangsasan, Odisha 754002',
-      isRealGps: true,
-      isWithinAcceptableRange: true,
-      accuracyBand: 'OPTIMAL',
-      distanceFromOffice: 0,
-      distanceFormatted: '0 m (At Filtec HQ)'
-    });
-    setGpsError(null);
-    setIsLoadingGps(false);
   };
 
   const startCamera = async (facing: 'user' | 'environment') => {
@@ -343,22 +322,14 @@ export function CameraCaptureModal({
                 </div>
               </div>
 
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-2 pt-1 border-t border-rose-200/60">
+              <div className="flex items-center justify-end pt-1 border-t border-rose-200/60">
                 <button
                   type="button"
-                  onClick={fetchLocation}
-                  className="bg-[#DC2626] hover:bg-[#B91C1C] text-white text-xs font-semibold px-3.5 py-2 rounded-lg flex items-center justify-center gap-1.5 shadow-xs cursor-pointer transition-all"
+                  onClick={() => fetchLocation(true)}
+                  className="bg-[#DC2626] hover:bg-[#B91C1C] text-white text-xs font-semibold px-4 py-2 rounded-lg flex items-center justify-center gap-1.5 shadow-xs cursor-pointer transition-all"
                 >
                   <Navigation className="w-3.5 h-3.5" />
-                  <span>Allow / Activate GPS</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={handleUsePlantLocation}
-                  className="bg-white border border-rose-300 hover:bg-rose-50 text-rose-800 text-xs font-semibold px-3 py-2 rounded-lg flex items-center justify-center gap-1.5 cursor-pointer transition-all"
-                >
-                  <MapPin className="w-3.5 h-3.5 text-rose-600" />
-                  <span>Use Plant GPS</span>
+                  <span>Activate Real GPS</span>
                 </button>
               </div>
             </div>
@@ -492,7 +463,7 @@ export function CameraCaptureModal({
 
               <button
                 type="button"
-                onClick={fetchLocation}
+                onClick={() => fetchLocation(true)}
                 disabled={isLoadingGps}
                 title="Activate / Refine GPS satellite fix"
                 className="shrink-0 flex items-center gap-1 text-[10px] font-semibold text-neutral-700 hover:text-[#111827] p-1.5 rounded-lg bg-neutral-100 hover:bg-neutral-200 transition-colors cursor-pointer disabled:opacity-50"

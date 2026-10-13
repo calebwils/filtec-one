@@ -29,6 +29,7 @@ import {
   RefreshCw
 } from 'lucide-react';
 import { calculateDistanceMeters, formatDistanceToFiltec, formatDistanceShort } from '@/utils/distance';
+import { AttendanceService } from '@/services/AttendanceService';
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 function todayStr() {
@@ -261,6 +262,9 @@ export default function AttendancePage() {
                     onClick={() => {
                       setMode('CHECK_IN');
                       setIsModalOpen(true);
+                      if (typeof navigator !== 'undefined' && 'geolocation' in navigator) {
+                        AttendanceService.getCurrentCoordinates(50).catch(() => {});
+                      }
                     }}
                     className={`flex-1 sm:flex-initial text-xs font-semibold px-4 py-2.5 rounded-lg flex items-center justify-center gap-1.5 transition-all shadow-xs ${
                       todayCheckIn
@@ -277,6 +281,9 @@ export default function AttendancePage() {
                     onClick={() => {
                       setMode('CHECK_OUT');
                       setIsModalOpen(true);
+                      if (typeof navigator !== 'undefined' && 'geolocation' in navigator) {
+                        AttendanceService.getCurrentCoordinates(50).catch(() => {});
+                      }
                     }}
                     className={`flex-1 sm:flex-initial text-xs font-semibold px-4 py-2.5 rounded-lg flex items-center justify-center gap-1.5 transition-all ${
                       todayCheckIn && !todayCheckOut
