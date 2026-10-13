@@ -449,7 +449,7 @@ export default function AttendancePage() {
                           </div>
                           <div>
                             <div className="flex items-center gap-2">
-                              <span className="font-semibold text-xs text-[#111827]">{l.type} Leave</span>
+                              <span className="font-semibold text-xs text-[#111827]">{(l.leaveType || 'Leave')}</span>
                               <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 font-semibold">
                                 Approved
                               </span>
