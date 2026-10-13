@@ -28,12 +28,18 @@ import {
   Sparkles,
   CreditCard,
   Briefcase,
-  Upload
+  Upload,
+  FileText,
+  Download,
+  Printer
 } from 'lucide-react';
+import { PayslipModal } from '@/components/payroll/PayslipModal';
+import { calculateEmployeePayroll } from '@/utils/payroll';
 
 export function ProfilePageContent() {
   const router = useRouter();
-  const { currentUser, employees, dealers, plumbers, orders, rewardVouchers } = useAppStore();
+  const { currentUser, employees, dealers, plumbers, orders, rewardVouchers, dailyAttendance, leaveRequests } = useAppStore();
+  const [isPayslipModalOpen, setIsPayslipModalOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Profile fields state
@@ -77,8 +83,16 @@ export function ProfilePageContent() {
 
   // Role-specific data lookups
   const currentEmployee = employees.find(
-    (e) => e.id === currentUser.id || e.code === currentUser.employeeCode
+    (e) =>
+      e.id === currentUser.id ||
+      e.code === currentUser.employeeCode ||
+      (currentUser.name && e.name.toLowerCase() === currentUser.name.toLowerCase())
   );
+
+  const currentMonthYYYYMM = new Date().toISOString().slice(0, 7);
+  const monthlyPayroll = currentEmployee
+    ? calculateEmployeePayroll(currentEmployee, currentMonthYYYYMM, dailyAttendance, leaveRequests)
+    : null;
 
   const currentDealer = dealers.find(
     (d) => d.id === currentUser.dealerId || d.code === currentUser.dealerId || d.id === currentUser.id
@@ -665,6 +679,35 @@ export function ProfilePageContent() {
                   </span>
                 </div>
 
+                {monthlyPayroll && (
+                  <div className="p-3.5 rounded-xl bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5">
+                        <FileText className="w-3.5 h-3.5 text-emerald-700" />
+                        <span className="text-xs font-bold text-emerald-950">
+                          {monthlyPayroll.monthLabel} Payslip
+                        </span>
+                      </div>
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-200 text-emerald-900 font-bold">
+                        Ready
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between text-xs pt-1">
+                      <span className="text-emerald-900 font-mono font-bold">
+                        ₹{monthlyPayroll.netPayableSalary.toLocaleString('en-IN')}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setIsPayslipModalOpen(true)}
+                        className="px-3 py-1.5 bg-[#DC2626] hover:bg-[#B91C1C] text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all shadow-2xs cursor-pointer"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                        <span>Download PDF</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 {currentEmployee?.targetMonthly ? (
                   <div className="p-3 rounded-xl bg-neutral-50 border border-neutral-100 flex items-center justify-between">
                     <span className="text-xs text-neutral-500">Monthly Target</span>
@@ -780,6 +823,13 @@ export function ProfilePageContent() {
           </div>
         </div>
       </div>
+
+      {/* Official Payslip Modal for PDF Download & Print */}
+      <PayslipModal
+        isOpen={isPayslipModalOpen}
+        payroll={monthlyPayroll}
+        onClose={() => setIsPayslipModalOpen(false)}
+      />
     </div>
   );
 }

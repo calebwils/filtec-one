@@ -43,17 +43,16 @@ export function PayslipModal({
   const companyEmail = company.supportEmail || 'care@filtec.in';
   const companyGstin = company.gstin || '21AAGCF5549N1ZC';
 
+  const [copied, setCopied] = useState(false);
+
   if (!isOpen || !payroll || !mounted) return null;
 
   const handlePrint = () => {
     window.print();
   };
 
-  const handleSendWhatsApp = () => {
-    const cleanPhone = (payroll.phone || '').replace(/[^0-9]/g, '');
-    const phoneWithCountry = cleanPhone.startsWith('91') ? cleanPhone : `91${cleanPhone}`;
-
-    const text = `*${companyLegalName.toUpperCase()} — SALARY SLIP*
+  const getShareText = () => {
+    return `*${companyLegalName.toUpperCase()} — SALARY SLIP*
 *Month:* ${payroll.monthLabel}
 *Employee:* ${payroll.employeeName} (${payroll.employeeCode})
 *Designation:* ${payroll.designation}
@@ -75,7 +74,37 @@ export function PayslipModal({
 *Works & Plant:* ${plantAddress}
 Phone: ${companyPhone} • Email: ${companyEmail}
 Generated via FILTEC ONE Operational Platform.`;
+  };
 
+  const handleShare = async () => {
+    const text = getShareText();
+    if (typeof navigator !== 'undefined' && navigator.share) {
+      try {
+        await navigator.share({
+          title: `${companyLegalName} - Salary Slip (${payroll.employeeName})`,
+          text: text,
+        });
+        return;
+      } catch (err: any) {
+        if (err?.name === 'AbortError') return;
+      }
+    }
+
+    try {
+      if (typeof navigator !== 'undefined' && navigator.clipboard) {
+        await navigator.clipboard.writeText(text);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2500);
+      }
+    } catch {
+      alert('Payslip text copied to clipboard!');
+    }
+  };
+
+  const handleSendWhatsApp = () => {
+    const cleanPhone = (payroll.phone || '').replace(/[^0-9]/g, '');
+    const phoneWithCountry = cleanPhone.startsWith('91') ? cleanPhone : `91${cleanPhone}`;
+    const text = getShareText();
     window.open(`https://wa.me/${phoneWithCountry}?text=${encodeURIComponent(text)}`, '_blank');
   };
 
@@ -87,7 +116,7 @@ Generated via FILTEC ONE Operational Platform.`;
       {/* Modal Container */}
       <div className="bg-white rounded-2xl max-w-2xl w-full overflow-hidden shadow-2xl border border-neutral-200 my-auto flex flex-col max-h-[94vh] print:max-w-none print:w-full print:shadow-none print:border-none print:my-0 print:max-h-none print:rounded-none">
         {/* Top Action Bar (hidden when printing) */}
-        <div className="px-5 py-3.5 border-b border-[#E5E7EB] bg-[#F8F9FA] flex items-center justify-between shrink-0 print:hidden">
+        <div className="px-5 py-3.5 border-b border-[#E5E7EB] bg-[#F8F9FA] flex flex-wrap items-center justify-between gap-2 shrink-0 print:hidden">
           <div className="flex items-center gap-2">
             <div className="w-7 h-7 rounded-lg bg-[#DC2626]/10 text-[#DC2626] flex items-center justify-center font-bold">
               <FileText className="w-4 h-4" />
@@ -103,20 +132,29 @@ Generated via FILTEC ONE Operational Platform.`;
           <div className="flex items-center gap-2">
             <button
               type="button"
+              onClick={handleShare}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-neutral-900 hover:bg-black text-white transition-all shadow-xs cursor-pointer"
+            >
+              <Share2 className="w-3.5 h-3.5" />
+              <span>{copied ? 'Copied!' : 'Share Payslip'}</span>
+            </button>
+
+            <button
+              type="button"
               onClick={handleSendWhatsApp}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white transition-all shadow-xs cursor-pointer"
             >
               <Send className="w-3.5 h-3.5" />
-              <span>Send WhatsApp</span>
+              <span>WhatsApp</span>
             </button>
 
             <button
               type="button"
               onClick={handlePrint}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#111827] hover:bg-black text-white transition-all shadow-xs cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#DC2626] hover:bg-[#B91C1C] text-white transition-all shadow-xs cursor-pointer"
             >
               <Printer className="w-3.5 h-3.5" />
-              <span>Print / PDF</span>
+              <span>Download / Print (PDF)</span>
             </button>
 
             <button
@@ -313,9 +351,6 @@ Generated via FILTEC ONE Operational Platform.`;
                 <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
                 <span>Verified by FILTEC ONE Operational Ledger</span>
               </div>
-              <p className="leading-relaxed">
-                This is a computer-generated payslip computed from immutable GPS check-in attendance records and approved leave logs. No physical signature required.
-              </p>
             </div>
 
             <div className="text-center sm:text-right border-t sm:border-t-0 pt-3 sm:pt-0">
@@ -330,15 +365,31 @@ Generated via FILTEC ONE Operational Platform.`;
         </div>
 
         {/* Modal Footer (hidden when printing) */}
-        <div className="px-5 py-3 border-t border-[#E5E7EB] bg-[#F8F9FA] flex items-center justify-between shrink-0 print:hidden text-xs">
+        <div className="px-5 py-3 border-t border-[#E5E7EB] bg-[#F8F9FA] flex flex-wrap items-center justify-between gap-2 shrink-0 print:hidden text-xs">
           <span className="text-[11px] text-[#6B7280] font-mono">
             Rate: ₹{payroll.perDayRate.toLocaleString('en-IN')} / working day
           </span>
           <div className="flex items-center gap-2">
             <button
               type="button"
+              onClick={handleShare}
+              className="px-3 py-1.5 rounded-lg font-semibold bg-neutral-900 hover:bg-black text-white transition-colors cursor-pointer flex items-center gap-1.5"
+            >
+              <Share2 className="w-3.5 h-3.5" />
+              <span>{copied ? 'Copied!' : 'Share'}</span>
+            </button>
+            <button
+              type="button"
+              onClick={handlePrint}
+              className="px-3 py-1.5 rounded-lg font-semibold bg-[#DC2626] hover:bg-[#B91C1C] text-white transition-colors cursor-pointer flex items-center gap-1.5"
+            >
+              <Printer className="w-3.5 h-3.5" />
+              <span>Download PDF</span>
+            </button>
+            <button
+              type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-lg font-semibold bg-neutral-200 hover:bg-neutral-300 text-[#111827] transition-colors cursor-pointer"
+              className="px-4 py-1.5 rounded-lg font-semibold bg-neutral-200 hover:bg-neutral-300 text-[#111827] transition-colors cursor-pointer"
             >
               Close
             </button>

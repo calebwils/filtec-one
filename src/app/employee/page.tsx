@@ -18,17 +18,31 @@ import {
   ArrowRight,
   TrendingUp,
   CheckCircle2,
-  Calendar
+  Calendar,
+  FileText,
+  Download,
+  Share2
 } from 'lucide-react';
+import { PayslipModal } from '@/components/payroll/PayslipModal';
+import { calculateEmployeePayroll } from '@/utils/payroll';
 
 export default function EmployeeHomePage() {
-  const { currentUser, employees, orders, dealers, attendanceRecords, cart } = useAppStore();
+  const { currentUser, employees, orders, dealers, attendanceRecords, cart, dailyAttendance, leaveRequests } = useAppStore();
   const [isAttendanceModalOpen, setIsAttendanceModalOpen] = useState(false);
+  const [isPayslipModalOpen, setIsPayslipModalOpen] = useState(false);
   const [attendanceMode, setAttendanceMode] = useState<'CHECK_IN' | 'CHECK_OUT'>('CHECK_IN');
 
   const currentEmployee = employees.find(
-    (e) => e.id === currentUser.id || e.code === currentUser.employeeCode
+    (e) =>
+      e.id === currentUser.id ||
+      e.code === currentUser.employeeCode ||
+      (currentUser.name && e.name.toLowerCase() === currentUser.name.toLowerCase())
   );
+
+  const currentMonthYYYYMM = new Date().toISOString().slice(0, 7);
+  const monthlyPayroll = currentEmployee
+    ? calculateEmployeePayroll(currentEmployee, currentMonthYYYYMM, dailyAttendance, leaveRequests)
+    : null;
 
   const employeeOrders = orders.filter((o) => o.employeeName === currentUser.name || o.employeeId === currentUser.employeeCode);
   const todaySales = employeeOrders.reduce((acc, o) => acc + o.totalAmount, 0);
@@ -188,6 +202,47 @@ export default function EmployeeHomePage() {
           </div>
         </div>
 
+        {/* MONTHLY PAYSLIP READY BANNER / CARD */}
+        {monthlyPayroll && (
+          <div className="bg-gradient-to-r from-emerald-950 via-[#064E3B] to-emerald-900 text-white rounded-xl p-5 shadow-sm border border-emerald-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-start sm:items-center gap-3.5">
+              <div className="w-11 h-11 rounded-xl bg-white/10 text-emerald-300 flex items-center justify-center font-bold shrink-0 border border-white/10">
+                <FileText className="w-6 h-6" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-sm text-white">
+                    {monthlyPayroll.monthLabel} Official Payslip Ready
+                  </span>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-400 text-emerald-950 font-extrabold uppercase">
+                    Ready
+                  </span>
+                </div>
+                <p className="text-xs text-emerald-200/90 mt-0.5 font-mono">
+                  Net Payable: <strong className="text-white text-sm">₹{monthlyPayroll.netPayableSalary.toLocaleString('en-IN')}</strong> • Attendance: {monthlyPayroll.attendancePercentage}% ({monthlyPayroll.payableDays}/{monthlyPayroll.totalWorkingDays} days)
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => setIsPayslipModalOpen(true)}
+                className="px-4 py-2 rounded-lg bg-white hover:bg-neutral-100 text-emerald-950 text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
+              >
+                <Download className="w-4 h-4 text-emerald-800" />
+                <span>Download Payslip (PDF)</span>
+              </button>
+              <Link
+                href="/employee/attendance"
+                className="px-3.5 py-2 rounded-lg bg-emerald-800/80 hover:bg-emerald-800 border border-emerald-600/50 text-emerald-100 text-xs font-semibold transition-all"
+              >
+                <span>View Details →</span>
+              </Link>
+            </div>
+          </div>
+        )}
+
         {/* RECENT ORDERS IN FIELD */}
         <div className="bg-white border border-[#E5E7EB] rounded-xl p-4 sm:p-5 shadow-2xs">
           <div className="flex items-center justify-between mb-3 pb-3 border-b border-[#F3F4F6]">
@@ -260,6 +315,13 @@ export default function EmployeeHomePage() {
         mode={attendanceMode}
         onClose={() => setIsAttendanceModalOpen(false)}
         onSuccess={() => {}}
+      />
+
+      {/* Official Payslip Modal for PDF Download & Print */}
+      <PayslipModal
+        isOpen={isPayslipModalOpen}
+        payroll={monthlyPayroll}
+        onClose={() => setIsPayslipModalOpen(false)}
       />
     </div>
   );
