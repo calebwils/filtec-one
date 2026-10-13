@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { User, Role } from '@/types';
 import { checkRateLimit } from '@/lib/rateLimit';
+import { hashPassword, getSessionFromRequest, createSessionToken } from '@/lib/security';
 
 // Helper to format clean Indian phone numbers
 function formatPhone(phone: string): string {
@@ -35,10 +36,13 @@ export async function POST(req: Request) {
       );
     }
 
+    const session = getSessionFromRequest(req);
+
     const trimmedName = name ? name.trim() : undefined;
     const formattedPhone = phone ? formatPhone(phone) : undefined;
     const trimmedEmail = email ? email.trim() : undefined;
     const trimmedPassword = newPassword && newPassword.trim().length >= 5 ? newPassword.trim() : undefined;
+    const hashedPassword = trimmedPassword ? hashPassword(trimmedPassword) : undefined;
 
     // 1. EMPLOYEE or ADMIN
     if (type === 'EMPLOYEE' || type === 'ADMIN') {
@@ -61,12 +65,27 @@ export async function POST(req: Request) {
         );
       }
 
+      // Authorization guard: must be self or admin
+      const isSelf = session && (
+        session.userId === employee.id ||
+        session.userId === `user-${employee.id}` ||
+        session.employeeCode === employee.code
+      );
+      const isAdmin = session && session.role === 'ADMIN';
+
+      if (!isSelf && !isAdmin) {
+        return NextResponse.json(
+          { success: false, error: 'Unauthorized: You can only update your own profile.' },
+          { status: 403 }
+        );
+      }
+
       const empUpdateData: any = {};
       if (trimmedName) empUpdateData.name = trimmedName;
       if (formattedPhone) empUpdateData.phone = formattedPhone;
       if (trimmedEmail !== undefined) empUpdateData.email = trimmedEmail;
-      if (trimmedPassword) {
-        empUpdateData.password = trimmedPassword;
+      if (hashedPassword) {
+        empUpdateData.password = hashedPassword;
         empUpdateData.mustChangePassword = false;
       }
 
@@ -93,8 +112,8 @@ export async function POST(req: Request) {
         if (formattedPhone) userUpdateData.phone = formattedPhone;
         if (trimmedEmail !== undefined) userUpdateData.email = trimmedEmail;
         if (avatarUrl !== undefined) userUpdateData.avatarUrl = avatarUrl;
-        if (trimmedPassword) {
-          userUpdateData.password = trimmedPassword;
+        if (hashedPassword) {
+          userUpdateData.password = hashedPassword;
           userUpdateData.mustChangePassword = false;
         }
 
@@ -114,7 +133,7 @@ export async function POST(req: Request) {
               avatarUrl: avatarUrl || null,
               employeeCode: employee.code,
               allowedPages: employee.allowedPages || '[]',
-              password: trimmedPassword || employee.password || null,
+              password: hashedPassword || employee.password || null,
               mustChangePassword: false
             }
           });
@@ -143,11 +162,30 @@ export async function POST(req: Request) {
         mustChangePassword: false
       };
 
-      return NextResponse.json({
+      const res = NextResponse.json({
         success: true,
         message: 'Profile updated successfully.',
         user: finalUser
       });
+
+      if (hashedPassword) {
+        const token = createSessionToken({
+          userId: updatedEmp.id,
+          role,
+          employeeCode: updatedEmp.code,
+          phone: updatedEmp.phone,
+          name: updatedEmp.name
+        });
+        res.cookies.set('filtec_session', token, {
+          httpOnly: true,
+          sameSite: 'lax',
+          path: '/',
+          secure: process.env.NODE_ENV === 'production',
+          maxAge: 72 * 3600
+        });
+      }
+
+      return res;
     }
 
     // 2. DEALER
@@ -171,6 +209,21 @@ export async function POST(req: Request) {
         );
       }
 
+      // Authorization guard: must be self or admin
+      const isSelf = session && (
+        session.userId === dealer.id ||
+        session.userId === `user-${dealer.id}` ||
+        session.phone === dealer.phone
+      );
+      const isAdmin = session && session.role === 'ADMIN';
+
+      if (!isSelf && !isAdmin) {
+        return NextResponse.json(
+          { success: false, error: 'Unauthorized: You can only update your own profile.' },
+          { status: 403 }
+        );
+      }
+
       const dealerUpdateData: any = {};
       if (trimmedName) {
         dealerUpdateData.name = trimmedName;
@@ -178,8 +231,8 @@ export async function POST(req: Request) {
       }
       if (formattedPhone) dealerUpdateData.phone = formattedPhone;
       if (trimmedEmail !== undefined) dealerUpdateData.email = trimmedEmail;
-      if (trimmedPassword) {
-        dealerUpdateData.password = trimmedPassword;
+      if (hashedPassword) {
+        dealerUpdateData.password = hashedPassword;
         dealerUpdateData.mustChangePassword = false;
       }
 
@@ -206,8 +259,8 @@ export async function POST(req: Request) {
         if (formattedPhone) userUpdateData.phone = formattedPhone;
         if (trimmedEmail !== undefined) userUpdateData.email = trimmedEmail;
         if (avatarUrl !== undefined) userUpdateData.avatarUrl = avatarUrl;
-        if (trimmedPassword) {
-          userUpdateData.password = trimmedPassword;
+        if (hashedPassword) {
+          userUpdateData.password = hashedPassword;
           userUpdateData.mustChangePassword = false;
         }
 
@@ -235,7 +288,7 @@ export async function POST(req: Request) {
                 '/dealer/invoices',
                 '/dealer/profile'
               ]),
-              password: trimmedPassword || dealer.password || null,
+              password: hashedPassword || dealer.password || null,
               mustChangePassword: false
             }
           });
@@ -264,11 +317,29 @@ export async function POST(req: Request) {
         mustChangePassword: false
       };
 
-      return NextResponse.json({
+      const res = NextResponse.json({
         success: true,
         message: 'Profile updated successfully.',
         user: finalUser
       });
+
+      if (hashedPassword) {
+        const token = createSessionToken({
+          userId: updatedDealer.id,
+          role: 'DEALER',
+          phone: updatedDealer.phone,
+          name: updatedDealer.name
+        });
+        res.cookies.set('filtec_session', token, {
+          httpOnly: true,
+          sameSite: 'lax',
+          path: '/',
+          secure: process.env.NODE_ENV === 'production',
+          maxAge: 72 * 3600
+        });
+      }
+
+      return res;
     }
 
     return NextResponse.json(

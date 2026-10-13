@@ -2,12 +2,13 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { User, Role } from '@/types';
 import { checkRateLimit } from '@/lib/rateLimit';
+import { hashPassword, verifyPassword, getSessionFromRequest, createSessionToken } from '@/lib/security';
 
 export async function POST(req: Request) {
   try {
     const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
     const body = await req.json();
-    const { entityId, type, newPassword } = body;
+    const { entityId, type, newPassword, currentPassword } = body;
 
     // Rate limit: 8 attempts per minute
     const rl = checkRateLimit(`pwd:${ip}:${entityId || 'anon'}`, 8, 60000);
@@ -36,11 +37,21 @@ export async function POST(req: Request) {
     }
 
     const trimmedPassword = newPassword.trim();
+    const hashedPassword = hashPassword(trimmedPassword);
+    const session = getSessionFromRequest(req);
 
     // 1. Employee / Admin
     if (type === 'EMPLOYEE' || type === 'ADMIN') {
-      const employee = await prisma.employee.findUnique({
-        where: { id: entityId }
+      const cleanEmpId = entityId.replace(/^user-/, '');
+      const employee = await prisma.employee.findFirst({
+        where: {
+          OR: [
+            { id: entityId },
+            { id: cleanEmpId },
+            { code: entityId },
+            { code: cleanEmpId }
+          ]
+        }
       });
 
       if (!employee) {
@@ -50,10 +61,35 @@ export async function POST(req: Request) {
         );
       }
 
+      // Authorization guard:
+      // Must have valid active session matching this employee OR admin role OR valid current password supplied
+      const isSelfSession = session && (
+        session.userId === employee.id ||
+        session.userId === `user-${employee.id}` ||
+        session.employeeCode === employee.code
+      );
+      const isAdminSession = session && session.role === 'ADMIN';
+
+      if (!isAdminSession && !isSelfSession) {
+        if (!currentPassword) {
+          return NextResponse.json(
+            { success: false, error: 'Authorization required: Current password or active session is necessary to change password.' },
+            { status: 401 }
+          );
+        }
+        const verifyRes = verifyPassword(currentPassword, employee.password);
+        if (!verifyRes.valid) {
+          return NextResponse.json(
+            { success: false, error: 'Current password provided is incorrect.' },
+            { status: 403 }
+          );
+        }
+      }
+
       const updated = await prisma.employee.update({
-        where: { id: entityId },
+        where: { id: employee.id },
         data: {
-          password: trimmedPassword,
+          password: hashedPassword,
           mustChangePassword: false
         }
       });
@@ -64,12 +100,13 @@ export async function POST(req: Request) {
           where: {
             OR: [
               { id: `user-${employee.id}` },
+              { id: employee.id },
               { employeeCode: employee.code },
               { phone: employee.phone }
             ]
           },
           data: {
-            password: trimmedPassword,
+            password: hashedPassword,
             mustChangePassword: false
           }
         });
@@ -94,17 +131,45 @@ export async function POST(req: Request) {
         mustChangePassword: false
       };
 
-      return NextResponse.json({
-        success: true,
-        message: 'Password successfully changed and saved.',
-        user: updatedUser
+      // Generate refreshed signed session token
+      const newSessionToken = createSessionToken({
+        userId: updated.id,
+        role,
+        employeeCode: updated.code,
+        phone: updated.phone,
+        name: updated.name
       });
+
+      const response = NextResponse.json({
+        success: true,
+        message: 'Password successfully changed and secured.',
+        user: updatedUser,
+        token: newSessionToken
+      });
+
+      response.cookies.set('filtec_session', newSessionToken, {
+        httpOnly: true,
+        sameSite: 'lax',
+        path: '/',
+        secure: process.env.NODE_ENV === 'production',
+        maxAge: 72 * 3600
+      });
+
+      return response;
     }
 
     // 2. Dealer
     if (type === 'DEALER') {
-      const dealer = await prisma.dealer.findUnique({
-        where: { id: entityId }
+      const cleanDealerId = entityId.replace(/^user-/, '');
+      const dealer = await prisma.dealer.findFirst({
+        where: {
+          OR: [
+            { id: entityId },
+            { id: cleanDealerId },
+            { code: entityId },
+            { code: cleanDealerId }
+          ]
+        }
       });
 
       if (!dealer) {
@@ -114,10 +179,33 @@ export async function POST(req: Request) {
         );
       }
 
+      const isSelfSession = session && (
+        session.userId === dealer.id ||
+        session.userId === `user-${dealer.id}` ||
+        session.phone === dealer.phone
+      );
+      const isAdminSession = session && session.role === 'ADMIN';
+
+      if (!isAdminSession && !isSelfSession) {
+        if (!currentPassword) {
+          return NextResponse.json(
+            { success: false, error: 'Authorization required: Current password or active session is necessary to change password.' },
+            { status: 401 }
+          );
+        }
+        const verifyRes = verifyPassword(currentPassword, dealer.password);
+        if (!verifyRes.valid) {
+          return NextResponse.json(
+            { success: false, error: 'Current password provided is incorrect.' },
+            { status: 403 }
+          );
+        }
+      }
+
       const updated = await prisma.dealer.update({
-        where: { id: entityId },
+        where: { id: dealer.id },
         data: {
-          password: trimmedPassword,
+          password: hashedPassword,
           mustChangePassword: false
         }
       });
@@ -127,12 +215,13 @@ export async function POST(req: Request) {
           where: {
             OR: [
               { id: `user-${dealer.id}` },
+              { id: dealer.id },
               { dealerId: dealer.id },
               { phone: dealer.phone }
             ]
           },
           data: {
-            password: trimmedPassword,
+            password: hashedPassword,
             mustChangePassword: false
           }
         });
@@ -151,16 +240,35 @@ export async function POST(req: Request) {
           '/dealer/orders',
           '/dealer/rewards',
           '/dealer/plumbers',
-          '/dealer/invoices'
+          '/dealer/invoices',
+          '/dealer/profile'
         ],
         mustChangePassword: false
       };
 
-      return NextResponse.json({
-        success: true,
-        message: 'Password successfully changed and saved.',
-        user: updatedUser
+      const newSessionToken = createSessionToken({
+        userId: updated.id,
+        role: 'DEALER',
+        phone: updated.phone,
+        name: updated.name
       });
+
+      const response = NextResponse.json({
+        success: true,
+        message: 'Password successfully changed and secured.',
+        user: updatedUser,
+        token: newSessionToken
+      });
+
+      response.cookies.set('filtec_session', newSessionToken, {
+        httpOnly: true,
+        sameSite: 'lax',
+        path: '/',
+        secure: process.env.NODE_ENV === 'production',
+        maxAge: 72 * 3600
+      });
+
+      return response;
     }
 
     return NextResponse.json(

@@ -9,13 +9,26 @@ export async function GET() {
     return NextResponse.json({ error: 'Catalogue file not found' }, { status: 404 });
   }
 
-  const fileBuffer = fs.readFileSync(filePath);
+  const stat = fs.statSync(filePath);
+  const nodeStream = fs.createReadStream(filePath);
 
-  return new NextResponse(fileBuffer, {
+  const webStream = new ReadableStream({
+    start(controller) {
+      nodeStream.on('data', (chunk) => controller.enqueue(chunk));
+      nodeStream.on('end', () => controller.close());
+      nodeStream.on('error', (err) => controller.error(err));
+    },
+    cancel() {
+      nodeStream.destroy();
+    }
+  });
+
+  return new NextResponse(webStream as unknown as BodyInit, {
     headers: {
       'Content-Type': 'application/pdf',
       'Content-Disposition': 'attachment; filename="FILTEC_CATALOGUE_01.07.2026.pdf"',
-      'Content-Length': fileBuffer.length.toString(),
+      'Content-Length': stat.size.toString(),
     },
   });
 }
+

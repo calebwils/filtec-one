@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { sortProductsNaturally } from '@/lib/catalogueUtils';
+import { getSessionFromRequest } from '@/lib/security';
 
 export async function GET() {
   try {
@@ -127,6 +128,18 @@ export async function POST(req: Request) {
   try {
     const body = await req.json();
     const { action, payload } = body;
+
+    // Destructive administrative actions require authenticated admin session
+    const ADMIN_ONLY_ACTIONS = ['DELETE_EMPLOYEE', 'DELETE_PRODUCT', 'DELETE_ORDER', 'UPDATE_SETTINGS'];
+    if (ADMIN_ONLY_ACTIONS.includes(action)) {
+      const session = getSessionFromRequest(req);
+      if (!session || session.role !== 'ADMIN') {
+        return NextResponse.json(
+          { success: false, error: 'Unauthorized: Admin credentials required to execute this operation.' },
+          { status: 403 }
+        );
+      }
+    }
 
     switch (action) {
       case 'UPDATE_SETTINGS': {

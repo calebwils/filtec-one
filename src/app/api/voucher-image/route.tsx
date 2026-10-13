@@ -5,16 +5,18 @@ import { NextRequest } from 'next/server';
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
-    const code = searchParams.get('code') || 'D-001';
-    const amount = searchParams.get('amount') || '500';
-    const points = searchParams.get('points') || amount;
-    const name = searchParams.get('name') || 'Authorized Partner';
-    const dealerCode = searchParams.get('dealerCode') || '';
-    const date = searchParams.get('date') || new Date().toLocaleDateString('en-IN');
-    const type = (searchParams.get('type') || 'DEALER').toUpperCase();
+    const sanitize = (val: string | null, max = 50) => (val || '').replace(/[<>{}\r\n]/g, '').trim().slice(0, max);
+    const code = sanitize(searchParams.get('code'), 30) || 'D-001';
+    const rawAmount = searchParams.get('amount') || '500';
+    const numAmount = Math.max(0, Math.min(10000000, parseFloat(rawAmount) || 0));
+    const amount = String(numAmount);
+    const points = sanitize(searchParams.get('points'), 20) || amount;
+    const name = sanitize(searchParams.get('name'), 60) || 'Authorized Partner';
+    const dealerCode = sanitize(searchParams.get('dealerCode'), 30);
+    const date = sanitize(searchParams.get('date'), 30) || new Date().toLocaleDateString('en-IN');
+    const type = (sanitize(searchParams.get('type'), 15) || 'DEALER').toUpperCase();
     const isDealer = type === 'DEALER';
 
-    const numAmount = parseFloat(amount) || 0;
     const formattedAmount = `₹${numAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
 
     return new ImageResponse(

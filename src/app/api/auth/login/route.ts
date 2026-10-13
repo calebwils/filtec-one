@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { User, Role } from '@/types';
 import { checkRateLimit } from '@/lib/rateLimit';
+import { hashPassword, verifyPassword, createSessionToken } from '@/lib/security';
 
 // Helper to extract clean digits from phone
 function extractDigits(str: string): string {
@@ -76,12 +77,14 @@ export async function POST(req: Request) {
         const phoneDigits = extractDigits(matchedEmployee.phone);
         const defaultLast5 = phoneDigits.slice(-5);
 
-        // Password check: custom password if set, or default last 5 digits of phone
+        // Password check: secure PBKDF2 verification or default last 5 digits
         const hasCustomPassword = Boolean(matchedEmployee.password && matchedEmployee.password.trim());
         const isDefaultPasswordMatch = trimmedPassword === defaultLast5;
-        const isCustomPasswordMatch = hasCustomPassword && trimmedPassword === matchedEmployee.password?.trim();
+        const passwordCheck = hasCustomPassword
+          ? verifyPassword(trimmedPassword, matchedEmployee.password)
+          : { valid: false, needsUpgrade: false };
 
-        if (!isCustomPasswordMatch && !isDefaultPasswordMatch) {
+        if (!passwordCheck.valid && !isDefaultPasswordMatch) {
           return NextResponse.json(
             {
               success: false,
@@ -93,8 +96,20 @@ export async function POST(req: Request) {
           );
         }
 
+        // Automatic security upgrade: hash plaintext or legacy passwords
+        if (passwordCheck.needsUpgrade || (!matchedEmployee.password?.startsWith('pbkdf2$') && isDefaultPasswordMatch)) {
+          try {
+            const secureHash = hashPassword(trimmedPassword);
+            await prisma.employee.update({
+              where: { id: matchedEmployee.id },
+              data: { password: secureHash }
+            });
+          } catch (e) {
+            console.warn('Failed to upgrade password hash:', e);
+          }
+        }
+
         // Determine if first-time password change is required
-        // Required if mustChangePassword is true OR if they logged in with default password and haven't set a custom password
         const mustChangePassword = matchedEmployee.mustChangePassword ?? !hasCustomPassword;
 
         const role: Role = (matchedEmployee.systemRole as Role) || 'EMPLOYEE';
@@ -157,8 +172,17 @@ export async function POST(req: Request) {
 
         const { password: _empPass, ...safeEmployee } = matchedEmployee;
 
-        return NextResponse.json({
+        const sessionToken = createSessionToken({
+          userId: authenticatedUser.id,
+          role,
+          employeeCode: matchedEmployee.code,
+          phone: matchedEmployee.phone,
+          name: matchedEmployee.name
+        });
+
+        const res = NextResponse.json({
           success: true,
+          token: sessionToken,
           mustChangePassword,
           role,
           type: role === 'ADMIN' ? 'ADMIN' : 'EMPLOYEE',
@@ -166,6 +190,17 @@ export async function POST(req: Request) {
           user: authenticatedUser,
           employee: safeEmployee
         });
+
+        // Set HttpOnly, secure session cookie
+        res.cookies.set('filtec_session', sessionToken, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'lax',
+          path: '/',
+          maxAge: 72 * 3600
+        });
+
+        return res;
       }
     }
 
@@ -188,9 +223,11 @@ export async function POST(req: Request) {
 
         const hasCustomPassword = Boolean(matchedDealer.password && matchedDealer.password.trim());
         const isDefaultPasswordMatch = trimmedPassword === defaultLast5;
-        const isCustomPasswordMatch = hasCustomPassword && trimmedPassword === matchedDealer.password?.trim();
+        const passwordCheck = hasCustomPassword
+          ? verifyPassword(trimmedPassword, matchedDealer.password)
+          : { valid: false, needsUpgrade: false };
 
-        if (!isCustomPasswordMatch && !isDefaultPasswordMatch) {
+        if (!passwordCheck.valid && !isDefaultPasswordMatch) {
           return NextResponse.json(
             {
               success: false,
@@ -200,6 +237,19 @@ export async function POST(req: Request) {
             },
             { status: 401 }
           );
+        }
+
+        // Automatic security upgrade: hash plaintext or legacy passwords
+        if (passwordCheck.needsUpgrade || (!matchedDealer.password?.startsWith('pbkdf2$') && isDefaultPasswordMatch)) {
+          try {
+            const secureHash = hashPassword(trimmedPassword);
+            await prisma.dealer.update({
+              where: { id: matchedDealer.id },
+              data: { password: secureHash }
+            });
+          } catch (e) {
+            console.warn('Failed to upgrade dealer password hash:', e);
+          }
         }
 
         const mustChangePassword = matchedDealer.mustChangePassword ?? !hasCustomPassword;
@@ -242,8 +292,16 @@ export async function POST(req: Request) {
 
         const { password: _dlrPass, ...safeDealer } = matchedDealer;
 
-        return NextResponse.json({
+        const sessionToken = createSessionToken({
+          userId: authenticatedUser.id,
+          role: 'DEALER',
+          phone: matchedDealer.phone,
+          name: matchedDealer.name
+        });
+
+        const res = NextResponse.json({
           success: true,
+          token: sessionToken,
           mustChangePassword,
           role: 'DEALER',
           type: 'DEALER',
@@ -251,6 +309,16 @@ export async function POST(req: Request) {
           user: authenticatedUser,
           dealer: safeDealer
         });
+
+        res.cookies.set('filtec_session', sessionToken, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'lax',
+          path: '/',
+          maxAge: 72 * 3600
+        });
+
+        return res;
       }
     }
 

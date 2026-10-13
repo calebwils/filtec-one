@@ -23,6 +23,9 @@ model User {
   mustChangePassword Boolean @default(true)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+
+  @@index([phone])
+  @@index([role])
 }
 
 model Employee {
@@ -49,6 +52,9 @@ model Employee {
   mustChangePassword Boolean   @default(true)
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
+
+  @@index([phone])
+  @@index([systemRole])
 }
 
 model Dealer {
@@ -75,6 +81,9 @@ model Dealer {
   mustChangePassword Boolean  @default(true)
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
+
+  @@index([phone])
+  @@index([city])
 }
 
 model Plumber {
@@ -89,6 +98,9 @@ model Plumber {
   dateAdded             String
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
+
+  @@index([dealerId])
+  @@index([phone])
 }
 
 model Product {
@@ -154,6 +166,11 @@ model Order {
   invoiceDate        String?
   invoiceValue       Float?
   items              OrderItem[]
+
+  @@index([dealerId])
+  @@index([employeeId])
+  @@index([status])
+  @@index([createdAt])
 }
 
 model OrderItem {
@@ -184,6 +201,8 @@ model RewardTransaction {
   balanceAfter Float
   description  String
   createdAt    DateTime @default(now())
+
+  @@index([dealerId, createdAt])
 }
 
 model RewardVoucher {
@@ -209,6 +228,9 @@ model RewardVoucher {
   instructions     String?
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
+
+  @@index([dealerId])
+  @@index([status])
 }
 
 model AttendanceRecord {
@@ -223,6 +245,9 @@ model AttendanceRecord {
   photoUrl     String
   verified     Boolean  @default(true)
   distanceFromOffice Float?
+
+  @@index([employeeId, timestamp])
+  @@index([type])
 }
 
 model DailyAttendanceSummary {
@@ -240,6 +265,9 @@ model DailyAttendanceSummary {
   dealerVisitsCount Int     @default(0)
   ordersCount       Int     @default(0)
   notes             String?
+
+  @@index([employeeId, date])
+  @@index([date])
 }
 
 model LeaveRequest {
@@ -256,6 +284,9 @@ model LeaveRequest {
   contactNumber   String?
   rejectionReason String?
   createdAt       DateTime @default(now())
+
+  @@index([employeeId])
+  @@index([status])
 }
 
 model AppSetting {
@@ -274,6 +305,9 @@ model AuditLog {
   entityId   String
   details    String
   timestamp  DateTime @default(now())
+
+  @@index([userId, timestamp])
+  @@index([entityType, entityId])
 }
 
 model IntegrationEvent {
@@ -285,4 +319,8 @@ model IntegrationEvent {
   payloadSummary String
   timestamp      DateTime @default(now())
   latencyMs      Int?
+
+  @@index([type, status])
+  @@index([timestamp])
 }
+

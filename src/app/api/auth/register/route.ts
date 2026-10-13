@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { User, Role } from '@/types';
 import { checkRateLimit } from '@/lib/rateLimit';
+import { hashPassword, createSessionToken } from '@/lib/security';
 
 function extractDigits(str: string): string {
   return (str || '').replace(/\D/g, '');
@@ -66,6 +67,8 @@ export async function POST(req: Request) {
       ? phone.trim()
       : `+91 ${inputLast10.slice(0, 5)} ${inputLast10.slice(5)}`;
 
+    const hashedPassword = hashPassword(password.trim());
+
     // 1. REGISTER DEALERSHIP
     if (role === 'DEALER') {
       if (!name || !name.trim()) {
@@ -112,7 +115,7 @@ export async function POST(req: Request) {
           address: address?.trim() || 'Odisha, India',
           pincode: pincode?.trim() || null,
           gstin: gstin?.trim() || null,
-          password: password.trim(),
+          password: hashedPassword,
           mustChangePassword: false, // Set password during registration so no prompt needed
           tier: 'Silver',
           creditLimit: 0,
@@ -137,19 +140,38 @@ export async function POST(req: Request) {
           '/dealer/orders',
           '/dealer/rewards',
           '/dealer/plumbers',
-          '/dealer/invoices'
+          '/dealer/invoices',
+          '/dealer/profile'
         ],
         mustChangePassword: false
       };
 
+      const sessionToken = createSessionToken({
+        userId: newDealer.id,
+        role: 'DEALER',
+        phone: newDealer.phone,
+        name: newDealer.name
+      });
+
       const { password: _dlrPass, ...safeDealer } = newDealer;
 
-      return NextResponse.json({
+      const response = NextResponse.json({
         success: true,
         message: 'Dealership account successfully created!',
         user: authenticatedUser,
-        dealer: safeDealer
+        dealer: safeDealer,
+        token: sessionToken
       });
+
+      response.cookies.set('filtec_session', sessionToken, {
+        httpOnly: true,
+        sameSite: 'lax',
+        path: '/',
+        secure: process.env.NODE_ENV === 'production',
+        maxAge: 72 * 3600
+      });
+
+      return response;
     }
 
     // 2. REGISTER EMPLOYEE
@@ -202,7 +224,7 @@ export async function POST(req: Request) {
           email: email?.trim() || `${candidateCode.toLowerCase().replace(/[^a-z0-9]/g, '')}@filtec.in`,
           designation: designation?.trim() || 'Field Representative',
           territory: territory?.trim() || 'Odisha Hub',
-          password: password.trim(),
+          password: hashedPassword,
           mustChangePassword: false,
           systemRole: 'EMPLOYEE',
           allowedPages: JSON.stringify(allowedPages),
@@ -225,14 +247,33 @@ export async function POST(req: Request) {
         mustChangePassword: false
       };
 
+      const sessionToken = createSessionToken({
+        userId: newEmployee.id,
+        role: 'EMPLOYEE',
+        employeeCode: newEmployee.code,
+        phone: newEmployee.phone,
+        name: newEmployee.name
+      });
+
       const { password: _empPass, ...safeEmployee } = newEmployee;
 
-      return NextResponse.json({
+      const response = NextResponse.json({
         success: true,
         message: 'Employee account successfully created!',
         user: authenticatedUser,
-        employee: safeEmployee
+        employee: safeEmployee,
+        token: sessionToken
       });
+
+      response.cookies.set('filtec_session', sessionToken, {
+        httpOnly: true,
+        sameSite: 'lax',
+        path: '/',
+        secure: process.env.NODE_ENV === 'production',
+        maxAge: 72 * 3600
+      });
+
+      return response;
     }
 
     return NextResponse.json(

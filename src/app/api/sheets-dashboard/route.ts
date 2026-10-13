@@ -97,7 +97,15 @@ function parsePercent(val: unknown): number {
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
-    const sheetId = searchParams.get('sheetId') || DEFAULT_SHEET_ID;
+    const rawSheetId = searchParams.get('sheetId') || DEFAULT_SHEET_ID;
+    const SHEET_ID_REGEX = /^[a-zA-Z0-9_-]{15,100}$/;
+    if (!SHEET_ID_REGEX.test(rawSheetId)) {
+      return NextResponse.json(
+        { success: false, error: 'Invalid Google Sheet ID format provided.' },
+        { status: 400 }
+      );
+    }
+    const sheetId = rawSheetId;
 
     const gvizUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json`;
     
