@@ -1,11 +1,40 @@
-import { describe, it } from 'node:test';
+import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createSessionToken, hashPassword, verifyPassword, getAuthSecret } from '../security.ts';
 import crypto from 'node:crypto';
+import { spawn, ChildProcess } from 'node:child_process';
 
 const BASE_URL = process.env.TEST_BASE_URL || 'http://localhost:3001';
 
 describe('Live HTTP Endpoints End-to-End Security Verification', () => {
+
+  let spawnedServer: ChildProcess | null = null;
+
+  before(async () => {
+    try {
+      const probe = await fetch(`${BASE_URL}/api/health`, { signal: AbortSignal.timeout(1500) });
+      if (probe.status === 200) return; // Server is already alive and running
+    } catch {
+      // Server not detected; spawn next start on port 3001
+      spawnedServer = spawn('npx', ['next', 'start', '-p', '3001'], {
+        stdio: 'ignore',
+        env: { ...process.env, PORT: '3001' }
+      });
+      for (let i = 0; i < 20; i++) {
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+        try {
+          const check = await fetch(`${BASE_URL}/api/health`, { signal: AbortSignal.timeout(1000) });
+          if (check.status === 200) break;
+        } catch {}
+      }
+    }
+  });
+
+  after(() => {
+    if (spawnedServer) {
+      spawnedServer.kill();
+    }
+  });
 
   const secret = getAuthSecret();
 
