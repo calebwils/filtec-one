@@ -277,7 +277,7 @@ export default function LoginPage() {
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         {/* Brand Header */}
         <div className="text-center">
-          <div className="inline-flex items-center justify-center px-6 py-3 rounded-2xl bg-white shadow-2xs border border-[#E5E7EB] mb-4">
+          <div className="inline-flex items-center justify-center px-6 py-3 rounded-2xl bg-white shadow-2xs border border-[#E5E7EB]">
             <Image
               src="/brand/filtec-one-logo.png"
               alt="FILTEC ONE"
@@ -287,12 +287,7 @@ export default function LoginPage() {
               priority
             />
           </div>
-          <h1 className="text-lg sm:text-xl font-bold tracking-tight text-[#111827]">
-            Operational Management Platform
-          </h1>
-          <p className="text-xs text-[#6B7280] mt-0.5">
-            Identity-Verified Access for Authorized Dealers, Staff & Management
-          </p>
+          <h1 className="sr-only">FILTEC ONE</h1>
         </div>
 
         {/* Portal Card */}

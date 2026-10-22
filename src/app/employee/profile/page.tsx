@@ -9,7 +9,7 @@ import { ProfilePageContent } from '@/components/profile/ProfilePageContent';
 export default function EmployeeProfilePage() {
   return (
     <div className="min-h-screen bg-[#F8F9FA] pb-mobile-nav">
-      <TopContextBar title="Employee Profile" subtitle="Account & Credentials" />
+      <TopContextBar title="Employee Profile" />
       <DesktopSubNav />
       <main>
         <ProfilePageContent />

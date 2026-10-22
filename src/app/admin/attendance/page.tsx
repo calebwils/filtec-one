@@ -156,9 +156,6 @@ export default function AdminAttendancePage() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <h1 className="text-xl font-bold text-[#111827]">Attendance & Location Tracking</h1>
-            <p className="text-xs text-[#6B7280] mt-0.5">
-              Live GPS satellite verification, selfie capture inspection and staff daily attendance
-            </p>
           </div>
 
           <div className="flex items-center gap-2">
@@ -361,7 +358,7 @@ export default function AdminAttendancePage() {
                             </span>
                           </div>
 
-                          <div className="flex items-center gap-1 text-xs text-[#6B7280] mt-1">
+                          <div className="flex items-center gap-1 text-xs text-[#6B7280] mt-1" title={punch.locationName}>
                             <MapPin className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
                             <span className="line-clamp-1">{punch.locationName}</span>
                           </div>
@@ -508,9 +505,9 @@ export default function AdminAttendancePage() {
                                     );
                                   })()}
                                 </div>
-                                <div className="text-[11px] text-[#4B5563] flex items-start gap-1 mt-0.5 line-clamp-1">
+                                <div className="text-[11px] text-[#4B5563] flex items-start gap-1 mt-0.5 line-clamp-1" title={record.checkIn.locationName}>
                                   <MapPin className="w-3 h-3 text-neutral-400 shrink-0 mt-0.5" />
-                                  <span>{record.checkIn.locationName}</span>
+                                  <span className="truncate">{record.checkIn.locationName}</span>
                                 </div>
                               </div>
                             ) : (
@@ -538,9 +535,9 @@ export default function AdminAttendancePage() {
                                     );
                                   })()}
                                 </div>
-                                <div className="text-[11px] text-[#4B5563] flex items-start gap-1 mt-0.5 line-clamp-1">
+                                <div className="text-[11px] text-[#4B5563] flex items-start gap-1 mt-0.5 line-clamp-1" title={record.checkOut.locationName}>
                                   <MapPin className="w-3 h-3 text-neutral-400 shrink-0 mt-0.5" />
-                                  <span>{record.checkOut.locationName}</span>
+                                  <span className="truncate">{record.checkOut.locationName}</span>
                                 </div>
                               </div>
                             ) : record.status === 'ACTIVE_ON_FIELD' ? (

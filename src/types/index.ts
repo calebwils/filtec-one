@@ -28,7 +28,7 @@ export interface Employee {
   lastCheckInTime?: string;
   lastLocation?: string;
   designation?: string;
-  baseSalary?: number;
+  baseSalary?: number | null;
   assignedDealerIds?: string[];
   dateOfJoining?: string;
   email?: string;

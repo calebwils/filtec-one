@@ -95,8 +95,8 @@ export async function GET(req: Request) {
         const isAssigned = assignedDealerIds.includes(d.id);
         return {
           ...d,
-          creditLimit: isAssigned ? d.creditLimit : 0,
-          outstandingBalance: isAssigned ? d.outstandingBalance : 0
+          creditLimit: isAssigned ? d.creditLimit : null,
+          outstandingBalance: isAssigned ? d.outstandingBalance : null
         };
       });
 
@@ -113,7 +113,7 @@ export async function GET(req: Request) {
 
           return {
             ...safeEmployee,
-            baseSalary: canViewSalary ? safeEmployee.baseSalary : 0,
+            baseSalary: canViewSalary ? safeEmployee.baseSalary : null,
             phone: isCallerAdmin || isCallerEmployee ? safeEmployee.phone : '-',
             email: isCallerAdmin || isCallerEmployee ? safeEmployee.email : '-',
             assignedDealerIds: safeEmployee.assignedDealerIds ? JSON.parse(safeEmployee.assignedDealerIds) : [],
@@ -285,11 +285,103 @@ async function recordAudit(
   }
 }
 
+// List of all 26 supported mutation actions
+const ALL_SUPPORTED_ACTIONS = [
+  'UPDATE_SETTINGS',
+  'CREATE_DEALER',
+  'UPDATE_DEALER',
+  'DELETE_DEALER',
+  'CREATE_EMPLOYEE',
+  'UPDATE_EMPLOYEE',
+  'DELETE_EMPLOYEE',
+  'CREATE_PRODUCT',
+  'UPDATE_PRODUCT',
+  'TOGGLE_PRODUCT_STOCK',
+  'UPDATE_VARIANT_STOCK',
+  'DELETE_PRODUCT',
+  'CREATE_PLUMBER',
+  'UPDATE_PLUMBER',
+  'DELETE_PLUMBER',
+  'CREATE_ORDER',
+  'APPROVE_ORDER',
+  'RELEASE_ORDER',
+  'REJECT_ORDER',
+  'DELETE_ORDER',
+  'RECORD_ATTENDANCE',
+  'CREATE_LEAVE_REQUEST',
+  'UPDATE_LEAVE_REQUEST',
+  'ALLOCATE_PLUMBER_REWARD',
+  'DEALER_REDEEM_REWARD',
+  'SETTLE_VOUCHER'
+];
+
+// 16 administrative actions requiring authenticated ADMIN role
+const ADMIN_ONLY_ACTIONS = [
+  'UPDATE_SETTINGS',
+  'CREATE_DEALER',
+  'DELETE_DEALER',
+  'CREATE_EMPLOYEE',
+  'DELETE_EMPLOYEE',
+  'CREATE_PRODUCT',
+  'UPDATE_PRODUCT',
+  'TOGGLE_PRODUCT_STOCK',
+  'UPDATE_VARIANT_STOCK',
+  'DELETE_PRODUCT',
+  'APPROVE_ORDER',
+  'RELEASE_ORDER',
+  'REJECT_ORDER',
+  'DELETE_ORDER',
+  'UPDATE_LEAVE_REQUEST',
+  'SETTLE_VOUCHER'
+];
+
 // Handler to persist changes directly to PostgreSQL
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
+    const contentLength = req.headers.get('content-length');
+    if (contentLength && parseInt(contentLength, 10) > 2 * 1024 * 1024) {
+      return NextResponse.json(
+        { success: false, error: 'Payload Too Large: Maximum allowed payload is 2MB.' },
+        { status: 413 }
+      );
+    }
+
+    let body;
+    try {
+      body = await req.json();
+    } catch {
+      return NextResponse.json(
+        { success: false, error: 'Bad Request: Malformed JSON payload.' },
+        { status: 400 }
+      );
+    }
+
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      return NextResponse.json(
+        { success: false, error: 'Bad Request: Request body must be a JSON object.' },
+        { status: 400 }
+      );
+    }
+
     const { action, payload } = body;
+    if (!action || typeof action !== 'string' || !ALL_SUPPORTED_ACTIONS.includes(action)) {
+      return NextResponse.json(
+        { success: false, error: `Bad Request: Invalid or unsupported action "${action}".` },
+        { status: 400 }
+      );
+    }
+
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+      return NextResponse.json(
+        { success: false, error: 'Bad Request: Action payload must be a non-null object.' },
+        { status: 400 }
+      );
+    }
+
+    // Prototype pollution prevention
+    delete (payload as any).__proto__;
+    delete (payload as any).constructor;
+    delete (payload as any).prototype;
 
     const session = getSessionFromRequest(req);
     if (!session) {
@@ -299,24 +391,6 @@ export async function POST(req: Request) {
       );
     }
 
-    // Administrative actions require authenticated admin role
-    const ADMIN_ONLY_ACTIONS = [
-      'DELETE_EMPLOYEE',
-      'DELETE_PRODUCT',
-      'DELETE_ORDER',
-      'UPDATE_SETTINGS',
-      'DELETE_DEALER',
-      'CREATE_EMPLOYEE',
-      'CREATE_PRODUCT',
-      'UPDATE_PRODUCT',
-      'TOGGLE_PRODUCT_STOCK',
-      'UPDATE_VARIANT_STOCK',
-      'APPROVE_ORDER',
-      'RELEASE_ORDER',
-      'REJECT_ORDER',
-      'UPDATE_LEAVE_REQUEST',
-      'SETTLE_VOUCHER'
-    ];
     const isEscalationAttempt = action === 'UPDATE_EMPLOYEE' && payload?.systemRole && payload.systemRole !== 'EMPLOYEE';
 
     if (ADMIN_ONLY_ACTIONS.includes(action) || isEscalationAttempt) {
@@ -332,13 +406,6 @@ export async function POST(req: Request) {
     if (session.role !== 'ADMIN') {
       const cleanDealerId = session.dealerId || session.userId.replace(/^user-/, '');
       const cleanEmpId = session.userId.replace(/^user-/, '');
-
-      if (action === 'CREATE_DEALER' && session.role === 'DEALER') {
-        return NextResponse.json(
-          { success: false, error: 'Forbidden: Dealers cannot register new dealerships.' },
-          { status: 403 }
-        );
-      }
 
       if (action === 'UPDATE_EMPLOYEE') {
         if (session.role === 'DEALER') {
@@ -393,17 +460,47 @@ export async function POST(req: Request) {
         }
       }
 
-      if (action === 'CREATE_ORDER' && session.role === 'DEALER') {
-        const isOwn = payload.dealerId === session.userId || payload.dealerId === session.dealerId || payload.dealerId === cleanDealerId;
-        if (!isOwn) {
-          return NextResponse.json(
-            { success: false, error: 'Forbidden: Dealers can only create purchase orders for their own account.' },
-            { status: 403 }
-          );
+      if (action === 'CREATE_ORDER') {
+        if (session.role === 'DEALER') {
+          const isOwn = payload.dealerId === session.userId || payload.dealerId === session.dealerId || payload.dealerId === cleanDealerId;
+          if (!isOwn) {
+            return NextResponse.json(
+              { success: false, error: 'Forbidden: Dealers can only create purchase orders for their own account.' },
+              { status: 403 }
+            );
+          }
+        } else if (session.role === 'EMPLOYEE') {
+          const currentEmp = await prisma.employee.findFirst({
+            where: {
+              OR: [
+                { id: session.userId },
+                { id: cleanEmpId },
+                { code: session.employeeCode || '' }
+              ]
+            }
+          });
+          let assignedIds: string[] = [];
+          if (currentEmp?.assignedDealerIds) {
+            try {
+              assignedIds = JSON.parse(currentEmp.assignedDealerIds);
+            } catch {}
+          }
+          if (!assignedIds.includes(payload.dealerId)) {
+            return NextResponse.json(
+              { success: false, error: 'Forbidden: Employees can only create orders for dealers in their assigned territory.' },
+              { status: 403 }
+            );
+          }
         }
       }
 
-      if (action === 'CREATE_PLUMBER' && session.role === 'DEALER') {
+      if (action === 'CREATE_PLUMBER') {
+        if (session.role === 'EMPLOYEE') {
+          return NextResponse.json(
+            { success: false, error: 'Forbidden: Employees cannot register plumbers.' },
+            { status: 403 }
+          );
+        }
         const isOwn = payload.dealerId === session.userId || payload.dealerId === session.dealerId || payload.dealerId === cleanDealerId;
         if (!isOwn) {
           return NextResponse.json(
@@ -413,7 +510,13 @@ export async function POST(req: Request) {
         }
       }
 
-      if (action === 'UPDATE_PLUMBER' && session.role === 'DEALER') {
+      if (action === 'UPDATE_PLUMBER') {
+        if (session.role === 'EMPLOYEE') {
+          return NextResponse.json(
+            { success: false, error: 'Forbidden: Employees cannot modify plumbers.' },
+            { status: 403 }
+          );
+        }
         const plumber = await prisma.plumber.findUnique({ where: { id: payload.id } });
         const isOwn = plumber && (plumber.dealerId === session.userId || plumber.dealerId === session.dealerId || plumber.dealerId === cleanDealerId);
         if (!isOwn) {
@@ -423,6 +526,24 @@ export async function POST(req: Request) {
           );
         }
         delete payload.dealerId;
+      }
+
+      if (action === 'DELETE_PLUMBER') {
+        if (session.role === 'EMPLOYEE') {
+          return NextResponse.json(
+            { success: false, error: 'Forbidden: Employees cannot delete plumbers.' },
+            { status: 403 }
+          );
+        }
+        const targetId = payload.id || payload.plumberId;
+        const plumber = await prisma.plumber.findUnique({ where: { id: targetId } });
+        const isOwn = plumber && (plumber.dealerId === session.userId || plumber.dealerId === session.dealerId || plumber.dealerId === cleanDealerId);
+        if (!isOwn) {
+          return NextResponse.json(
+            { success: false, error: 'Forbidden: Dealers cannot delete plumbers of other dealerships.' },
+            { status: 403 }
+          );
+        }
       }
 
       if (action === 'ALLOCATE_PLUMBER_REWARD') {
@@ -458,6 +579,12 @@ export async function POST(req: Request) {
       }
 
       if (action === 'UPDATE_DEALER') {
+        if (payload.creditLimit !== undefined || payload.outstandingBalance !== undefined || payload.tier !== undefined) {
+          return NextResponse.json(
+            { success: false, error: 'Forbidden: Non-administrators cannot modify financial limits or tiers.' },
+            { status: 403 }
+          );
+        }
         if (session.role === 'DEALER') {
           const isOwn = payload.id === session.userId || payload.id === session.dealerId || payload.id === cleanDealerId;
           if (!isOwn) {
@@ -466,17 +593,10 @@ export async function POST(req: Request) {
               { status: 403 }
             );
           }
-          // Protect financial attributes from tampering
-          delete payload.creditLimit;
-          delete payload.outstandingBalance;
-          delete payload.tier;
           delete payload.totalPurchases;
           delete payload.availableRewards;
           delete payload.pendingPlumberRewards;
           delete payload.assignedRepId;
-        } else if (session.role === 'EMPLOYEE') {
-          delete payload.creditLimit;
-          delete payload.tier;
         }
       }
     }
@@ -549,6 +669,20 @@ export async function POST(req: Request) {
         });
         await recordAudit(session, 'UPDATE_DEALER', 'DEALER', updated.id, `Updated dealership ${updated.name} (${updated.code})`);
         return NextResponse.json({ success: true, dealer: updated });
+      }
+
+      case 'DELETE_DEALER': {
+        const dealerId = payload.id || payload.dealerId;
+        if (!dealerId) {
+          return NextResponse.json({ success: false, error: 'Dealer ID is required.' }, { status: 400 });
+        }
+        const existing = await prisma.dealer.findUnique({ where: { id: dealerId } });
+        if (!existing) {
+          return NextResponse.json({ success: false, error: 'Dealer not found.' }, { status: 404 });
+        }
+        await prisma.dealer.delete({ where: { id: dealerId } });
+        await recordAudit(session, 'DELETE_DEALER', 'DEALER', dealerId, `Deleted dealership ${existing.name} (${existing.code})`);
+        return NextResponse.json({ success: true, deletedId: dealerId });
       }
 
       case 'UPDATE_EMPLOYEE': {
@@ -628,6 +762,20 @@ export async function POST(req: Request) {
           data
         });
         return NextResponse.json({ success: true, plumber: updated });
+      }
+
+      case 'DELETE_PLUMBER': {
+        const targetId = payload.id || payload.plumberId;
+        if (!targetId) {
+          return NextResponse.json({ success: false, error: 'Plumber ID is required.' }, { status: 400 });
+        }
+        const existing = await prisma.plumber.findUnique({ where: { id: targetId } });
+        if (!existing) {
+          return NextResponse.json({ success: false, error: 'Plumber not found.' }, { status: 404 });
+        }
+        await prisma.plumber.delete({ where: { id: targetId } });
+        await recordAudit(session, 'DELETE_PLUMBER', 'PLUMBER', targetId, `Deleted plumber ${existing.name}`);
+        return NextResponse.json({ success: true, deletedId: targetId });
       }
 
       case 'CREATE_PLUMBER': {
@@ -728,6 +876,20 @@ export async function POST(req: Request) {
 
       case 'CREATE_ORDER': {
         const { items, ...orderData } = payload;
+        if (!items || !Array.isArray(items) || items.length === 0) {
+          return NextResponse.json({ success: false, error: 'Order must contain at least one item.' }, { status: 400 });
+        }
+        for (const it of items) {
+          if (typeof it.quantity !== 'number' || it.quantity <= 0 || !Number.isInteger(it.quantity)) {
+            return NextResponse.json({ success: false, error: 'Item quantity must be a positive integer.' }, { status: 400 });
+          }
+          if (typeof it.unitPrice !== 'number' || it.unitPrice < 0) {
+            return NextResponse.json({ success: false, error: 'Item unit price cannot be negative.' }, { status: 400 });
+          }
+        }
+        if (typeof orderData.totalAmount === 'number' && orderData.totalAmount < 0) {
+          return NextResponse.json({ success: false, error: 'Total amount cannot be negative.' }, { status: 400 });
+        }
         const created = await prisma.order.create({
           data: {
             ...orderData,
@@ -754,6 +916,13 @@ export async function POST(req: Request) {
 
       case 'APPROVE_ORDER': {
         const { orderId, adminNotes, invoiceNumber, approvedAt, confirmedAt, dealerId, rewardDealerShare, subtotal } = payload;
+        const existingOrder = await prisma.order.findUnique({ where: { id: orderId } });
+        if (!existingOrder) {
+          return NextResponse.json({ success: false, error: 'Order not found.' }, { status: 404 });
+        }
+        if (existingOrder.status === 'CONFIRMED' || existingOrder.status === 'DELIVERED') {
+          return NextResponse.json({ success: false, error: 'Conflict: Order is already approved.' }, { status: 409 });
+        }
         const updatedOrder = await prisma.order.update({
           where: { id: orderId },
           data: {
@@ -1092,11 +1261,19 @@ export async function POST(req: Request) {
 
       case 'ALLOCATE_PLUMBER_REWARD': {
         const { dealerId, plumberId, points, source, voucher } = payload;
+        if (!points || typeof points !== 'number' || points <= 0 || !Number.isFinite(points)) {
+          return NextResponse.json({ success: false, error: 'Invalid reward points: must be a positive number.' }, { status: 400 });
+        }
         let dealer = await prisma.dealer.findFirst({
           where: { OR: [{ id: dealerId }, { code: dealerId }] }
         });
         if (!dealer) {
           dealer = await prisma.dealer.findFirst();
+        }
+        if (dealer && source === 'DEALER_ACCOUNT') {
+          if (dealer.availableRewards < points) {
+            return NextResponse.json({ success: false, error: 'Insufficient dealer reward balance.' }, { status: 400 });
+          }
         }
         let plumber = await prisma.plumber.findUnique({ where: { id: plumberId } });
         if (!plumber) {
@@ -1229,57 +1406,65 @@ export async function POST(req: Request) {
 
       case 'DEALER_REDEEM_REWARD': {
         const { dealerId, points, voucherNumber, voucher } = payload;
+        if (!points || typeof points !== 'number' || points <= 0 || !Number.isFinite(points)) {
+          return NextResponse.json({ success: false, error: 'Invalid reward points: must be a positive number.' }, { status: 400 });
+        }
         const dealer = await prisma.dealer.findFirst({
           where: { OR: [{ id: dealerId }, { code: dealerId }] }
         });
-        if (dealer) {
-          const newBalance = Math.max(0, Number((dealer.availableRewards - points).toFixed(2)));
-          await prisma.dealer.update({
-            where: { id: dealer.id },
-            data: { availableRewards: newBalance }
-          });
-          await prisma.rewardTransaction.create({
-            data: {
-              id: `rew-${Date.now()}`,
-              dealerId: dealer.id,
-              type: 'DEALER_REDEEM_VOUCHER',
-              amount: -points,
-              balanceAfter: newBalance,
-              description: `Redeemed Voucher ${voucherNumber || 'D-001'} for Credit Note Settlement`,
-              createdAt: new Date()
-            }
-          });
-
-          const v = voucher;
-          const vNum = v?.voucherNumber || voucherNumber || 'D-001';
-          await prisma.rewardVoucher.upsert({
-            where: { voucherNumber: vNum },
-            update: {
-              status: v?.status || 'ISSUED',
-              points: Number(points),
-              amount: Number(points),
-              dealerId: dealer.id,
-              dealerName: dealer.name,
-              dealerCode: dealer.code,
-              contactNumber: v?.contactNumber || '+91 94378 60479',
-              instructions: v?.instructions || null
-            },
-            create: {
-              id: v?.id || `vouch-d-${Date.now()}`,
-              voucherNumber: vNum,
-              type: 'DEALER',
-              dealerId: dealer.id,
-              dealerName: dealer.name,
-              dealerCode: dealer.code,
-              points: Number(points),
-              amount: Number(points),
-              status: v?.status || 'ISSUED',
-              dateRedeemed: v?.dateRedeemed || new Date().toISOString().split('T')[0],
-              contactNumber: v?.contactNumber || '+91 94378 60479',
-              instructions: v?.instructions || `Present this voucher to your FILTEC Area Sales Executive or contact Head Office (+91 94378 60479) to settle as Credit Note.`
-            }
-          }).catch((err) => console.warn('Failed to upsert dealer reward voucher in DB:', err));
+        if (!dealer) {
+          return NextResponse.json({ success: false, error: 'Dealer not found.' }, { status: 404 });
         }
+        if (dealer.availableRewards < points) {
+          return NextResponse.json({ success: false, error: 'Insufficient reward balance to redeem.' }, { status: 400 });
+        }
+        const newBalance = Math.max(0, Number((dealer.availableRewards - points).toFixed(2)));
+        await prisma.dealer.update({
+          where: { id: dealer.id },
+          data: { availableRewards: newBalance }
+        });
+        await prisma.rewardTransaction.create({
+          data: {
+            id: `rew-${Date.now()}`,
+            dealerId: dealer.id,
+            type: 'DEALER_REDEEM_VOUCHER',
+            amount: -points,
+            balanceAfter: newBalance,
+            description: `Redeemed Voucher ${voucherNumber || 'D-001'} for Credit Note Settlement`,
+            createdAt: new Date()
+          }
+        });
+
+        const v = voucher;
+        const vNum = v?.voucherNumber || voucherNumber || 'D-001';
+        await prisma.rewardVoucher.upsert({
+          where: { voucherNumber: vNum },
+          update: {
+            status: v?.status || 'ISSUED',
+            points: Number(points),
+            amount: Number(points),
+            dealerId: dealer.id,
+            dealerName: dealer.name,
+            dealerCode: dealer.code,
+            contactNumber: v?.contactNumber || '+91 94378 60479',
+            instructions: v?.instructions || null
+          },
+          create: {
+            id: v?.id || `vouch-d-${Date.now()}`,
+            voucherNumber: vNum,
+            type: 'DEALER',
+            dealerId: dealer.id,
+            dealerName: dealer.name,
+            dealerCode: dealer.code,
+            points: Number(points),
+            amount: Number(points),
+            status: v?.status || 'ISSUED',
+            dateRedeemed: v?.dateRedeemed || new Date().toISOString().split('T')[0],
+            contactNumber: v?.contactNumber || '+91 94378 60479',
+            instructions: v?.instructions || `Present this voucher to your FILTEC Area Sales Executive or contact Head Office (+91 94378 60479) to settle as Credit Note.`
+          }
+        }).catch((err) => console.warn('Failed to upsert dealer reward voucher in DB:', err));
+
         return NextResponse.json({ success: true });
       }
 
@@ -1297,20 +1482,25 @@ export async function POST(req: Request) {
           }
         });
 
-        let updatedVoucher;
-        if (existing) {
-          updatedVoucher = await prisma.rewardVoucher.update({
-            where: { id: existing.id },
-            data: {
-              status: 'SETTLED',
-              paymentMode: paymentMode || 'CREDIT_NOTE',
-              paymentReference: paymentReference || creditNoteNumber || null,
-              creditNoteNumber: creditNoteNumber || (paymentMode === 'CREDIT_NOTE' ? paymentReference : null),
-              settledAt,
-              settledBy: settledBy || 'Admin'
-            }
-          });
+        if (!existing) {
+          return NextResponse.json({ success: false, error: 'Voucher not found.' }, { status: 404 });
         }
+
+        if (existing.status === 'SETTLED') {
+          return NextResponse.json({ success: false, error: 'Conflict: Voucher has already been settled.' }, { status: 409 });
+        }
+
+        const updatedVoucher = await prisma.rewardVoucher.update({
+          where: { id: existing.id },
+          data: {
+            status: 'SETTLED',
+            paymentMode: paymentMode || 'CREDIT_NOTE',
+            paymentReference: paymentReference || creditNoteNumber || null,
+            creditNoteNumber: creditNoteNumber || (paymentMode === 'CREDIT_NOTE' ? paymentReference : null),
+            settledAt,
+            settledBy: settledBy || 'Admin'
+          }
+        });
 
         const desc = `Settled ${existing?.type || 'Reward'} Voucher ${existing?.voucherNumber || voucherNumber} (₹${existing?.amount || payload.amount}) via ${paymentMode || 'Credit Note'} [Ref: ${paymentReference || creditNoteNumber || 'N/A'}] by ${settledBy || 'Admin'}`;
 
@@ -1328,19 +1518,7 @@ export async function POST(req: Request) {
           }
         }).catch((err) => console.warn('Settlement reward transaction log error:', err));
 
-        await prisma.auditLog.create({
-          data: {
-            id: `aud-${Date.now()}`,
-            userId: 'admin',
-            userName: settledBy || 'Admin',
-            role: 'ADMIN',
-            action: 'VOUCHER_SETTLED',
-            entityType: 'REWARD',
-            entityId: existing?.id || voucherId,
-            details: desc,
-            timestamp: settledAt
-          }
-        }).catch((err) => console.warn('Settlement audit log error:', err));
+        await recordAudit(session, 'SETTLE_VOUCHER', 'REWARD_VOUCHER', existing.id, desc);
 
         return NextResponse.json({ success: true, voucher: updatedVoucher });
       }

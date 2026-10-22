@@ -95,7 +95,7 @@ export default function EmployeeHomePage() {
 
   return (
     <div className="min-h-screen bg-[#F8F9FA] pb-mobile-nav">
-      <TopContextBar title="Today's Field Operations" subtitle="Field Operations & Orders" />
+      <TopContextBar title="Today's Field Operations" />
       <DesktopSubNav />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-5 space-y-6">

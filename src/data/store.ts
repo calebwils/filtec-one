@@ -240,9 +240,11 @@ export const store = {
               ? ALL_ADMIN_PAGES
               : ALL_EMPLOYEE_PAGES;
 
-          const baseSalary = typeof e.baseSalary === 'number'
+          const baseSalary = e.baseSalary === null
+            ? null
+            : (typeof e.baseSalary === 'number'
             ? e.baseSalary
-            : (Number(e.baseSalary) || 0);
+            : (Number(e.baseSalary) || 0));
 
           const cleanLastLocation = (e.lastLocation && e.lastLocation.includes('Benin')) ? undefined : (e.lastLocation || undefined);
           const cleanLastCheckIn = (e.lastCheckInTime && e.lastCheckInTime.includes('02:28 PM')) ? undefined : (e.lastCheckInTime || undefined);
@@ -429,7 +431,7 @@ export const store = {
                         checkInStatus: emp.checkInStatus || 'CHECKED_OUT',
                         lastCheckInTime: emp.lastCheckInTime || null,
                         lastLocation: emp.lastLocation || null,
-                        baseSalary: typeof emp.baseSalary === 'number' ? emp.baseSalary : (Number(emp.baseSalary) || 0)
+                        baseSalary: emp.baseSalary === null ? null : (typeof emp.baseSalary === 'number' ? emp.baseSalary : (Number(emp.baseSalary) || 0))
                       };
                     })
                 : globalState.employees.filter((emp) => emp.name !== 'Manoj Kumar Panda' && emp.code !== 'FPPL/OD-007'),

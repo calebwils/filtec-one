@@ -15,20 +15,23 @@ export function getAuthSecret(): string {
     // Development/test fallback with clear identifier
     return 'filtec_local_dev_ephemeral_auth_secret_do_not_use_in_prod_x92!';
   }
-  if (secret.length < 32 && process.env.NODE_ENV === 'production') {
+  
+  // Validate minimum key material of 32 bytes (256 bits) in production
+  const byteLength = Buffer.byteLength(secret, 'utf-8');
+  if (byteLength < 32 && process.env.NODE_ENV === 'production') {
     throw new Error(
-      'CRITICAL SECURITY CONFIGURATION ERROR: AUTH_SECRET must be at least 32 characters (256-bit entropy) in production.'
+      'CRITICAL SECURITY CONFIGURATION ERROR: AUTH_SECRET must contain at least 32 bytes of raw key material (e.g. 64 hex characters or 44 base64 characters) in production.'
     );
   }
   return secret;
 }
 
 /**
- * Hash a password using PBKDF2 with 100,000 iterations and SHA-512.
+ * Hash a password using PBKDF2 with 210,000 iterations (OWASP recommendation) and SHA-512.
  */
 export function hashPassword(password: string): string {
   const salt = crypto.randomBytes(16).toString('hex');
-  const iterations = 100000;
+  const iterations = 210000;
   const hash = crypto.pbkdf2Sync(password, salt, iterations, 64, 'sha512').toString('hex');
   return `pbkdf2$${iterations}$${salt}$${hash}`;
 }
@@ -67,7 +70,7 @@ export function verifyPassword(
     }
 
     const valid = crypto.timingSafeEqual(computedBuf, expectedBuf);
-    return { valid, needsUpgrade: false };
+    return { valid, needsUpgrade: valid && iterations < 210000 };
   }
 
   // Legacy plaintext match

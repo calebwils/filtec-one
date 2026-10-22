@@ -84,9 +84,7 @@ export function EditDealerModal({
         address: formData.address.trim(),
         pincode: formData.pincode.trim(),
         gstin: formData.gstin.trim().toUpperCase(),
-        creditLimit: 0,
-        outstandingBalance: 0,
-        tier: formData.tier,
+        tier: currentUser.role === 'ADMIN' ? formData.tier : dealer.tier,
         assignedRepId: currentUser.role === 'ADMIN' ? (formData.assignedRepId || undefined) : dealer.assignedRepId
       });
 

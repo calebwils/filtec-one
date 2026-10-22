@@ -282,7 +282,7 @@ Generated via FILTEC ONE Operational Platform.`;
 
   return (
     <div className="min-h-screen bg-[#F8F9FA] pb-mobile-nav">
-      <TopContextBar title="Field Attendance" subtitle="GPS & Photo Verification" />
+      <TopContextBar title="Field Attendance" />
       <DesktopSubNav />
 
       <main className="max-w-4xl mx-auto px-4 sm:px-6 py-5 space-y-5">

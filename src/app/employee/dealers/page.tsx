@@ -26,7 +26,7 @@ export default function EmployeeDealersPage() {
 
   return (
     <div className="min-h-screen bg-[#F8F9FA] pb-mobile-nav">
-      <TopContextBar title="Dealer Directory" subtitle="Territory Network & Quick Order" />
+      <TopContextBar title="Dealer Directory" />
       <DesktopSubNav />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-5 space-y-4">

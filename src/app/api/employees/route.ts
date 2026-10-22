@@ -36,7 +36,7 @@ export async function GET(req: Request) {
 
       return {
         ...safeEmployee,
-        baseSalary: canViewSalary ? safeEmployee.baseSalary : 0,
+        baseSalary: canViewSalary ? safeEmployee.baseSalary : null,
         assignedDealerIds: safeEmployee.assignedDealerIds ? JSON.parse(safeEmployee.assignedDealerIds) : [],
         allowedPages: safeEmployee.allowedPages ? JSON.parse(safeEmployee.allowedPages) : []
       };

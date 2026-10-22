@@ -11,12 +11,12 @@ import {
 describe('Post-Remediation Security Verification Suite', () => {
 
   describe('1. Cryptographic Password Hashing & Legacy Migration (VULN-01)', () => {
-    it('generates salted PBKDF2 hashes with 100k iterations and SHA-512', () => {
+    it('generates salted PBKDF2 hashes with 210k iterations and SHA-512', () => {
       const password = 'TestSecretPassword#2026';
       const hash1 = hashPassword(password);
       const hash2 = hashPassword(password);
 
-      assert.ok(hash1.startsWith('pbkdf2$100000$'), 'Hash must have PBKDF2 scheme with 100000 iterations');
+      assert.ok(hash1.startsWith('pbkdf2$210000$'), 'Hash must have PBKDF2 scheme with 210000 iterations');
       assert.notEqual(hash1, hash2, 'Salts must be cryptographically random and unique per invocation');
 
       const verification = verifyPassword(password, hash1);
@@ -122,7 +122,7 @@ describe('Post-Remediation Security Verification Suite', () => {
   });
 
   describe('4. Salary Masking & Cross-Entity Privacy Protection (VULN-06)', () => {
-    it('masks employee baseSalary to 0 for unauthorized callers', () => {
+    it('masks employee baseSalary to null for unauthorized callers', () => {
       const targetEmployee = { id: 'emp-samir', code: 'FPPL/OD-001', baseSalary: 30000 };
 
       // Case 1: Caller is another employee
@@ -135,8 +135,8 @@ describe('Post-Remediation Security Verification Suite', () => {
         otherEmployeeSession.role === 'ADMIN' ||
         otherEmployeeSession.userId === targetEmployee.id ||
         otherEmployeeSession.employeeCode === targetEmployee.code;
-      const salaryViewedByOther = canOtherView ? targetEmployee.baseSalary : 0;
-      assert.equal(salaryViewedByOther, 0, 'Other employee must NOT see peer salary');
+      const salaryViewedByOther = canOtherView ? targetEmployee.baseSalary : null;
+      assert.equal(salaryViewedByOther, null, 'Other employee must receive null for peer salary');
 
       // Case 2: Caller is Samir (Self)
       const selfSession: { userId: string; role: string; employeeCode: string } = {
@@ -148,13 +148,13 @@ describe('Post-Remediation Security Verification Suite', () => {
         selfSession.role === 'ADMIN' ||
         selfSession.userId === targetEmployee.id ||
         selfSession.employeeCode === targetEmployee.code;
-      const salaryViewedBySelf = canSelfView ? targetEmployee.baseSalary : 0;
+      const salaryViewedBySelf = canSelfView ? targetEmployee.baseSalary : null;
       assert.equal(salaryViewedBySelf, 30000, 'Employee must be able to view their own salary');
 
       // Case 3: Caller is Admin
       const adminSession = { userId: 'admin-1', role: 'ADMIN' as const };
       const canAdminView = adminSession.role === 'ADMIN';
-      const salaryViewedByAdmin = canAdminView ? targetEmployee.baseSalary : 0;
+      const salaryViewedByAdmin = canAdminView ? targetEmployee.baseSalary : null;
       assert.equal(salaryViewedByAdmin, 30000, 'Admin must be able to view employee salary');
     });
   });

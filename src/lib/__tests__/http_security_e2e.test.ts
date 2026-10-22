@@ -75,7 +75,7 @@ describe('Live HTTP Endpoints End-to-End Security Verification', () => {
       const res = await fetch(`${BASE_URL}/api/data`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'CREATE_ORDER', payload: {} })
+        body: JSON.stringify({ action: 'CREATE_ORDER', payload: { dealerId: 'dlr-101' } })
       });
       assert.equal(res.status, 401);
       const json = await res.json();
@@ -127,7 +127,6 @@ describe('Live HTTP Endpoints End-to-End Security Verification', () => {
 
     it('rejects payload-tampered forged role (attempting ADMIN elevation) with 401', async () => {
       const [payload, sig] = dealerAToken.split('.');
-      // Forged payload with role ADMIN
       const forgedPayload = Buffer.from(JSON.stringify({ userId: 'dlr-101', role: 'ADMIN' })).toString('base64url');
       const forgedToken = `${forgedPayload}.${sig}`;
 
@@ -241,7 +240,7 @@ describe('Live HTTP Endpoints End-to-End Security Verification', () => {
             orderNumber: 'ORD-IDOR',
             dealerId: 'dlr-102', // Target Dealer B
             totalAmount: 99999,
-            items: []
+            items: [{ productId: 'p1', quantity: 1, unitPrice: 100 }]
           }
         })
       });
@@ -291,6 +290,45 @@ describe('Live HTTP Endpoints End-to-End Security Verification', () => {
       assert.match(json.error, /own dealership/i);
     });
 
+    it('blocks Dealer A from calling UPDATE_PLUMBER on Dealer B plumber with 403', async () => {
+      const res = await fetch(`${BASE_URL}/api/data`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: `filtec_session=${dealerAToken}`
+        },
+        body: JSON.stringify({
+          action: 'UPDATE_PLUMBER',
+          payload: {
+            id: 'plumb-dealer-b',
+            name: 'Tampered Plumber Name'
+          }
+        })
+      });
+      assert.equal(res.status, 403);
+      const json = await res.json();
+      assert.match(json.error, /other dealerships/i);
+    });
+
+    it('blocks Dealer A from calling DELETE_PLUMBER on Dealer B plumber with 403', async () => {
+      const res = await fetch(`${BASE_URL}/api/data`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: `filtec_session=${dealerAToken}`
+        },
+        body: JSON.stringify({
+          action: 'DELETE_PLUMBER',
+          payload: {
+            id: 'plumb-dealer-b'
+          }
+        })
+      });
+      assert.equal(res.status, 403);
+      const json = await res.json();
+      assert.match(json.error, /other dealerships/i);
+    });
+
     it('blocks Dealer A from allocating rewards from Dealer B account with 403', async () => {
       const res = await fetch(`${BASE_URL}/api/data`, {
         method: 'POST',
@@ -312,7 +350,7 @@ describe('Live HTTP Endpoints End-to-End Security Verification', () => {
       assert.match(json.error, /another dealer/i);
     });
 
-    it('blocks Dealer from registering another dealership (CREATE_DEALER) with 403', async () => {
+    it('blocks Dealer A from calling DEALER_REDEEM_REWARD for Dealer B with 403', async () => {
       const res = await fetch(`${BASE_URL}/api/data`, {
         method: 'POST',
         headers: {
@@ -320,30 +358,76 @@ describe('Live HTTP Endpoints End-to-End Security Verification', () => {
           Cookie: `filtec_session=${dealerAToken}`
         },
         body: JSON.stringify({
-          action: 'CREATE_DEALER',
-          payload: { name: 'Unauthorized Dealership' }
+          action: 'DEALER_REDEEM_REWARD',
+          payload: {
+            dealerId: 'dlr-102',
+            points: 500
+          }
         })
       });
       assert.equal(res.status, 403);
+      const json = await res.json();
+      assert.match(json.error, /another dealer/i);
+    });
+
+    it('blocks non-admin from modifying creditLimit or outstandingBalance on UPDATE_DEALER with 403', async () => {
+      const res = await fetch(`${BASE_URL}/api/data`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: `filtec_session=${dealerAToken}`
+        },
+        body: JSON.stringify({
+          action: 'UPDATE_DEALER',
+          payload: {
+            id: 'dlr-101',
+            creditLimit: 500000
+          }
+        })
+      });
+      assert.equal(res.status, 403);
+      const json = await res.json();
+      assert.match(json.error, /financial limits/i);
+    });
+
+    it('blocks Employee from creating order for unassigned dealer with 403', async () => {
+      const res = await fetch(`${BASE_URL}/api/data`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: `filtec_session=${employeeToken}`
+        },
+        body: JSON.stringify({
+          action: 'CREATE_ORDER',
+          payload: {
+            id: 'ord-unassigned-test',
+            dealerId: 'dlr-unassigned-territory-999',
+            items: [{ productId: 'p1', quantity: 2, unitPrice: 200 }]
+          }
+        })
+      });
+      assert.equal(res.status, 403);
+      const json = await res.json();
+      assert.match(json.error, /assigned territory/i);
     });
   });
 
   // 4. Employee Privacy & Non-Admin Mutations
   describe('4. Employee Privacy & Non-Admin Mutations', () => {
-    it('Employee querying GET /api/data cannot view peer salaries (masked to 0)', async () => {
+    it('Employee querying GET /api/data cannot view peer salaries (masked to null)', async () => {
       const res = await fetch(`${BASE_URL}/api/data`, {
         headers: { Cookie: `filtec_session=${employeeToken}` }
       });
       assert.equal(res.status, 200);
       const json = await res.json();
 
-      // Ensure peer employees have baseSalary === 0
+      // Ensure peer employees have baseSalary === null
       for (const e of json.data.employees) {
         if (e.id !== 'emp-201' && e.code !== 'EMP-001') {
           assert.equal(
             e.baseSalary,
-            0,
-            `Privacy breach: Peer employee ${e.name} baseSalary was not masked!`
+            null,
+            `Privacy breach: Peer employee ${e.name} baseSalary was not masked to null!`
           );
         }
       }
@@ -416,10 +500,12 @@ describe('Live HTTP Endpoints End-to-End Security Verification', () => {
     });
   });
 
-  // 5. Complete 14 Admin-Only Mutations Blocked for Non-Admin
-  describe('5. Complete Enumeration of 14 Admin-Only Actions (All Blocked for Non-Admin with 403)', () => {
+  // 5. Complete 16 Admin-Only Mutations Blocked for Non-Admin
+  describe('5. Complete Enumeration of 16 Admin-Only Actions (All Blocked for Non-Admin with 403)', () => {
     const adminActions = [
       'UPDATE_SETTINGS',
+      'CREATE_DEALER',
+      'DELETE_DEALER',
       'CREATE_EMPLOYEE',
       'DELETE_EMPLOYEE',
       'CREATE_PRODUCT',
@@ -445,7 +531,7 @@ describe('Live HTTP Endpoints End-to-End Security Verification', () => {
           },
           body: JSON.stringify({
             action: act,
-            payload: { id: 'test-id', orderId: 'test-order' }
+            payload: { id: 'test-id', orderId: 'test-order', voucherId: 'test-vouch' }
           })
         });
         assert.equal(
@@ -492,9 +578,9 @@ describe('Live HTTP Endpoints End-to-End Security Verification', () => {
       assert.equal(json.success, false);
     });
 
-    it('verifies getAuthSecret requires 256-bit entropy and guards production', () => {
+    it('verifies getAuthSecret requires >= 32 bytes (256 bits) of raw key material in production', () => {
       const sec = getAuthSecret();
-      assert.ok(sec.length >= 32, 'Secret must be >= 32 characters (256-bit entropy)');
+      assert.ok(Buffer.byteLength(sec, 'utf-8') >= 32, 'Secret must contain at least 32 bytes');
     });
 
     it('verifies passwords stored using salted PBKDF2 never leak plaintext in tokens', () => {
@@ -509,8 +595,8 @@ describe('Live HTTP Endpoints End-to-End Security Verification', () => {
     });
   });
 
-  // 7. Administrative Audit Trail & Data Integrity Verification
-  describe('7. Administrative Audit Trail & Data Integrity Verification', () => {
+  // 7. Administrative Audit Trail & Mutation Capture
+  describe('7. Administrative Audit Trail & Mutation Capture', () => {
     it('captures audit log entry when admin updates settings and isolates audit logs from non-admins', async () => {
       const testAuditKey = `test_setting_${Date.now()}`;
       const mutateRes = await fetch(`${BASE_URL}/api/data`, {
@@ -542,12 +628,365 @@ describe('Live HTTP Endpoints End-to-End Security Verification', () => {
       assert.ok(foundAudit, `Audit log entry for ${testAuditKey} was not found!`);
       assert.equal(foundAudit.role, 'ADMIN');
 
-      // Verify Dealer receives empty auditLogs (cannot inspect or tamper with audit trail)
+      // Verify Dealer receives empty auditLogs (cannot inspect audit trail)
       const dealerGetRes = await fetch(`${BASE_URL}/api/data`, {
         headers: { Cookie: `filtec_session=${dealerAToken}` }
       });
       const dealerData = await dealerGetRes.json();
       assert.deepEqual(dealerData.data.auditLogs, [], 'Audit trail must be completely hidden from dealers');
+    });
+  });
+
+  // 8. Authentication Brute-Force Rate Limiting & Session Cookie Lifecycle
+  describe('8. Authentication Brute-Force Rate Limiting & Session Lifecycle', () => {
+    it('triggers HTTP 429 Too Many Requests when login threshold is exceeded', async () => {
+      const testPhone = '+91 99999 00001';
+      let triggered429 = false;
+
+      for (let i = 0; i < 12; i++) {
+        const res = await fetch(`${BASE_URL}/api/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            phone: testPhone,
+            password: `bad_pass_${i}`
+          })
+        });
+
+        if (res.status === 429) {
+          triggered429 = true;
+          const json = await res.json();
+          assert.match(json.error, /Too many login attempts/i);
+          break;
+        }
+      }
+      assert.equal(triggered429, true, 'Rate limiter must enforce HTTP 429 on brute force');
+    });
+
+    it('enforces HttpOnly, SameSite=lax, and Path=/ attributes on session cookie', async () => {
+      const res = await fetch(`${BASE_URL}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          phone: '+91 94375 05814', // Samir (Admin)
+          password: '05814' // Default last 5 digits
+        })
+      });
+
+      if (res.status === 200) {
+        const setCookie = res.headers.get('set-cookie') || '';
+        assert.match(setCookie, /filtec_session=/i, 'Must set filtec_session cookie');
+        assert.match(setCookie, /HttpOnly/i, 'Must enforce HttpOnly flag');
+        assert.match(setCookie, /SameSite=Lax/i, 'Must enforce SameSite=Lax flag');
+        assert.match(setCookie, /Path=\//i, 'Must enforce Path=/ flag');
+      }
+    });
+
+    it('terminates session and clears cookie via POST /api/auth/logout', async () => {
+      const res = await fetch(`${BASE_URL}/api/auth/logout`, {
+        method: 'POST'
+      });
+      assert.equal(res.status, 200);
+      const setCookie = res.headers.get('set-cookie') || '';
+      assert.match(setCookie, /filtec_session=/i);
+      assert.match(setCookie, /Max-Age=0/i, 'Logout must clear cookie with Max-Age=0');
+    });
+  });
+
+  // 9. Input Validation & Malformed Payload Rejection on POST /api/data
+  describe('9. Input Validation & Malformed Payload Rejection on POST /api/data', () => {
+    it('rejects unsupported action with 400 Bad Request', async () => {
+      const res = await fetch(`${BASE_URL}/api/data`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: `filtec_session=${adminToken}`
+        },
+        body: JSON.stringify({
+          action: 'EXECUTE_UNAUTHORIZED_COMMAND',
+          payload: {}
+        })
+      });
+      assert.equal(res.status, 400);
+      const json = await res.json();
+      assert.match(json.error, /Invalid or unsupported action/i);
+    });
+
+    it('rejects non-object payload with 400 Bad Request', async () => {
+      const res = await fetch(`${BASE_URL}/api/data`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: `filtec_session=${adminToken}`
+        },
+        body: JSON.stringify({
+          action: 'UPDATE_SETTINGS',
+          payload: 'invalid-string-payload'
+        })
+      });
+      assert.equal(res.status, 400);
+      const json = await res.json();
+      assert.match(json.error, /Action payload must be a non-null object/i);
+    });
+
+    it('rejects oversized payload exceeding 2MB with 413 Payload Too Large', async () => {
+      const hugeString = 'A'.repeat(2.5 * 1024 * 1024);
+      const res = await fetch(`${BASE_URL}/api/data`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: `filtec_session=${adminToken}`
+        },
+        body: JSON.stringify({
+          action: 'UPDATE_SETTINGS',
+          payload: { huge: hugeString }
+        })
+      });
+      assert.equal(res.status, 413);
+      const json = await res.json();
+      assert.match(json.error, /Payload Too Large/i);
+    });
+  });
+
+  // 10. Financial Logic & State Constraints
+  describe('10. Financial Logic & State Constraints', () => {
+    it('rejects order with empty items array with 400 Bad Request', async () => {
+      const res = await fetch(`${BASE_URL}/api/data`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: `filtec_session=${adminToken}`
+        },
+        body: JSON.stringify({
+          action: 'CREATE_ORDER',
+          payload: {
+            dealerId: 'dlr-001',
+            items: []
+          }
+        })
+      });
+      assert.equal(res.status, 400);
+      const json = await res.json();
+      assert.match(json.error, /at least one item/i);
+    });
+
+    it('rejects order with negative item quantity with 400 Bad Request', async () => {
+      const res = await fetch(`${BASE_URL}/api/data`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: `filtec_session=${adminToken}`
+        },
+        body: JSON.stringify({
+          action: 'CREATE_ORDER',
+          payload: {
+            dealerId: 'dlr-001',
+            items: [{ productId: 'p1', quantity: -5, unitPrice: 100 }]
+          }
+        })
+      });
+      assert.equal(res.status, 400);
+      const json = await res.json();
+      assert.match(json.error, /quantity must be a positive integer/i);
+    });
+
+    it('rejects order with negative unit price with 400 Bad Request', async () => {
+      const res = await fetch(`${BASE_URL}/api/data`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: `filtec_session=${adminToken}`
+        },
+        body: JSON.stringify({
+          action: 'CREATE_ORDER',
+          payload: {
+            dealerId: 'dlr-001',
+            items: [{ productId: 'p1', quantity: 1, unitPrice: -50 }]
+          }
+        })
+      });
+      assert.equal(res.status, 400);
+      const json = await res.json();
+      assert.match(json.error, /unit price cannot be negative/i);
+    });
+
+    it('rejects negative or zero points in DEALER_REDEEM_REWARD with 400', async () => {
+      const res = await fetch(`${BASE_URL}/api/data`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: `filtec_session=${dealerAToken}`
+        },
+        body: JSON.stringify({
+          action: 'DEALER_REDEEM_REWARD',
+          payload: {
+            dealerId: 'dlr-101',
+            points: -100
+          }
+        })
+      });
+      assert.equal(res.status, 400);
+      const json = await res.json();
+      assert.match(json.error, /must be a positive number/i);
+    });
+
+    it('rejects over-redeeming points exceeding dealer balance with 400', async () => {
+      const res = await fetch(`${BASE_URL}/api/data`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: `filtec_session=${adminToken}`
+        },
+        body: JSON.stringify({
+          action: 'DEALER_REDEEM_REWARD',
+          payload: {
+            dealerId: 'dlr-001',
+            points: 99999999 // Exceeds availableRewards (which is 0)
+          }
+        })
+      });
+      assert.equal(res.status, 400);
+      const json = await res.json();
+      assert.match(json.error, /Insufficient reward balance/i);
+    });
+
+    it('rejects double-approving an already confirmed order with 409 Conflict', async () => {
+      // 1. Create order
+      const createRes = await fetch(`${BASE_URL}/api/data`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: `filtec_session=${adminToken}`
+        },
+        body: JSON.stringify({
+          action: 'CREATE_ORDER',
+          payload: {
+            id: `ord-double-${Date.now()}`,
+            orderNumber: `ORD-DBL-${Date.now()}`,
+            employeeId: 'emp-admin-samir',
+            employeeName: 'Samir',
+            dealerId: 'dlr-001',
+            dealerName: 'Ashirbad Sanitary',
+            dealerPhone: '+91 8847879318',
+            dealerCity: 'Kendrapara',
+            subtotal: 1271.19,
+            gstAmount: 228.81,
+            status: 'PENDING',
+            totalAmount: 1500,
+            items: [{
+              id: `it-${Date.now()}`,
+              productId: 'F-1',
+              productCode: 'F-1',
+              productName: 'uPVC Pipe',
+              variantId: 'v1',
+              variantDescription: '1 inch',
+              quantity: 1,
+              unitPrice: 1500,
+              packingQty: 1,
+              packingUnit: 'Pcs',
+              totalAmount: 1500
+            }]
+          }
+        })
+      });
+      assert.equal(createRes.status, 200, `Order creation failed: ${createRes.status}`);
+      const orderJson = await createRes.json();
+      const orderId = orderJson.order.id;
+
+      // 2. Approve first time -> 200
+      const approveRes1 = await fetch(`${BASE_URL}/api/data`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: `filtec_session=${adminToken}`
+        },
+        body: JSON.stringify({
+          action: 'APPROVE_ORDER',
+          payload: { orderId, dealerId: 'dlr-001', subtotal: 1500 }
+        })
+      });
+      assert.equal(approveRes1.status, 200);
+
+      // 3. Approve second time -> 409 Conflict
+      const approveRes2 = await fetch(`${BASE_URL}/api/data`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: `filtec_session=${adminToken}`
+        },
+        body: JSON.stringify({
+          action: 'APPROVE_ORDER',
+          payload: { orderId, dealerId: 'dlr-001', subtotal: 1500 }
+        })
+      });
+      assert.equal(approveRes2.status, 409);
+      const dblJson = await approveRes2.json();
+      assert.match(dblJson.error, /already approved/i);
+    });
+
+    it('rejects double-settling an already settled voucher with 409 Conflict', async () => {
+      const testVoucherNum = `VOUCH-DBL-${Date.now()}`;
+      // Settle first time
+      const settleRes1 = await fetch(`${BASE_URL}/api/data`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: `filtec_session=${adminToken}`
+        },
+        body: JSON.stringify({
+          action: 'SETTLE_VOUCHER',
+          payload: {
+            voucherId: `v-${Date.now()}`,
+            voucherNumber: testVoucherNum,
+            paymentMode: 'BANK_TRANSFER',
+            paymentReference: 'REF123456'
+          }
+        })
+      });
+
+      // If voucher was newly settled, second attempt returns 409
+      if (settleRes1.status === 200) {
+        const settleRes2 = await fetch(`${BASE_URL}/api/data`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Cookie: `filtec_session=${adminToken}`
+          },
+          body: JSON.stringify({
+            action: 'SETTLE_VOUCHER',
+            payload: {
+              voucherNumber: testVoucherNum,
+              paymentMode: 'BANK_TRANSFER'
+            }
+          })
+        });
+        assert.equal(settleRes2.status, 409);
+        const json = await settleRes2.json();
+        assert.match(json.error, /already been settled/i);
+      }
+    });
+  });
+
+  // 11. Security Response Headers Enforcement
+  describe('11. Security Response Headers Enforcement', () => {
+    it('returns strict security headers on all responses', async () => {
+      const res = await fetch(`${BASE_URL}/api/health`);
+      assert.equal(res.status, 200);
+
+      const xContentType = res.headers.get('x-content-type-options');
+      assert.equal(xContentType, 'nosniff', 'Must include X-Content-Type-Options: nosniff');
+
+      const xFrame = res.headers.get('x-frame-options');
+      assert.equal(xFrame, 'SAMEORIGIN', 'Must include X-Frame-Options: SAMEORIGIN');
+
+      const referrerPolicy = res.headers.get('referrer-policy');
+      assert.equal(referrerPolicy, 'origin-when-cross-origin', 'Must include Referrer-Policy');
+
+      const hsts = res.headers.get('strict-transport-security');
+      assert.ok(hsts?.includes('max-age'), 'Must include Strict-Transport-Security');
+
+      const csp = res.headers.get('content-security-policy');
+      assert.ok(csp?.includes("default-src 'self'"), 'Must include Content-Security-Policy');
     });
   });
 });

@@ -126,7 +126,7 @@ export default function NewOrderPage() {
 
   return (
     <div className="min-h-screen bg-[#F8F9FA] pb-mobile-nav">
-      <TopContextBar title="Create Field Order" subtitle="Employee Flow" />
+      <TopContextBar title="Create Field Order" />
       <DesktopSubNav />
 
       <main className="max-w-4xl mx-auto px-4 sm:px-6 py-5 space-y-5">
