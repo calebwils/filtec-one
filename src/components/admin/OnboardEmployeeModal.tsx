@@ -362,41 +362,7 @@ export function OnboardEmployeeModal({
               </div>
             </div>
 
-            {/* QUICK PRESETS BAR */}
-            <div className="flex items-center flex-wrap gap-2 p-3 bg-neutral-50 rounded-xl border border-neutral-200">
-              <span className="text-[11px] font-semibold text-neutral-700 flex items-center gap-1">
-                <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                Presets:
-              </span>
-              <button
-                type="button"
-                onClick={() => applyPreset('STANDARD_FIELD')}
-                className="text-[11px] font-medium px-2 py-1 rounded bg-white hover:bg-blue-50 hover:text-blue-700 border border-neutral-200 transition-colors"
-              >
-                Standard Field Rep (5 Field)
-              </button>
-              <button
-                type="button"
-                onClick={() => applyPreset('SUPERVISOR')}
-                className="text-[11px] font-medium px-2 py-1 rounded bg-white hover:bg-rose-50 hover:text-rose-700 border border-neutral-200 transition-colors"
-              >
-                Supervisor (+ Admin Orders & Dealers)
-              </button>
-              <button
-                type="button"
-                onClick={() => applyPreset('PLANT_HEAD')}
-                className="text-[11px] font-medium px-2 py-1 rounded bg-white hover:bg-rose-50 hover:text-rose-700 border border-neutral-200 transition-colors"
-              >
-                Plant Head (+ Admin Catalogue & Attendance)
-              </button>
-              <button
-                type="button"
-                onClick={() => applyPreset('FULL_ADMIN')}
-                className="text-[11px] font-medium px-2 py-1 rounded bg-white hover:bg-rose-50 hover:text-rose-700 border border-neutral-200 transition-colors"
-              >
-                Full Admin (All 15 Pages)
-              </button>
-            </div>
+
 
             {/* ADMIN MODULES SELECTOR */}
             <div className="p-4 rounded-xl border border-rose-200 bg-rose-50/20 space-y-3">
