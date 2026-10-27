@@ -11,6 +11,7 @@ echo "📥 Pulling latest code and rebuilding on VPS..."
 ssh -o StrictHostKeyChecking=no root@200.234.33.86 'bash -s' << 'EOF'
   set -e
   cd /var/www/filtec-one
+  git checkout -- package-lock.json || true
   git pull origin main
   npm install --production=false
   npx prisma generate
