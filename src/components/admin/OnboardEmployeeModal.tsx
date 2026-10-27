@@ -82,6 +82,7 @@ export function OnboardEmployeeModal({
     email: '',
     code: defaultEmpCode,
     designation: 'Sr. Marketing Executive',
+    customDesignation: '',
     territory: '(-)',
     customTerritory: '',
     targetMonthly: 0,
@@ -98,6 +99,11 @@ export function OnboardEmployeeModal({
 
   const territoryToUse =
     formData.territory === 'CUSTOM' ? formData.customTerritory || '(-)' : formData.territory || '(-)';
+
+  const designationToUse =
+    formData.designation === 'CUSTOM'
+      ? formData.customDesignation.trim() || 'Field Staff'
+      : formData.designation || (systemRole === 'ADMIN' ? 'Operations Admin' : 'Field Staff');
 
   const grantedAdminPages = ADMIN_PAGE_OPTIONS.filter((p) => formData.allowedPages.includes(p.path));
   const grantedFieldPages = EMPLOYEE_PAGE_OPTIONS.filter((p) => formData.allowedPages.includes(p.path));
@@ -205,7 +211,7 @@ export function OnboardEmployeeModal({
         phone: formData.phone.trim(),
         email: formData.email.trim() || '(-)',
         code: formData.code.trim() || (systemRole === 'ADMIN' ? defaultAdminCode : defaultEmpCode),
-        designation: formData.designation || (systemRole === 'ADMIN' ? 'Operations Admin' : 'Field Staff'),
+        designation: designationToUse,
         territory: territoryToUse,
         targetMonthly: Number(formData.targetMonthly) || 0,
         baseSalary: Number(formData.baseSalary) || 0,
@@ -548,7 +554,19 @@ export function OnboardEmployeeModal({
                       {d}
                     </option>
                   ))}
+                  <option value="CUSTOM">+ Type New Position / Custom Role...</option>
                 </select>
+                {formData.designation === 'CUSTOM' && (
+                  <input
+                    type="text"
+                    required
+                    placeholder="Type new position title..."
+                    value={formData.customDesignation}
+                    onChange={(e) => setFormData({ ...formData, customDesignation: e.target.value })}
+                    className="w-full mt-2 text-xs p-2.5 rounded-lg border border-neutral-300 focus:outline-none focus:ring-1 focus:ring-[#DC2626]"
+                    autoFocus
+                  />
+                )}
               </div>
 
               <div>
