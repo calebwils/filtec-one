@@ -183,9 +183,6 @@ export function AddProductModal({
               <h3 className="font-bold text-sm text-[#111827]">
                 Add New Catalogue Product
               </h3>
-              <p className="text-[11px] text-[#6B7280]">
-                Configure product SKU, standard specifications, MRP price variants, and warehouse stock
-              </p>
             </div>
           </div>
           <button

@@ -52,7 +52,7 @@ export function DesktopSubNav() {
       count: pendingApprovalsCount
     },
     { path: '/admin/attendance', label: 'Attendance & Tracking', icon: Radio },
-    { path: '/admin/catalogue', label: 'Catalogue & Stock', icon: BookOpen },
+    { path: '/admin/catalogue', label: 'Catalogue', icon: BookOpen },
     { path: '/admin/dealers', label: 'Dealers', icon: Building2 },
     { path: '/admin/employees', label: 'Staff', icon: Users },
     {

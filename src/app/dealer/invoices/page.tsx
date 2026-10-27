@@ -23,9 +23,6 @@ export default function DealerInvoicesPage() {
       <main className="max-w-5xl mx-auto px-4 sm:px-6 py-5 space-y-4">
         <div>
           <h2 className="text-lg font-bold text-[#111827]">Financial Invoices</h2>
-          <p className="text-xs text-[#6B7280]">
-            Official tax invoices issued by FILTEC Polyplast accounting & billing authority
-          </p>
         </div>
 
         <div className="bg-white border border-[#E5E7EB] rounded-xl overflow-hidden shadow-2xs">

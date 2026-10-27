@@ -851,77 +851,124 @@ describe('Live HTTP Endpoints End-to-End Security Verification', () => {
     });
 
     it('rejects double-approving an already confirmed order with 409 Conflict', async () => {
-      // 1. Create order
-      const createRes = await fetch(`${BASE_URL}/api/data`, {
+      const testDlrId = `dlr-test-${Date.now()}`;
+      await fetch(`${BASE_URL}/api/data`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Cookie: `filtec_session=${adminToken}`
         },
         body: JSON.stringify({
-          action: 'CREATE_ORDER',
+          action: 'CREATE_DEALER',
           payload: {
-            id: `ord-double-${Date.now()}`,
-            orderNumber: `ORD-DBL-${Date.now()}`,
-            employeeId: 'emp-admin-samir',
-            employeeName: 'Samir',
-            dealerId: 'dlr-001',
-            dealerName: 'Ashirbad Sanitary',
-            dealerPhone: '+91 8847879318',
-            dealerCity: 'Kendrapara',
-            subtotal: 1271.19,
-            gstAmount: 228.81,
-            status: 'PENDING',
-            totalAmount: 1500,
-            items: [{
-              id: `it-${Date.now()}`,
-              productId: 'F-1',
-              productCode: 'F-1',
-              productName: 'uPVC Pipe',
-              variantId: 'v1',
-              variantDescription: '1 inch',
-              quantity: 1,
-              unitPrice: 1500,
-              packingQty: 1,
-              packingUnit: 'Pcs',
-              totalAmount: 1500
-            }]
+            id: testDlrId,
+            code: `DLR-T${Date.now().toString().slice(-4)}`,
+            name: 'Test Temporary Dealer',
+            ownerName: 'Test Owner',
+            phone: `+91 90000${Date.now().toString().slice(-5)}`,
+            city: 'Bhubaneswar',
+            address: 'Test Address'
           }
         })
       });
-      assert.equal(createRes.status, 200, `Order creation failed: ${createRes.status}`);
-      const orderJson = await createRes.json();
-      const orderId = orderJson.order.id;
 
-      // 2. Approve first time -> 200
-      const approveRes1 = await fetch(`${BASE_URL}/api/data`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Cookie: `filtec_session=${adminToken}`
-        },
-        body: JSON.stringify({
-          action: 'APPROVE_ORDER',
-          payload: { orderId, dealerId: 'dlr-001', subtotal: 1500 }
-        })
-      });
-      assert.equal(approveRes1.status, 200);
+      const orderId = `ord-double-${Date.now()}`;
+      try {
+        // 1. Create order
+        const createRes = await fetch(`${BASE_URL}/api/data`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Cookie: `filtec_session=${adminToken}`
+          },
+          body: JSON.stringify({
+            action: 'CREATE_ORDER',
+            payload: {
+              id: orderId,
+              orderNumber: `ORD-DBL-${Date.now()}`,
+              employeeId: 'emp-admin-samir',
+              employeeName: 'Samir',
+              dealerId: testDlrId,
+              dealerName: 'Test Temporary Dealer',
+              dealerPhone: '+91 9000000000',
+              dealerCity: 'Bhubaneswar',
+              subtotal: 1271.19,
+              gstAmount: 228.81,
+              status: 'PENDING',
+              totalAmount: 1500,
+              items: [{
+                id: `it-${Date.now()}`,
+                productId: 'F-1',
+                productCode: 'F-1',
+                productName: 'uPVC Pipe',
+                variantId: 'v1',
+                variantDescription: '1 inch',
+                quantity: 1,
+                unitPrice: 1500,
+                packingQty: 1,
+                packingUnit: 'Pcs',
+                totalAmount: 1500
+              }]
+            }
+          })
+        });
+        assert.equal(createRes.status, 200, `Order creation failed: ${createRes.status}`);
 
-      // 3. Approve second time -> 409 Conflict
-      const approveRes2 = await fetch(`${BASE_URL}/api/data`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Cookie: `filtec_session=${adminToken}`
-        },
-        body: JSON.stringify({
-          action: 'APPROVE_ORDER',
-          payload: { orderId, dealerId: 'dlr-001', subtotal: 1500 }
-        })
-      });
-      assert.equal(approveRes2.status, 409);
-      const dblJson = await approveRes2.json();
-      assert.match(dblJson.error, /already approved/i);
+        // 2. Approve first time -> 200
+        const approveRes1 = await fetch(`${BASE_URL}/api/data`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Cookie: `filtec_session=${adminToken}`
+          },
+          body: JSON.stringify({
+            action: 'APPROVE_ORDER',
+            payload: { orderId, dealerId: testDlrId, subtotal: 1500 }
+          })
+        });
+        assert.equal(approveRes1.status, 200);
+
+        // 3. Approve second time -> 409 Conflict
+        const approveRes2 = await fetch(`${BASE_URL}/api/data`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Cookie: `filtec_session=${adminToken}`
+          },
+          body: JSON.stringify({
+            action: 'APPROVE_ORDER',
+            payload: { orderId, dealerId: testDlrId, subtotal: 1500 }
+          })
+        });
+        assert.equal(approveRes2.status, 409);
+        const dblJson = await approveRes2.json();
+        assert.match(dblJson.error, /already approved/i);
+      } finally {
+        // Cleanup order and temporary test dealer
+        await fetch(`${BASE_URL}/api/data`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Cookie: `filtec_session=${adminToken}`
+          },
+          body: JSON.stringify({
+            action: 'DELETE_ORDER',
+            payload: { orderId }
+          })
+        }).catch(() => {});
+
+        await fetch(`${BASE_URL}/api/data`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Cookie: `filtec_session=${adminToken}`
+          },
+          body: JSON.stringify({
+            action: 'DELETE_DEALER',
+            payload: { id: testDlrId }
+          })
+        }).catch(() => {});
+      }
     });
 
     it('rejects double-settling an already settled voucher with 409 Conflict', async () => {

@@ -89,9 +89,6 @@ export default function EmployeeOrdersPage() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <h2 className="text-lg font-bold text-[#111827]">Order Management</h2>
-            <p className="text-xs text-[#6B7280]">
-              Lifecycle progression from Submission to Admin Approval and WhatsApp Requisition
-            </p>
           </div>
 
           <Link

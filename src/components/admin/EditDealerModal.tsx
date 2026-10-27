@@ -116,9 +116,6 @@ export function EditDealerModal({
                   {dealer.code}
                 </span>
               </div>
-              <p className="text-xs text-[#6B7280]">
-                Commercial account master, location & primary authorized contacts
-              </p>
             </div>
           </div>
 

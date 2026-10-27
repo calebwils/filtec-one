@@ -219,9 +219,6 @@ export default function AdminRewardsPage() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <h2 className="text-lg font-bold text-[#111827]">Reward Operations, Policy & Settlement Desk</h2>
-            <p className="text-xs text-[#6B7280]">
-              Receive real-time vouchers from dealers & plumbers, review payment details, and complete settlements.
-            </p>
           </div>
           <button
             type="button"
@@ -444,9 +441,6 @@ export default function AdminRewardsPage() {
                   </span>
                 )}
               </h3>
-              <p className="text-xs text-[#6B7280]">
-                Review incoming voucher claims from dealers and plumbers, click to complete settlement transactions.
-              </p>
             </div>
 
             {/* Sub-Tabs: Vouchers vs Transactions */}

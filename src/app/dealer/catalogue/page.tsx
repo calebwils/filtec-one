@@ -73,9 +73,6 @@ export default function DealerCataloguePage() {
             <h1 className="text-lg sm:text-xl font-bold text-[#111827]">
               Product Catalogue
             </h1>
-            <p className="text-xs text-[#6B7280] mt-0.5">
-              Official technical specifications and packaging directory
-            </p>
           </div>
 
           <div className="flex items-center gap-2 shrink-0">

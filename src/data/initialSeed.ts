@@ -27,7 +27,7 @@ export const ADMIN_PAGE_OPTIONS: PageOption[] = [
   { path: '/admin', label: 'Control Center', category: 'Executive', description: 'Real-time overview, KPI cards & alerts' },
   { path: '/admin/orders', label: 'Order Approvals', category: 'Commercial', description: 'Pending dealer orders & pricing review' },
   { path: '/admin/attendance', label: 'Attendance & GPS', category: 'Workforce', description: 'Live location punch & field staff tracking' },
-  { path: '/admin/catalogue', label: 'Catalogue & Stock', category: 'Inventory', description: 'F-1 to F-99 product master & availability' },
+  { path: '/admin/catalogue', label: 'Catalogue', category: 'Inventory', description: 'F-1 to F-99 product master & availability' },
   { path: '/admin/dealers', label: 'Dealer Directory', category: 'Distribution', description: 'Distributor accounts, contacts & territory coverage' },
   { path: '/admin/employees', label: 'Staff & Leave Approvals', category: 'Workforce', description: 'Employee roster, targets & leave decisions' },
   { path: '/admin/rewards', label: 'Plumber Rewards', category: 'Loyalty', description: 'QR coupons, points balance & redemptions' },

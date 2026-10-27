@@ -276,9 +276,6 @@ export default function AdminAttendancePage() {
                 <h3 className="text-sm font-bold text-[#111827]">
                   Live Photo & GPS Verification Feed ({filteredAttendanceRecords.length})
                 </h3>
-                <p className="text-xs text-[#6B7280]">
-                  Real-time punches recorded by employees with camera selfies and satellite coordinates
-                </p>
               </div>
               <span className="text-[11px] font-mono font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
                 Live Captures

@@ -9,7 +9,7 @@ import { ProfilePageContent } from '@/components/profile/ProfilePageContent';
 export default function AdminProfilePage() {
   return (
     <div className="min-h-screen bg-[#F8F9FA] pb-mobile-nav">
-      <TopContextBar title="Administrator Profile" subtitle="Operations & Access Control" />
+      <TopContextBar title="Administrator Profile" />
       <DesktopSubNav />
       <main>
         <ProfilePageContent />

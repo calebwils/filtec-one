@@ -250,7 +250,6 @@ export default function EmployeeHomePage() {
               <h3 className="text-sm font-bold text-[#111827] uppercase font-mono tracking-tight">
                 Recent Orders in Territory
               </h3>
-              <p className="text-xs text-[#6B7280]">Live status machine progression</p>
             </div>
             <Link
               href="/employee/orders"

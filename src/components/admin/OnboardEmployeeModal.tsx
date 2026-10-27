@@ -243,9 +243,6 @@ export function OnboardEmployeeModal({
             </div>
             <div>
               <h3 className="font-bold text-sm text-neutral-900">Onboard New Personnel</h3>
-              <p className="text-[11px] text-neutral-500">
-                Provision Operations Administrators or Field Representatives with tailored access to admin & field pages
-              </p>
             </div>
           </div>
           <button
@@ -322,9 +319,6 @@ export function OnboardEmployeeModal({
                         Full Admin
                       </span>
                     </div>
-                    <p className="text-[11px] text-neutral-600 mt-0.5 leading-snug">
-                      Executive control over operational admin pages, order approvals, catalog stock & settings
-                    </p>
                   </div>
                 </button>
 
@@ -354,9 +348,6 @@ export function OnboardEmployeeModal({
                         Field Ops (+ Custom Admin Pages)
                       </span>
                     </div>
-                    <p className="text-[11px] text-neutral-600 mt-0.5 leading-snug">
-                      Field sales rep who can also be granted access to designated admin modules below
-                    </p>
                   </div>
                 </button>
               </div>
@@ -372,9 +363,6 @@ export function OnboardEmployeeModal({
                   <div>
                     <span className="text-xs font-bold text-neutral-900 block">
                       Admin Management Modules ({grantedAdminPages.length} of {ADMIN_PAGE_OPTIONS.length} Granted)
-                    </span>
-                    <span className="text-[10px] text-neutral-500">
-                      Grant this employee access to specific administrative pages
                     </span>
                   </div>
                 </div>
@@ -435,9 +423,6 @@ export function OnboardEmployeeModal({
                   <div>
                     <span className="text-xs font-bold text-neutral-900 block">
                       Field Sales & Self-Service Modules ({grantedFieldPages.length} of {EMPLOYEE_PAGE_OPTIONS.length} Granted)
-                    </span>
-                    <span className="text-[10px] text-neutral-500">
-                      Standard mobile and field representative access
                     </span>
                   </div>
                 </div>

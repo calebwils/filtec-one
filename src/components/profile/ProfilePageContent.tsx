@@ -430,7 +430,6 @@ export function ProfilePageContent() {
                 </div>
                 <div>
                   <h2 className="text-sm font-bold text-[#111827]">Personal Details</h2>
-                  <p className="text-[11px] text-[#6B7280]">Update your display name, contact phone, and email</p>
                 </div>
               </div>
             </div>
@@ -537,7 +536,6 @@ export function ProfilePageContent() {
                 </div>
                 <div>
                   <h2 className="text-sm font-bold text-[#111827]">Account Password</h2>
-                  <p className="text-[11px] text-[#6B7280]">Set a strong password to protect your account access</p>
                 </div>
               </div>
             </div>

@@ -103,9 +103,6 @@ export default function DealerOrdersPage() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div>
             <h2 className="text-lg font-bold text-[#111827]">Order Tracking & History</h2>
-            <p className="text-xs text-[#6B7280]">
-              Real-time dispatch status tracking and WhatsApp requisition copies for {currentDealer.name}
-            </p>
           </div>
         </div>
 

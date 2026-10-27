@@ -57,9 +57,6 @@ export default function EmployeeDealersPage() {
               <h3 className="text-xs font-bold font-mono uppercase tracking-wider text-[#111827]">
                 Authorized Dealer Accounts
               </h3>
-              <p className="text-[11px] text-[#6B7280]">
-                Field partner roster and fast WhatsApp order booking
-              </p>
             </div>
             <span className="text-[10px] font-mono text-[#6B7280] bg-white px-2 py-0.5 rounded border border-[#E5E7EB]">
               {filteredDealers.length} Accounts

@@ -63,9 +63,6 @@ export default function DealerRewardsPage() {
               <h2 className="text-xl font-bold text-[#111827] mt-0.5">
                 Commercial Incentive Architecture
               </h2>
-              <p className="text-xs text-[#6B7280]">
-                1% of total order value split between Dealer (75%) and Plumber (25%). Strictly separated pools.
-              </p>
             </div>
 
             <Link
@@ -93,9 +90,6 @@ export default function DealerRewardsPage() {
                 <div className="text-2xl sm:text-3xl font-bold font-mono text-emerald-700 mt-1">
                   ₹{currentDealer.availableRewards.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                 </div>
-                <p className="text-[11px] text-[#6B7280] mt-1">
-                  75% of 1% total order value credited to dealer profit account.
-                </p>
               </div>
 
               {/* Redeem / Claim Voucher Button */}

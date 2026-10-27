@@ -222,9 +222,6 @@ export default function AdminSettingsPage() {
                     <Users className="w-4 h-4 text-[#DC2626]" />
                     <span>Staff Role & Admin Privilege Assignment</span>
                   </h3>
-                  <p className="text-xs text-[#6B7280]">
-                    Define who is an Operations Admin vs Field Employee, and assign specific page management rights
-                  </p>
                 </div>
                 <span className="text-[11px] font-mono text-neutral-500 bg-neutral-100 px-2.5 py-1 rounded-md border border-neutral-200 self-start sm:self-auto">
                   {employees.filter((e) => e.systemRole === 'ADMIN').length} Admins •{' '}
@@ -369,9 +366,6 @@ export default function AdminSettingsPage() {
                   <CheckSquare className="w-4 h-4 text-[#DC2626]" />
                   <span>Default Page Visibility by Role Tier</span>
                 </h3>
-                <p className="text-xs text-[#6B7280]">
-                  Configure standard page availability presets for newly onboarded staff and user accounts
-                </p>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -380,7 +374,6 @@ export default function AdminSettingsPage() {
                   <div className="flex items-center justify-between pb-2 border-b border-[#E5E7EB]">
                     <div>
                       <span className="text-xs font-bold text-[#111827] block">ADMIN PAGES</span>
-                      <span className="text-[10px] text-[#6B7280]">Executive Operations Control</span>
                     </div>
                     <span className="bg-rose-50 text-rose-700 text-[10px] font-mono px-2 py-0.5 rounded border border-rose-200 font-semibold">
                       10 Modules
@@ -414,7 +407,6 @@ export default function AdminSettingsPage() {
                   <div className="flex items-center justify-between pb-2 border-b border-[#E5E7EB]">
                     <div>
                       <span className="text-xs font-bold text-[#111827] block">EMPLOYEE PAGES</span>
-                      <span className="text-[10px] text-[#6B7280]">Field Representative Portal</span>
                     </div>
                     <span className="bg-blue-50 text-blue-700 text-[10px] font-mono px-2 py-0.5 rounded border border-blue-200 font-semibold">
                       5 Modules
@@ -456,9 +448,6 @@ export default function AdminSettingsPage() {
                 <Building2 className="w-4 h-4 text-[#DC2626]" />
                 <span>Enterprise & Operational Entity Profile</span>
               </h3>
-              <p className="text-xs text-[#6B7280]">
-                Official manufacturing company identity, manufacturing hub address, and contact lines
-              </p>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -826,9 +815,6 @@ export default function AdminSettingsPage() {
                 <Calendar className="w-4 h-4 text-[#DC2626]" />
                 <span>Field Attendance & Leave Governance Rules</span>
               </h3>
-              <p className="text-xs text-[#6B7280]">
-                Define monthly staff quotas, working hours, and GPS verification policies
-              </p>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -987,9 +973,6 @@ export default function AdminSettingsPage() {
                 <MessageSquare className="w-4 h-4 text-[#DC2626]" />
                 <span>Automated Messaging & ERP Integrations</span>
               </h3>
-              <p className="text-xs text-[#6B7280]">
-                Control automatic dispatches via WhatsApp Cloud API and simulated ERP webhooks
-              </p>
             </div>
 
             <div className="space-y-3">

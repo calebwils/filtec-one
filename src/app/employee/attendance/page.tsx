@@ -411,9 +411,6 @@ Generated via FILTEC ONE Operational Platform.`;
                   <h2 className="text-lg font-bold text-[#111827] mt-0.5">
                     Attendance & Field Check-In
                   </h2>
-                  <p className="text-xs text-[#6B7280]">
-                    Requires browser geolocation and live camera capture (no geofencing required)
-                  </p>
                 </div>
 
                 <div className="flex items-center gap-2">
@@ -781,9 +778,6 @@ Generated via FILTEC ONE Operational Platform.`;
                   <h3 className="text-xs font-bold font-mono uppercase tracking-wider text-[#111827]">
                     Your Leave Applications
                   </h3>
-                  <p className="text-[11px] text-[#6B7280]">
-                    Status tracking and official approvals from Operations
-                  </p>
                 </div>
                 <button
                   type="button"
@@ -900,9 +894,6 @@ Generated via FILTEC ONE Operational Platform.`;
                       Official Payslip Ready
                     </span>
                   </h2>
-                  <p className="text-[11px] text-[#6B7280]">
-                    Verified attendance and leave ledger calculation
-                  </p>
                 </div>
                 <button
                   type="button"

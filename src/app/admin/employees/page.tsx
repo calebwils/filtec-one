@@ -28,7 +28,9 @@ import {
   Info,
   CalendarDays,
   IndianRupee,
-  Share2
+  Share2,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { OnboardEmployeeModal } from '@/components/admin/OnboardEmployeeModal';
 import { EditEmployeeModal } from '@/components/admin/EditEmployeeModal';
@@ -55,6 +57,20 @@ export default function AdminEmployeesPage() {
   const [rejectionReason, setRejectionReason] = useState('');
 
   const [roleFilter, setRoleFilter] = useState<'ALL' | 'ADMIN' | 'EMPLOYEE'>('ALL');
+  const [showSalaries, setShowSalaries] = useState(false);
+  const [revealedEmployeeIds, setRevealedEmployeeIds] = useState<Record<string, boolean>>({});
+
+  const isSalaryVisible = (empId: string) => {
+    if (showSalaries) return true;
+    return !!revealedEmployeeIds[empId];
+  };
+
+  const toggleIndividualSalary = (empId: string) => {
+    setRevealedEmployeeIds((prev) => ({
+      ...prev,
+      [empId]: !prev[empId]
+    }));
+  };
 
   const adminCount = employees.filter((e) => e.systemRole === 'ADMIN').length;
   const staffCount = employees.filter((e) => e.systemRole !== 'ADMIN').length;
@@ -269,6 +285,32 @@ export default function AdminEmployeesPage() {
                     <span>Field Reps ({staffCount})</span>
                   </button>
                 </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowSalaries(!showSalaries);
+                    setRevealedEmployeeIds({});
+                  }}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 border cursor-pointer ${
+                    showSalaries
+                      ? 'bg-amber-50 text-amber-900 border-amber-300 hover:bg-amber-100'
+                      : 'bg-white text-neutral-700 border-neutral-300 hover:bg-neutral-50 shadow-2xs'
+                  }`}
+                  title={showSalaries ? 'Salaries currently visible. Click to hide (Privacy Mode for screen sharing).' : 'Salaries hidden for screen sharing. Click to reveal all.'}
+                >
+                  {showSalaries ? (
+                    <>
+                      <EyeOff className="w-3.5 h-3.5 text-amber-700" />
+                      <span>Hide Salaries</span>
+                    </>
+                  ) : (
+                    <>
+                      <Eye className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>Show Salaries</span>
+                    </>
+                  )}
+                </button>
               </div>
             </div>
 
@@ -279,7 +321,6 @@ export default function AdminEmployeesPage() {
                   <h3 className="text-xs font-bold font-mono uppercase tracking-wider text-[#111827]">
                     Employee Master Data
                   </h3>
-                  <p className="text-[11px] text-[#6B7280]">Official personnel directory and operational roster</p>
                 </div>
                 <span className="text-[10px] font-mono text-[#6B7280] bg-white px-2 py-0.5 rounded border border-[#E5E7EB]">
                   Real Staff Ledger • {filteredEmployees.length} Records
@@ -297,7 +338,22 @@ export default function AdminEmployeesPage() {
                       <th className="py-3 px-4 whitespace-nowrap">Contact</th>
                       <th className="py-3 px-3 whitespace-nowrap">Territory</th>
                       <th className="py-3 px-3 whitespace-nowrap">Target / Sales</th>
-                      <th className="py-3 px-3 whitespace-nowrap">Base Salary</th>
+                      <th className="py-3 px-3 whitespace-nowrap">
+                        <div className="flex items-center gap-1.5">
+                          <span>Base Salary</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowSalaries(!showSalaries);
+                              setRevealedEmployeeIds({});
+                            }}
+                            className="text-neutral-400 hover:text-neutral-700 transition-colors p-0.5 rounded cursor-pointer"
+                            title={showSalaries ? 'Click to hide all salaries (Privacy Mode)' : 'Click to show all salaries'}
+                          >
+                            {showSalaries ? <EyeOff className="w-3 h-3 text-neutral-600" /> : <Eye className="w-3 h-3 text-neutral-400" />}
+                          </button>
+                        </div>
+                      </th>
                       <th className="py-3 px-3 whitespace-nowrap">Status</th>
                       <th className="py-3 px-4 text-right whitespace-nowrap">Actions</th>
                     </tr>
@@ -458,9 +514,33 @@ export default function AdminEmployeesPage() {
                           {/* Base Salary */}
                           <td className="py-3 px-3 whitespace-nowrap">
                             {emp.baseSalary && emp.baseSalary > 0 ? (
-                              <div className="font-mono text-xs font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded inline-block">
-                                ₹{emp.baseSalary.toLocaleString('en-IN')}<span className="text-[9px] font-normal text-emerald-700">/mo</span>
-                              </div>
+                              isSalaryVisible(emp.id) ? (
+                                <div className="flex items-center gap-1.5">
+                                  <div className="font-mono text-xs font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded inline-block">
+                                    ₹{emp.baseSalary.toLocaleString('en-IN')}<span className="text-[9px] font-normal text-emerald-700">/mo</span>
+                                  </div>
+                                  {!showSalaries && (
+                                    <button
+                                      type="button"
+                                      onClick={() => toggleIndividualSalary(emp.id)}
+                                      title="Hide this salary"
+                                      className="text-neutral-400 hover:text-neutral-600 cursor-pointer p-0.5"
+                                    >
+                                      <EyeOff className="w-3 h-3" />
+                                    </button>
+                                  )}
+                                </div>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => toggleIndividualSalary(emp.id)}
+                                  title="Hidden for screen privacy. Click to peek."
+                                  className="font-mono text-xs text-neutral-400 hover:text-neutral-600 bg-neutral-100 hover:bg-neutral-200/70 border border-neutral-200 px-2 py-0.5 rounded inline-flex items-center gap-1 tracking-widest transition-colors cursor-pointer select-none"
+                                >
+                                  <span>••••••</span>
+                                  <Eye className="w-3 h-3 text-neutral-400" />
+                                </button>
+                              )
                             ) : (
                               <span className="font-mono text-neutral-400 text-xs">(-)</span>
                             )}
@@ -538,9 +618,6 @@ export default function AdminEmployeesPage() {
                 <h3 className="text-base font-bold text-[#111827] mt-1">
                   Monthly Salary Ledger — {monthTitle}
                 </h3>
-                <p className="text-xs text-[#6B7280] mt-0.5">
-                  Salaries computed automatically based on verified attendance punches. Payable Remuneration = (Present Days + Approved Leaves) ÷ Total Working Days × Base Salary.
-                </p>
               </div>
 
               {/* Month Navigation Controls */}
@@ -597,7 +674,7 @@ export default function AdminEmployeesPage() {
                   MONTHLY BASE COMMITTED
                 </span>
                 <div className="text-xl font-bold font-mono text-[#111827] mt-1">
-                  ₹{totalBaseSalarySum.toLocaleString('en-IN')}
+                  {showSalaries ? `₹${totalBaseSalarySum.toLocaleString('en-IN')}` : '₹ ••••••'}
                 </div>
                 <span className="text-[10px] text-[#6B7280]">Contracted base total</span>
               </div>
@@ -607,7 +684,7 @@ export default function AdminEmployeesPage() {
                   NET PAYABLE REMUNERATION
                 </span>
                 <div className="text-xl font-bold font-mono text-emerald-900 mt-1">
-                  ₹{totalPayableSalarySum.toLocaleString('en-IN')}
+                  {showSalaries ? `₹${totalPayableSalarySum.toLocaleString('en-IN')}` : '₹ ••••••'}
                 </div>
                 <span className="text-[10px] text-emerald-700">Attendance-verified payout</span>
               </div>
@@ -620,13 +697,15 @@ export default function AdminEmployeesPage() {
                   {avgAttendancePct}%
                 </div>
                 <span className="text-[10px] text-rose-600 font-mono">
-                  {totalDeductionsSum > 0 ? `₹${totalDeductionsSum.toLocaleString('en-IN')} LOP Deductions` : 'Zero Loss of Pay'}
+                  {totalDeductionsSum > 0
+                    ? (showSalaries ? `₹${totalDeductionsSum.toLocaleString('en-IN')} LOP Deductions` : '•••••• LOP Deductions')
+                    : 'Zero Loss of Pay'}
                 </span>
               </div>
             </div>
 
             {/* Search filter in Salary Ledger */}
-            <div className="bg-white border border-[#E5E7EB] rounded-xl p-3.5 shadow-2xs">
+            <div className="bg-white border border-[#E5E7EB] rounded-xl p-3.5 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="relative w-full sm:w-80">
                 <Search className="w-4 h-4 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
@@ -637,6 +716,32 @@ export default function AdminEmployeesPage() {
                   className="w-full pl-9 pr-3 py-2 text-xs rounded-lg border border-[#E5E7EB] bg-white focus:outline-none focus:ring-1 focus:ring-[#DC2626]"
                 />
               </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setShowSalaries(!showSalaries);
+                  setRevealedEmployeeIds({});
+                }}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 border cursor-pointer ${
+                  showSalaries
+                    ? 'bg-amber-50 text-amber-900 border-amber-300 hover:bg-amber-100'
+                    : 'bg-white text-neutral-700 border-neutral-300 hover:bg-neutral-50 shadow-2xs'
+                }`}
+                title={showSalaries ? 'Salaries currently visible. Click to hide.' : 'Salaries hidden for screen sharing. Click to reveal.'}
+              >
+                {showSalaries ? (
+                  <>
+                    <EyeOff className="w-3.5 h-3.5 text-amber-700" />
+                    <span>Hide Salaries</span>
+                  </>
+                ) : (
+                  <>
+                    <Eye className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Show Salaries</span>
+                  </>
+                )}
+              </button>
             </div>
 
             {/* Master Salary Calculation Ledger Table */}
@@ -671,7 +776,22 @@ export default function AdminEmployeesPage() {
                         <th className="py-3 px-3 text-right">Absent</th>
                         <th className="py-3 px-3 text-right">Leave</th>
                         <th className="py-3 px-3 text-right">Attendance %</th>
-                        <th className="py-3 px-3 text-right">Base Salary</th>
+                        <th className="py-3 px-3 text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            <span>Base Salary</span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setShowSalaries(!showSalaries);
+                                setRevealedEmployeeIds({});
+                              }}
+                              className="text-neutral-400 hover:text-neutral-600 cursor-pointer"
+                              title={showSalaries ? 'Hide salaries' : 'Show salaries'}
+                            >
+                              {showSalaries ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                            </button>
+                          </div>
+                        </th>
                         <th className="py-3 px-3 text-right">Per Day Rate</th>
                         <th className="py-3 px-3 text-right">Payable Remuneration</th>
                         <th className="py-3 px-4 text-right">Official Payslip</th>
@@ -741,31 +861,50 @@ export default function AdminEmployeesPage() {
                           </td>
 
                           <td className="py-3 px-3 text-right font-mono text-[#111827]">
-                            {base > 0 ? (
-                              <span className="font-semibold">₹{base.toLocaleString('en-IN')}</span>
+                            {isSalaryVisible(emp.id) ? (
+                              base > 0 ? (
+                                <span className="font-semibold">₹{base.toLocaleString('en-IN')}</span>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedEmployeeForEdit(emp);
+                                    setIsEditModalOpen(true);
+                                  }}
+                                  className="text-rose-600 underline text-[10px]"
+                                >
+                                  Set base salary
+                                </button>
+                              )
                             ) : (
                               <button
                                 type="button"
-                                onClick={() => {
-                                  setSelectedEmployeeForEdit(emp);
-                                  setIsEditModalOpen(true);
-                                }}
-                                className="text-rose-600 underline text-[10px]"
+                                onClick={() => toggleIndividualSalary(emp.id)}
+                                title="Click to peek salary"
+                                className="font-mono text-xs text-neutral-400 hover:text-neutral-600 bg-neutral-100 border border-neutral-200 px-2 py-0.5 rounded tracking-widest cursor-pointer select-none"
                               >
-                                Set base salary
+                                ••••••
                               </button>
                             )}
                           </td>
 
                           <td className="py-3 px-3 text-right font-mono text-[#6B7280]">
-                            {perDay > 0 ? `₹${perDay.toLocaleString('en-IN')}` : '—'}
+                            {isSalaryVisible(emp.id) ? (
+                              perDay > 0 ? `₹${perDay.toLocaleString('en-IN')}` : '—'
+                            ) : (
+                              <span className="text-neutral-400 text-xs">••••••</span>
+                            )}
                           </td>
 
                           <td className="py-3 px-3 text-right font-mono font-bold text-emerald-800 text-sm">
-                            {base > 0 ? (
-                              `₹${payable.toLocaleString('en-IN')}`
+                            {isSalaryVisible(emp.id) ? (
+                              base > 0 ? (
+                                `₹${payable.toLocaleString('en-IN')}`
+                              ) : (
+                                <span className="text-neutral-400 text-xs font-normal">—</span>
+                              )
                             ) : (
-                              <span className="text-neutral-400 text-xs font-normal">—</span>
+                              <span className="text-neutral-400 text-xs font-normal">••••••</span>
                             )}
                           </td>
 
@@ -819,9 +958,6 @@ export default function AdminEmployeesPage() {
                 <h3 className="text-sm font-bold text-[#111827] uppercase font-mono">
                   Leave & Regularization Administration
                 </h3>
-                <p className="text-xs text-[#6B7280]">
-                  Review, approve or reject leave requests from field sales personnel
-                </p>
               </div>
               <span className="text-xs font-mono text-[#6B7280]">
                 {pendingLeaves.length} Pending Approval

@@ -305,9 +305,6 @@ export function EditEmployeeModal({
                   {formData.systemRole}
                 </span>
               </div>
-              <p className="text-xs text-[#6B7280]">
-                Assign administrative privileges, designate authorized admin & field pages, and configure contact terms
-              </p>
             </div>
           </div>
 
@@ -337,9 +334,6 @@ export function EditEmployeeModal({
                 <label className="block text-xs font-bold text-[#111827]">
                   Primary System Role
                 </label>
-                <p className="text-[11px] text-[#6B7280]">
-                  Employees can be granted access to specific admin pages even with Field Employee role
-                </p>
               </div>
               <span className="text-[11px] font-mono font-medium text-neutral-500">
                 Active Role: <strong className="text-neutral-900">{formData.systemRole}</strong>
@@ -373,9 +367,6 @@ export function EditEmployeeModal({
                       Full Admin
                     </span>
                   </div>
-                  <p className="text-[11px] text-[#6B7280] mt-0.5 leading-snug">
-                    Full executive control over all operational admin pages, order approvals & system settings
-                  </p>
                 </div>
               </button>
 
@@ -405,9 +396,6 @@ export function EditEmployeeModal({
                       Field Ops (+ Custom Admin Pages)
                     </span>
                   </div>
-                  <p className="text-[11px] text-[#6B7280] mt-0.5 leading-snug">
-                    Field representative who can also be granted access to designated admin modules below
-                  </p>
                 </div>
               </button>
             </div>
@@ -424,9 +412,6 @@ export function EditEmployeeModal({
                   <label className="block text-xs font-bold text-[#111827]">
                     Admin Management Modules ({grantedAdminPages.length} of {ADMIN_PAGE_OPTIONS.length} Granted)
                   </label>
-                  <p className="text-[11px] text-[#6B7280]">
-                    Select which administrative pages and operations modules this employee is permitted to access
-                  </p>
                 </div>
               </div>
 
@@ -493,9 +478,6 @@ export function EditEmployeeModal({
                   <label className="block text-xs font-bold text-[#111827]">
                     Field Sales & Self-Service Modules ({grantedFieldPages.length} of {EMPLOYEE_PAGE_OPTIONS.length} Granted)
                   </label>
-                  <p className="text-[11px] text-[#6B7280]">
-                    Field representative views: Today dashboard, dealer network, orders booking, and GPS punch
-                  </p>
                 </div>
               </div>
 

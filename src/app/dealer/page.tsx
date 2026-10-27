@@ -161,9 +161,6 @@ export default function DealerHomePage() {
             </div>
             <div>
               <div className="text-sm font-bold text-[#111827]">FILTEC Product Catalogue</div>
-              <p className="text-xs text-[#6B7280] mt-0.5">
-                Official specifications, size variants, and packaging directory
-              </p>
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
@@ -192,7 +189,6 @@ export default function DealerHomePage() {
               <h3 className="text-sm font-bold text-[#111827] uppercase font-mono tracking-tight">
                 Current Orders
               </h3>
-              <p className="text-xs text-[#6B7280]">Real-time status updates and order requisitions</p>
             </div>
             <Link
               href="/dealer/orders"

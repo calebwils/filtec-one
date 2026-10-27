@@ -208,9 +208,6 @@ export default function DealerPlumbersPage() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <h2 className="text-lg font-bold text-[#111827]">Plumber Beneficiaries</h2>
-            <p className="text-xs text-[#6B7280]">
-              Onboard registered plumbers, edit contact info, and allocate commercial incentive points
-            </p>
           </div>
 
           <div className="flex items-center gap-2">
@@ -561,9 +558,6 @@ export default function DealerPlumbersPage() {
                       {dealerPlumbers.length} Plumber{dealerPlumbers.length === 1 ? '' : 's'}
                     </span>
                   </h3>
-                  <p className="text-[11px] text-[#6B7280]">
-                    View all registered plumbers and manage or edit their contact details and status
-                  </p>
                 </div>
               </div>
               <button
@@ -710,9 +704,6 @@ export default function DealerPlumbersPage() {
                   <Award className="w-4 h-4 text-emerald-600" />
                   <span>Select Plumber to Allocate Reward</span>
                 </h3>
-                <p className="text-[11px] text-[#6B7280] mt-0.5">
-                  Choose an active registered plumber to allocate reward points
-                </p>
               </div>
               <button
                 type="button"
@@ -795,9 +786,6 @@ export default function DealerPlumbersPage() {
                   <Pencil className="w-4 h-4 text-[#DC2626]" />
                   <span>Edit Plumber Information</span>
                 </h3>
-                <p className="text-[11px] text-[#6B7280] mt-0.5">
-                  Update contact details and status for {editingPlumber.name}
-                </p>
               </div>
               <button
                 type="button"

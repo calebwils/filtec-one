@@ -117,9 +117,6 @@ export default function AdminControlCenterPage() {
               <h3 className="font-bold text-sm text-[#111827] group-hover:text-[#DC2626] transition-colors">
                 Attendance & Tracking
               </h3>
-              <p className="text-[11px] text-[#6B7280] mt-1 line-clamp-2">
-                Daily, weekly & monthly attendance audits, reverse-geocoded coordinates & selfie proofs.
-              </p>
             </div>
             <div className="mt-3 pt-2.5 border-t border-[#F3F4F6] flex items-center justify-between text-xs font-semibold text-neutral-800 group-hover:text-[#DC2626]">
               <span>View Roster & Ledger</span>
@@ -144,9 +141,6 @@ export default function AdminControlCenterPage() {
               <h3 className="font-bold text-sm text-[#111827] group-hover:text-[#DC2626] transition-colors">
                 Order Management
               </h3>
-              <p className="text-[11px] text-[#6B7280] mt-1 line-clamp-2">
-                Central verification, dealer balance checks, ERP invoice dispatch and WhatsApp alerts.
-              </p>
             </div>
             <div className="mt-3 pt-2.5 border-t border-[#F3F4F6] flex items-center justify-between text-xs font-semibold text-neutral-800 group-hover:text-[#DC2626]">
               <span>Authorizations Queue</span>
@@ -171,9 +165,6 @@ export default function AdminControlCenterPage() {
               <h3 className="font-bold text-sm text-[#111827] group-hover:text-[#DC2626] transition-colors">
                 Staff & Onboarding
               </h3>
-              <p className="text-[11px] text-[#6B7280] mt-1 line-clamp-2">
-                Onboard field officers, assign territories, define sales targets, and review leaves.
-              </p>
             </div>
             <div className="mt-3 pt-2.5 border-t border-[#F3F4F6] flex items-center justify-between text-xs font-semibold text-neutral-800 group-hover:text-[#DC2626]">
               <span>Directory & Onboard</span>
@@ -181,7 +172,7 @@ export default function AdminControlCenterPage() {
             </div>
           </Link>
 
-          {/* 4. Catalogue & Stock Management */}
+          {/* 4. Catalogue Management */}
           <Link
             href="/admin/catalogue"
             className="bg-white border border-[#E5E7EB] hover:border-neutral-400 rounded-xl p-4 shadow-2xs transition-all flex flex-col justify-between group"
@@ -195,9 +186,6 @@ export default function AdminControlCenterPage() {
               <h3 className="font-bold text-sm text-[#111827] group-hover:text-[#DC2626] transition-colors">
                 Catalogue
               </h3>
-              <p className="text-[11px] text-[#6B7280] mt-1 line-clamp-2">
-                Browse F-1..F-99+ products, variants, and packaging details.
-              </p>
             </div>
             <div className="mt-3 pt-2.5 border-t border-[#F3F4F6] flex items-center justify-between text-xs font-semibold text-[#DC2626]">
               <span>View Catalogue</span>
@@ -213,9 +201,6 @@ export default function AdminControlCenterPage() {
               <h3 className="text-sm font-bold text-[#111827] uppercase font-mono tracking-tight">
                 Recent Orders
               </h3>
-              <p className="text-xs text-[#6B7280]">
-                Latest orders created by field reps — dispatch via WhatsApp to dealers
-              </p>
             </div>
             <Link
               href="/admin/orders"

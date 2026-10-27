@@ -49,9 +49,6 @@ export default function AdminOrdersPage() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <h2 className="text-lg font-bold text-[#111827]">Orders</h2>
-            <p className="text-xs text-[#6B7280]">
-              View created field orders and release for fulfillment
-            </p>
           </div>
         </div>
 

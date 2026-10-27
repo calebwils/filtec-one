@@ -9,7 +9,7 @@ import { ProfilePageContent } from '@/components/profile/ProfilePageContent';
 export default function DealerProfilePage() {
   return (
     <div className="min-h-screen bg-[#F8F9FA] pb-mobile-nav">
-      <TopContextBar title="Dealer Profile" subtitle="Business & Account Details" />
+      <TopContextBar title="Dealer Profile" />
       <DesktopSubNav />
       <main>
         <ProfilePageContent />
