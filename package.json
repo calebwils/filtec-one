@@ -11,7 +11,8 @@
     "postinstall": "prisma generate",
     "db:push": "prisma db push",
     "db:seed": "bun run prisma/seed.ts",
-    "db:studio": "prisma studio -p 5555"
+    "db:studio": "prisma studio -p 5555",
+    "deploy": "bash scripts/deploy-live.sh"
   },
   "dependencies": {
     "@prisma/adapter-pg": "7.9.1",
