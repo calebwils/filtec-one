@@ -46,6 +46,7 @@ model Employee {
   assignedDealerIds  String    @default("[]") // JSON string array
   dateOfJoining      String?
   remarks            String?
+  avatarUrl          String?
   systemRole         String    @default("EMPLOYEE") // "ADMIN" | "EMPLOYEE" | "DEALER"
   allowedPages       String    @default("[]") // JSON string array
   password           String?

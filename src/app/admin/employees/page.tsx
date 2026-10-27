@@ -327,11 +327,26 @@ export default function AdminEmployeesPage() {
 
                           {/* Name of Employee & Designation */}
                           <td className="py-3 px-4">
-                            <div className="font-bold text-sm text-[#111827]">
-                              {emp.name}
-                            </div>
-                            <div className="text-[11px] font-medium text-neutral-600 mt-0.5">
-                              {emp.designation || '(-)'}
+                            <div className="flex items-center gap-3">
+                              {emp.avatarUrl ? (
+                                <img
+                                  src={emp.avatarUrl}
+                                  alt={emp.name}
+                                  className="w-10 h-10 rounded-full object-cover border border-neutral-200 shadow-xs shrink-0"
+                                />
+                              ) : (
+                                <div className="w-10 h-10 rounded-full bg-neutral-100 border border-neutral-200 flex items-center justify-center text-xs font-bold text-neutral-600 shrink-0">
+                                  {emp.name.split(' ').map((n) => n[0]).slice(0, 2).join('')}
+                                </div>
+                              )}
+                              <div>
+                                <div className="font-bold text-sm text-[#111827]">
+                                  {emp.name}
+                                </div>
+                                <div className="text-[11px] font-medium text-neutral-600 mt-0.5">
+                                  {emp.designation || '(-)'}
+                                </div>
+                              </div>
                             </div>
                           </td>
 
