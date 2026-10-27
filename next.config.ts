@@ -32,6 +32,9 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  experimental: {
+    agentUpgrade: "security",
+  },
   serverExternalPackages: ['pg', '@prisma/adapter-pg'],
   allowedDevOrigins: [
     "*.trycloudflare.com",
