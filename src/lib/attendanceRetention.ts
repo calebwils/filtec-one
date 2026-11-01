@@ -1,5 +1,5 @@
-import { prisma } from './prisma';
-import { getAttendanceRetentionCutoff } from '@/utils/attendanceRetention';
+import { prisma } from './prisma.ts';
+import { getAttendanceRetentionCutoff } from '../utils/attendanceRetention.ts';
 
 export { getAttendanceRetentionCutoff };
 

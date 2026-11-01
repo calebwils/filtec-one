@@ -1,9 +1,9 @@
 import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { createSessionToken, verifySessionToken, SESSION_MAX_AGE_SECONDS, SESSION_MAX_AGE_HOURS } from '../security';
-import { getAttendanceRetentionCutoff, isWithinRetentionWindow } from '../../utils/attendanceRetention';
-import { pruneExpiredAttendanceRecords } from '../attendanceRetention';
-import { prisma } from '../prisma';
+import { createSessionToken, verifySessionToken, SESSION_MAX_AGE_SECONDS, SESSION_MAX_AGE_HOURS } from '../security.ts';
+import { getAttendanceRetentionCutoff, isWithinRetentionWindow } from '../../utils/attendanceRetention.ts';
+import { pruneExpiredAttendanceRecords } from '../attendanceRetention.ts';
+import { prisma } from '../prisma.ts';
 
 describe('1. 90-Day Session Persistence Specification', () => {
   it('defines 90-day constants correctly in seconds and hours', () => {
@@ -37,14 +37,7 @@ describe('1. 90-Day Session Persistence Specification', () => {
     const verified89 = verifySessionToken(valid89Days);
     assert.ok(verified89, 'Token must still be valid at 89 days');
 
-    const pastExp = Math.floor(Date.now() / 1000) - 100;
-    const expiredPayload = { userId: 'emp-101', role: 'EMPLOYEE' as const, exp: pastExp };
-    const encoded = Buffer.from(JSON.stringify(expiredPayload)).toString('base64url');
-    const crypto = require('crypto');
-    const secret = 'filtec_local_dev_ephemeral_auth_secret_do_not_use_in_prod_x92!';
-    const sig = crypto.createHmac('sha256', secret).update(encoded).digest('base64url');
-    const expiredToken = `${encoded}.${sig}`;
-
+    const expiredToken = createSessionToken({ userId: 'emp-101', role: 'EMPLOYEE' }, -1);
     assert.equal(verifySessionToken(expiredToken), null, 'Expired session token must be rejected');
   });
 });

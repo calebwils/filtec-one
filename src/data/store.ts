@@ -403,6 +403,8 @@ export const store = {
                     allowedPages:
                       matchedEmp.allowedPages && matchedEmp.allowedPages.length > 0
                         ? matchedEmp.allowedPages
+                        : sessionUser.allowedPages && sessionUser.allowedPages.length > 0
+                        ? sessionUser.allowedPages
                         : sessionUser.role === 'ADMIN'
                         ? ALL_ADMIN_PAGES
                         : ALL_EMPLOYEE_PAGES,
@@ -2168,6 +2170,111 @@ export const store = {
       auditLogs: [audit, ...globalState.auditLogs]
     };
     notify();
+  },
+
+  // Delete Attendance (strictly Samir only)
+  async deleteAttendance(params: {
+    id?: string;
+    recordId?: string;
+    employeeId?: string;
+    employeeCode?: string;
+    employeeName?: string;
+    date?: string;
+  }): Promise<boolean> {
+    const { id, recordId, employeeId, employeeCode, employeeName, date } = params;
+
+    // 1. Update dailyAttendance
+    let updatedDaily = [...globalState.dailyAttendance];
+    if (id) {
+      updatedDaily = updatedDaily.filter((d) => d.id !== id);
+    }
+    if (employeeId && date) {
+      const cleanEmpId = String(employeeId).replace(/^user-/, '');
+      updatedDaily = updatedDaily.filter(
+        (d) => !(d.date === date && (d.employeeId === employeeId || d.employeeId === cleanEmpId || d.employeeCode === employeeCode || d.employeeCode === employeeId))
+      );
+    }
+
+    // 2. Update attendanceRecords (raw punches)
+    let updatedPunches = [...globalState.attendanceRecords];
+    if (recordId) {
+      updatedPunches = updatedPunches.filter((p) => p.id !== recordId);
+    }
+    if (id) {
+      updatedPunches = updatedPunches.filter((p) => p.id !== id);
+    }
+    if (employeeId && date) {
+      const cleanEmpId = String(employeeId).replace(/^user-/, '');
+      updatedPunches = updatedPunches.filter((p) => {
+        const pDate = (p.timestamp || '').split('T')[0];
+        const matchEmp = p.employeeId === employeeId || p.employeeId === cleanEmpId;
+        return !(pDate === date && matchEmp);
+      });
+    }
+
+    // 3. Reset employee check-in status if deleting today
+    const today = new Date().toISOString().split('T')[0];
+    let updatedEmployees = [...globalState.employees];
+    if (!date || String(date).startsWith(today)) {
+      if (employeeId) {
+        const cleanEmpId = String(employeeId).replace(/^user-/, '');
+        updatedEmployees = updatedEmployees.map((emp) => {
+          if (emp.id === employeeId || emp.id === cleanEmpId || emp.code === employeeCode || emp.code === employeeId) {
+            return {
+              ...emp,
+              checkInStatus: 'CHECKED_OUT' as const,
+              lastCheckInTime: undefined,
+              lastLocation: undefined
+            };
+          }
+          return emp;
+        });
+      }
+    }
+
+    const audit: AuditLog = {
+      id: `aud-${Date.now()}`,
+      userId: globalState.currentUser.id,
+      userName: globalState.currentUser.name,
+      role: 'ADMIN',
+      action: 'DELETE_ATTENDANCE',
+      entityType: 'ATTENDANCE',
+      entityId: id || recordId || `${employeeId}-${date}`,
+      details: `Samir deleted attendance record for ${employeeName || employeeId || 'Employee'} (${date || 'Today'})`,
+      timestamp: new Date().toISOString()
+    };
+
+    globalState = {
+      ...globalState,
+      dailyAttendance: updatedDaily,
+      attendanceRecords: updatedPunches,
+      employees: updatedEmployees,
+      auditLogs: [audit, ...globalState.auditLogs]
+    };
+    notify();
+
+    if (typeof window !== 'undefined') {
+      try {
+        const res = await fetch('/api/data', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'DELETE_ATTENDANCE',
+            payload: params
+          })
+        });
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.error || 'Failed to delete attendance record');
+        }
+        await store.syncWithDatabase(true);
+        return true;
+      } catch (err) {
+        console.error('PostgreSQL delete attendance error:', err);
+        throw err;
+      }
+    }
+    return true;
   },
 
   submitLeaveRequest(data: {

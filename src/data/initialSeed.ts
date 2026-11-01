@@ -133,7 +133,13 @@ export const INITIAL_EMPLOYEES: Employee[] = [
     activeOrdersCount: 0,
     checkInStatus: 'CHECKED_OUT',
     remarks: '(-)',
-    allowedPages: ALL_EMPLOYEE_PAGES
+    allowedPages: [
+      ...ALL_EMPLOYEE_PAGES,
+      '/admin/catalogue',
+      '/admin/dealers',
+      '/admin/rewards',
+      '/admin/settings'
+    ]
   },
   {
     id: 'emp-3',

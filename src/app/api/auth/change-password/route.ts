@@ -137,7 +137,8 @@ export async function POST(req: Request) {
         role,
         employeeCode: updated.code,
         phone: updated.phone,
-        name: updated.name
+        name: updated.name,
+        allowedPages
       });
 
       const response = NextResponse.json({
@@ -250,7 +251,8 @@ export async function POST(req: Request) {
         userId: updated.id,
         role: 'DEALER',
         phone: updated.phone,
-        name: updated.name
+        name: updated.name,
+        allowedPages: updatedUser.allowedPages
       });
 
       const response = NextResponse.json({

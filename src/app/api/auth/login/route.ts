@@ -177,7 +177,8 @@ export async function POST(req: Request) {
           role,
           employeeCode: matchedEmployee.code,
           phone: matchedEmployee.phone,
-          name: matchedEmployee.name
+          name: matchedEmployee.name,
+          allowedPages
         });
 
         const res = NextResponse.json({
@@ -297,7 +298,8 @@ export async function POST(req: Request) {
           dealerId: matchedDealer.id,
           role: 'DEALER',
           phone: matchedDealer.phone,
-          name: matchedDealer.name
+          name: matchedDealer.name,
+          allowedPages: authenticatedUser.allowedPages
         });
 
         const res = NextResponse.json({

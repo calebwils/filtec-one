@@ -25,6 +25,7 @@ interface TokenData {
   userId: string;
   role: 'ADMIN' | 'EMPLOYEE' | 'DEALER';
   name?: string;
+  allowedPages?: string[];
   exp?: number;
 }
 
@@ -91,13 +92,38 @@ export async function middleware(request: NextRequest) {
   }
 
   // Role-based access control
-  if (isAdminRoute && user.role !== 'ADMIN') {
-    const target = user.role === 'EMPLOYEE' ? '/employee' : '/dealer';
-    return NextResponse.redirect(new URL(target, request.url));
+  if (isAdminRoute) {
+    if (user.role === 'ADMIN') {
+      // Full administrative access
+    } else if (user.role === 'EMPLOYEE') {
+      // Grant access if employee was explicitly granted this admin module
+      const isAllowed =
+        Array.isArray(user.allowedPages) &&
+        user.allowedPages.some((p) => pathname === p || pathname.startsWith(p + '/'));
+      if (!isAllowed) {
+        return NextResponse.redirect(new URL('/employee', request.url));
+      }
+    } else {
+      return NextResponse.redirect(new URL('/dealer', request.url));
+    }
   }
 
-  if (isEmployeeRoute && user.role !== 'EMPLOYEE' && user.role !== 'ADMIN') {
-    return NextResponse.redirect(new URL('/dealer', request.url));
+  if (isEmployeeRoute) {
+    if (user.role === 'ADMIN') {
+      // Admin has access to field views
+    } else if (user.role === 'EMPLOYEE') {
+      if (Array.isArray(user.allowedPages) && user.allowedPages.length > 0 && !pathname.endsWith('/profile')) {
+        const isAllowed = user.allowedPages.some((p) => pathname === p || pathname.startsWith(p + '/'));
+        if (!isAllowed) {
+          const fallback = user.allowedPages.find((p) => p.startsWith('/employee')) || '/employee';
+          if (pathname !== fallback) {
+            return NextResponse.redirect(new URL(fallback, request.url));
+          }
+        }
+      }
+    } else {
+      return NextResponse.redirect(new URL('/dealer', request.url));
+    }
   }
 
   if (isDealerRoute && user.role !== 'DEALER') {

@@ -97,6 +97,7 @@ export interface SessionPayload {
   employeeCode?: string;
   phone?: string;
   name?: string;
+  allowedPages?: string[];
   exp: number; // Unix timestamp in seconds
 }
 

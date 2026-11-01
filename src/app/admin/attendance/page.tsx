@@ -18,9 +18,11 @@ import {
   Navigation,
   RefreshCw,
   Camera,
-  Radio
+  Radio,
+  Trash2
 } from 'lucide-react';
 import { calculateDistanceMeters, formatDistanceToFiltec, formatDistanceShort } from '@/utils/distance';
+import { isSamirUser } from '@/utils/samirAuth';
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 function todayStr() {
@@ -38,7 +40,8 @@ function monthEnd(yyyyMM: string): string {
 
 // ─────────────────────────────────────────────────────────────────────────────
 export default function AdminAttendancePage() {
-  const { dailyAttendance, employees, leaveRequests, attendanceRecords } = useAppStore();
+  const { dailyAttendance, employees, leaveRequests, attendanceRecords, currentUser } = useAppStore();
+  const isSamir = isSamirUser(currentUser);
 
   const today = todayStr();
   const thisMonthStart = today.substring(0, 8) + '01';
@@ -53,6 +56,49 @@ export default function AdminAttendancePage() {
   const [selectedPunchPhoto, setSelectedPunchPhoto] = useState<string | null>(null);
   const [reminderSentForId, setReminderSentForId] = useState<string | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
+
+  // Samir-only deletion states
+  const [deleteTarget, setDeleteTarget] = useState<{
+    type: 'DAILY_SUMMARY' | 'PUNCH_RECORD';
+    summary?: DailyAttendanceSummary;
+    punch?: any;
+  } | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget) return;
+    setIsDeleting(true);
+    setDeleteError(null);
+    try {
+      if (deleteTarget.type === 'DAILY_SUMMARY' && deleteTarget.summary) {
+        const s = deleteTarget.summary;
+        await store.deleteAttendance({
+          id: s.id,
+          employeeId: s.employeeId,
+          employeeCode: s.employeeCode,
+          employeeName: s.employeeName,
+          date: s.date
+        });
+      } else if (deleteTarget.type === 'PUNCH_RECORD' && deleteTarget.punch) {
+        const p = deleteTarget.punch;
+        await store.deleteAttendance({
+          recordId: p.id,
+          employeeId: p.employeeId,
+          employeeName: p.employeeName,
+          date: (p.timestamp || '').split('T')[0]
+        });
+      }
+      setDeleteTarget(null);
+      if (selectedRecord && deleteTarget.summary?.id === selectedRecord.id) {
+        setSelectedRecord(null);
+      }
+    } catch (err: any) {
+      setDeleteError(err?.message || 'Failed to delete attendance record.');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   const handleSyncDatabase = async () => {
     setIsSyncing(true);
@@ -381,13 +427,25 @@ export default function AdminAttendancePage() {
                         </div>
                       </div>
 
-                      <div className="text-right font-mono text-xs text-[#111827] shrink-0 sm:self-center">
+                      <div className="text-right font-mono text-xs text-[#111827] shrink-0 sm:self-center flex flex-col items-end">
                         <span className="font-bold text-sm block">
                           {new Date(punch.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </span>
                         <span className="text-[11px] text-[#6B7280]">
                           {new Date(punch.timestamp).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })}
                         </span>
+
+                        {isSamir && (
+                          <button
+                            type="button"
+                            onClick={() => setDeleteTarget({ type: 'PUNCH_RECORD', punch })}
+                            title="Delete Punch (Samir Only)"
+                            className="mt-2 inline-flex items-center gap-1 border border-red-200 bg-red-50 hover:bg-red-100 text-red-600 text-[10px] font-semibold px-2 py-1 rounded transition-all cursor-pointer"
+                          >
+                            <Trash2 className="w-3 h-3 text-red-500" />
+                            <span>Delete Punch</span>
+                          </button>
+                        )}
                       </div>
                     </div>
                   );
@@ -556,26 +614,41 @@ export default function AdminAttendancePage() {
                           </td>
 
                           <td className="py-3 px-4 text-right whitespace-nowrap">
-                            {record.status === 'ABSENT' ? (
-                              <button
-                                type="button"
-                                onClick={() => handleSendReminder(record.employeeId)}
-                                className="inline-flex items-center gap-1 bg-neutral-900 hover:bg-black text-white text-[11px] font-semibold px-2.5 py-1.5 rounded transition-all cursor-pointer"
-                              >
-                                <Send className="w-3 h-3 text-emerald-400" />
-                                {reminderSentForId === record.employeeId ? 'Sent!' : 'WhatsApp Alert'}
-                              </button>
-                            ) : record.checkIn ? (
-                              <button
-                                type="button"
-                                onClick={() => setSelectedRecord(record)}
-                                className="inline-flex items-center gap-1 border border-[#E5E7EB] hover:bg-neutral-100 text-[#111827] text-[11px] font-medium px-2.5 py-1.5 rounded transition-all cursor-pointer"
-                              >
-                                <Eye className="w-3.5 h-3.5 text-neutral-500" /> Inspect GPS/Photo
-                              </button>
-                            ) : (
-                              <span className="text-neutral-400 text-xs font-mono">—</span>
-                            )}
+                            <div className="inline-flex items-center justify-end gap-1.5">
+                              {record.status === 'ABSENT' ? (
+                                <button
+                                  type="button"
+                                  onClick={() => handleSendReminder(record.employeeId)}
+                                  className="inline-flex items-center gap-1 bg-neutral-900 hover:bg-black text-white text-[11px] font-semibold px-2.5 py-1.5 rounded transition-all cursor-pointer"
+                                >
+                                  <Send className="w-3 h-3 text-emerald-400" />
+                                  {reminderSentForId === record.employeeId ? 'Sent!' : 'WhatsApp Alert'}
+                                </button>
+                              ) : record.checkIn ? (
+                                <button
+                                  type="button"
+                                  onClick={() => setSelectedRecord(record)}
+                                  className="inline-flex items-center gap-1 border border-[#E5E7EB] hover:bg-neutral-100 text-[#111827] text-[11px] font-medium px-2.5 py-1.5 rounded transition-all cursor-pointer"
+                                >
+                                  <Eye className="w-3.5 h-3.5 text-neutral-500" /> Inspect GPS/Photo
+                                </button>
+                              ) : (
+                                <span className="text-neutral-400 text-xs font-mono">—</span>
+                              )}
+
+                              {/* Delete button strictly visible only to Samir */}
+                              {isSamir && !record.id.startsWith('absent-') && (
+                                <button
+                                  type="button"
+                                  onClick={() => setDeleteTarget({ type: 'DAILY_SUMMARY', summary: record })}
+                                  title="Delete Attendance Record (Samir Only)"
+                                  className="inline-flex items-center gap-1 border border-red-200 bg-red-50 hover:bg-red-100 text-red-600 text-[11px] font-semibold px-2.5 py-1.5 rounded transition-all cursor-pointer"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5 text-red-500" />
+                                  <span>Delete</span>
+                                </button>
+                              )}
+                            </div>
                           </td>
                         </tr>
                       ))}
@@ -660,11 +733,25 @@ export default function AdminAttendancePage() {
               )}
             </div>
 
-            <div className="px-5 py-3 border-t border-[#E5E7EB] bg-[#F8F9FA] flex justify-end">
+            <div className="px-5 py-3 border-t border-[#E5E7EB] bg-[#F8F9FA] flex items-center justify-between">
+              {isSamir && !selectedRecord.id.startsWith('absent-') ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const rec = selectedRecord;
+                    setSelectedRecord(null);
+                    setDeleteTarget({ type: 'DAILY_SUMMARY', summary: rec });
+                  }}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 rounded-lg text-xs font-semibold transition cursor-pointer"
+                >
+                  <Trash2 className="w-3.5 h-3.5 text-red-500" />
+                  <span>Delete Record</span>
+                </button>
+              ) : <div />}
               <button
                 type="button"
                 onClick={() => setSelectedRecord(null)}
-                className="bg-[#111827] hover:bg-black text-white text-xs font-semibold px-4 py-2 rounded-lg"
+                className="bg-[#111827] hover:bg-black text-white text-xs font-semibold px-4 py-2 rounded-lg cursor-pointer"
               >
                 Done
               </button>
@@ -695,6 +782,95 @@ export default function AdminAttendancePage() {
             </div>
             <div className="bg-neutral-900 aspect-square flex items-center justify-center overflow-hidden">
               <img src={selectedPunchPhoto} alt="Audit Selfie" className="w-full h-full object-cover" />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Samir Attendance Deletion Confirmation Modal */}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full overflow-hidden shadow-2xl border border-neutral-200">
+            <div className="p-5">
+              <div className="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center mx-auto mb-4">
+                <Trash2 className="w-6 h-6" />
+              </div>
+              <h3 className="text-base font-bold text-center text-[#111827]">
+                Delete Attendance Record?
+              </h3>
+              <p className="text-xs text-[#6B7280] text-center mt-1.5">
+                This will permanently remove this attendance record from both the database and the dashboard.
+              </p>
+
+              <div className="mt-4 p-3 bg-neutral-50 rounded-lg border border-[#E5E7EB] space-y-1.5 text-xs font-mono">
+                <div className="flex justify-between">
+                  <span className="text-[#6B7280]">Employee:</span>
+                  <span className="font-bold text-[#111827]">
+                    {deleteTarget.summary?.employeeName || deleteTarget.punch?.employeeName || '—'}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-[#6B7280]">Date:</span>
+                  <span className="text-[#111827]">
+                    {deleteTarget.summary?.date || (deleteTarget.punch?.timestamp ? deleteTarget.punch.timestamp.split('T')[0] : '—')}
+                  </span>
+                </div>
+                {deleteTarget.summary?.checkIn?.time && (
+                  <div className="flex justify-between">
+                    <span className="text-[#6B7280]">Check-In Time:</span>
+                    <span className="text-emerald-700 font-bold">{deleteTarget.summary.checkIn.time}</span>
+                  </div>
+                )}
+                {deleteTarget.punch?.type && (
+                  <div className="flex justify-between">
+                    <span className="text-[#6B7280]">Punch Type:</span>
+                    <span className="text-[#111827] font-bold">{deleteTarget.punch.type}</span>
+                  </div>
+                )}
+              </div>
+
+              {deleteError && (
+                <div className="mt-3 p-2 bg-red-50 border border-red-200 rounded text-red-700 text-xs">
+                  {deleteError}
+                </div>
+              )}
+
+              <div className="mt-5 flex gap-2">
+                <button
+                  type="button"
+                  disabled={isDeleting}
+                  onClick={() => {
+                    setDeleteTarget(null);
+                    setDeleteError(null);
+                  }}
+                  className="flex-1 py-2 text-xs font-semibold border border-[#E5E7EB] rounded-lg text-[#374151] hover:bg-neutral-100 transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={isDeleting}
+                  onClick={handleConfirmDelete}
+                  className="flex-1 py-2 text-xs font-semibold bg-red-600 hover:bg-red-700 text-white rounded-lg transition shadow-xs flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  {isDeleting ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <span>Deleting…</span>
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Yes, Delete</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+            <div className="bg-[#F8F9FA] px-5 py-2.5 border-t border-[#E5E7EB] text-center">
+              <span className="text-[10px] text-[#9CA3AF] font-mono">
+                🔒 Restricted Action • Samir Admin Privilege Only
+              </span>
             </div>
           </div>
         </div>

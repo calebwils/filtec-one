@@ -174,7 +174,8 @@ export async function POST(req: Request) {
           role,
           employeeCode: updatedEmp.code,
           phone: updatedEmp.phone,
-          name: updatedEmp.name
+          name: updatedEmp.name,
+          allowedPages
         });
         res.cookies.set('filtec_session', token, {
           httpOnly: true,
@@ -328,7 +329,8 @@ export async function POST(req: Request) {
           userId: updatedDealer.id,
           role: 'DEALER',
           phone: updatedDealer.phone,
-          name: updatedDealer.name
+          name: updatedDealer.name,
+          allowedPages: finalUser.allowedPages
         });
         res.cookies.set('filtec_session', token, {
           httpOnly: true,

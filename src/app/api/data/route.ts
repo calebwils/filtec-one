@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { sortProductsNaturally } from '@/lib/catalogueUtils';
-import { getSessionFromRequest } from '@/lib/security';
+import { getSessionFromRequest, createSessionToken, SESSION_MAX_AGE_SECONDS } from '@/lib/security';
 import { getAttendanceRetentionCutoff, pruneExpiredAttendanceRecords } from '@/lib/attendanceRetention';
+import { ALL_ADMIN_PAGES, ALL_EMPLOYEE_PAGES, ALL_DEALER_PAGES } from '@/data/initialSeed';
+import { isSamirUser } from '@/utils/samirAuth';
 
 export const dynamic = 'force-dynamic';
 
@@ -87,7 +89,21 @@ export async function GET(req: Request) {
       } catch {}
     }
 
+    let employeeAllowedPages: string[] = [];
+    if (currentEmp?.allowedPages) {
+      try {
+        employeeAllowedPages = typeof currentEmp.allowedPages === 'string'
+          ? JSON.parse(currentEmp.allowedPages)
+          : currentEmp.allowedPages;
+      } catch {
+        employeeAllowedPages = [];
+      }
+    } else if (session.allowedPages && Array.isArray(session.allowedPages)) {
+      employeeAllowedPages = session.allowedPages;
+    }
+
     // 1. Scoped dealers: Dealers only see their OWN dealership; peers/financials are isolated
+    const hasAdminDealers = employeeAllowedPages.includes('/admin/dealers');
     const scopedDealers = dealers
       .map(({ password: _p, ...d }) => d)
       .filter((d) => {
@@ -101,16 +117,17 @@ export async function GET(req: Request) {
       .map((d) => {
         if (isCallerAdmin) return d;
         if (isCallerDealer) return d;
-        // Employee viewing dealer: hide financial limits unless directly assigned
+        // Employee viewing dealer: hide financial limits unless directly assigned or has admin dealer access
         const isAssigned = assignedDealerIds.includes(d.id);
         return {
           ...d,
-          creditLimit: isAssigned ? d.creditLimit : null,
-          outstandingBalance: isAssigned ? d.outstandingBalance : null
+          creditLimit: isAssigned || hasAdminDealers ? d.creditLimit : null,
+          outstandingBalance: isAssigned || hasAdminDealers ? d.outstandingBalance : null
         };
       });
 
     // 2. Scoped employees: Dealers receive [] (cannot see employees); for Employees, peers' salaries masked
+    const hasAdminStaff = employeeAllowedPages.includes('/admin/employees');
     const scopedEmployees = isCallerDealer
       ? []
       : employees.map((e) => {
@@ -119,7 +136,7 @@ export async function GET(req: Request) {
             session.userId === e.id ||
             session.userId === `user-${e.id}` ||
             session.employeeCode === e.code;
-          const canViewSalary = isCallerAdmin || isSelf;
+          const canViewSalary = isCallerAdmin || hasAdminStaff || isSelf;
 
           return {
             ...safeEmployee,
@@ -131,8 +148,8 @@ export async function GET(req: Request) {
           };
         });
 
-    // 3. Scoped users: Admin ONLY
-    const scopedUsers = isCallerAdmin
+    // 3. Scoped users: Admin ONLY (or staff admin)
+    const scopedUsers = (isCallerAdmin || hasAdminStaff)
       ? users.map((u) => {
           const { password: _p, ...safeUser } = u;
           return {
@@ -156,14 +173,20 @@ export async function GET(req: Request) {
     });
 
     // 5. Scoped orders: Dealer only sees their OWN orders
+    const hasAdminOrders = employeeAllowedPages.includes('/admin/orders');
     const scopedOrders = orders.filter((o) => {
-      if (isCallerAdmin) return true;
+      if (isCallerAdmin || hasAdminOrders) return true;
       if (isCallerDealer) {
         const cleanDealerId = session.dealerId || session.userId.replace(/^user-/, '');
         return o.dealerId === session.userId || o.dealerId === session.dealerId || o.dealerId === cleanDealerId;
       }
       if (isCallerEmployee) {
-        return o.employeeId === session.userId || o.employeeId === session.employeeCode || assignedDealerIds.includes(o.dealerId);
+        return (
+          assignedDealerIds.length === 0 ||
+          assignedDealerIds.includes(o.dealerId) ||
+          o.employeeId === session.userId ||
+          o.employeeId === session.employeeCode
+        );
       }
       return false;
     });
@@ -234,9 +257,10 @@ export async function GET(req: Request) {
         verified: r.verified !== false
       }));
 
-    // 8. Scoped rewards: Dealer only sees their OWN rewards
+    // 8. Scoped rewards: Dealer only sees their OWN rewards (or employee with /admin/rewards access)
+    const hasAdminRewards = employeeAllowedPages.includes('/admin/rewards');
     const scopedRewardLedger = rewardLedger.filter((rl) => {
-      if (isCallerAdmin) return true;
+      if (isCallerAdmin || hasAdminRewards) return true;
       if (isCallerDealer) {
         const cleanDealerId = session.dealerId || session.userId.replace(/^user-/, '');
         return rl.dealerId === session.userId || rl.dealerId === session.dealerId || rl.dealerId === cleanDealerId;
@@ -245,7 +269,7 @@ export async function GET(req: Request) {
     });
 
     const scopedRewardVouchers = (Array.isArray(rewardVouchers) ? rewardVouchers : []).filter((rv: any) => {
-      if (isCallerAdmin) return true;
+      if (isCallerAdmin || hasAdminRewards) return true;
       if (isCallerDealer) {
         const cleanDealerId = session.dealerId || session.userId.replace(/^user-/, '');
         return rv.dealerId === session.userId || rv.dealerId === session.dealerId || rv.dealerId === cleanDealerId;
@@ -253,9 +277,10 @@ export async function GET(req: Request) {
       return false;
     });
 
-    // 9. Audit logs & integration events: ADMIN ONLY
-    const scopedAuditLogs = isCallerAdmin ? auditLogs : [];
-    const scopedIntegrationEvents = isCallerAdmin ? integrationEvents : [];
+    // 9. Audit logs & integration events: ADMIN ONLY (or employee with settings/staff admin)
+    const hasAdminAudits = employeeAllowedPages.includes('/admin/settings') || employeeAllowedPages.includes('/admin/employees');
+    const scopedAuditLogs = (isCallerAdmin || hasAdminAudits) ? auditLogs : [];
+    const scopedIntegrationEvents = (isCallerAdmin || hasAdminAudits) ? integrationEvents : [];
 
     const settingsMap: Record<string, any> = {};
     for (const s of settingsRows) {
@@ -266,7 +291,14 @@ export async function GET(req: Request) {
       }
     }
 
-    return NextResponse.json({
+    const effectiveAllowedPages =
+      session.role === 'ADMIN'
+        ? ALL_ADMIN_PAGES
+        : session.role === 'EMPLOYEE'
+        ? (employeeAllowedPages.length > 0 ? employeeAllowedPages : ALL_EMPLOYEE_PAGES)
+        : ALL_DEALER_PAGES;
+
+    const res = NextResponse.json({
       success: true,
       sessionUser: {
         id: session.userId,
@@ -274,7 +306,8 @@ export async function GET(req: Request) {
         name: session.name,
         phone: session.phone,
         employeeCode: session.employeeCode,
-        dealerId: session.dealerId
+        dealerId: session.dealerId,
+        allowedPages: effectiveAllowedPages
       },
       data: {
         products: parsedProducts,
@@ -293,6 +326,26 @@ export async function GET(req: Request) {
         rewardVouchers: scopedRewardVouchers
       }
     });
+
+    // Keep session cookie synchronized with latest verified permissions
+    const sessionToken = createSessionToken({
+      userId: session.userId,
+      role: session.role,
+      employeeCode: session.employeeCode,
+      dealerId: session.dealerId,
+      phone: session.phone,
+      name: session.name,
+      allowedPages: effectiveAllowedPages
+    });
+    res.cookies.set('filtec_session', sessionToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/',
+      maxAge: SESSION_MAX_AGE_SECONDS
+    });
+
+    return res;
   } catch (error: any) {
     console.error('API /api/data error:', error);
     return NextResponse.json(
@@ -355,10 +408,11 @@ const ALL_SUPPORTED_ACTIONS = [
   'UPDATE_LEAVE_REQUEST',
   'ALLOCATE_PLUMBER_REWARD',
   'DEALER_REDEEM_REWARD',
-  'SETTLE_VOUCHER'
+  'SETTLE_VOUCHER',
+  'DELETE_ATTENDANCE'
 ];
 
-// 16 administrative actions requiring authenticated ADMIN role
+// Administrative actions requiring authenticated ADMIN role
 const ADMIN_ONLY_ACTIONS = [
   'UPDATE_SETTINGS',
   'CREATE_DEALER',
@@ -375,7 +429,8 @@ const ADMIN_ONLY_ACTIONS = [
   'REJECT_ORDER',
   'DELETE_ORDER',
   'UPDATE_LEAVE_REQUEST',
-  'SETTLE_VOUCHER'
+  'SETTLE_VOUCHER',
+  'DELETE_ATTENDANCE'
 ];
 
 // Handler to persist changes directly to PostgreSQL
@@ -436,8 +491,77 @@ export async function POST(req: Request) {
 
     const isEscalationAttempt = action === 'UPDATE_EMPLOYEE' && payload?.systemRole && payload.systemRole !== 'EMPLOYEE';
 
-    if (ADMIN_ONLY_ACTIONS.includes(action) || isEscalationAttempt) {
+    if (isEscalationAttempt) {
       if (session.role !== 'ADMIN') {
+        return NextResponse.json(
+          { success: false, error: 'Forbidden: Admin access required to escalate role.' },
+          { status: 403 }
+        );
+      }
+    }
+
+    // Attendance deletion is strictly reserved for Samir personally.
+    // Even if attendance management permissions are granted to an employee,
+    // they are strictly blocked from deleting attendance records.
+    if (action === 'DELETE_ATTENDANCE') {
+      if (!isSamirUser(session)) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'Forbidden: Attendance records can strictly only be deleted by Samir.'
+          },
+          { status: 403 }
+        );
+      }
+    }
+
+    if (ADMIN_ONLY_ACTIONS.includes(action)) {
+      if (session.role === 'ADMIN') {
+        // Unrestricted administrator access
+      } else if (session.role === 'EMPLOYEE') {
+        let empPages: string[] = session.allowedPages || [];
+        if (empPages.length === 0) {
+          try {
+            const cleanEmpId = session.userId.replace(/^user-/, '');
+            const empDb = await prisma.employee.findFirst({
+              where: {
+                OR: [
+                  { id: session.userId },
+                  { id: cleanEmpId },
+                  { code: session.employeeCode || '' }
+                ]
+              }
+            });
+            if (empDb?.allowedPages) {
+              empPages = typeof empDb.allowedPages === 'string' ? JSON.parse(empDb.allowedPages) : empDb.allowedPages;
+            }
+          } catch {}
+        }
+
+        const isCatalogueAction = ['CREATE_PRODUCT', 'UPDATE_PRODUCT', 'TOGGLE_PRODUCT_STOCK', 'UPDATE_VARIANT_STOCK', 'DELETE_PRODUCT'].includes(action);
+        const isDealerAction = ['CREATE_DEALER', 'DELETE_DEALER'].includes(action);
+        const isOrderAction = ['APPROVE_ORDER', 'RELEASE_ORDER', 'REJECT_ORDER', 'DELETE_ORDER'].includes(action);
+        const isLeaveAction = ['UPDATE_LEAVE_REQUEST'].includes(action);
+        const isRewardAction = ['SETTLE_VOUCHER'].includes(action);
+        const isSettingsAction = ['UPDATE_SETTINGS'].includes(action);
+        const isEmployeeAction = ['CREATE_EMPLOYEE', 'DELETE_EMPLOYEE'].includes(action);
+
+        const hasPermission =
+          (isCatalogueAction && empPages.includes('/admin/catalogue')) ||
+          (isDealerAction && empPages.includes('/admin/dealers')) ||
+          (isOrderAction && empPages.includes('/admin/orders')) ||
+          (isLeaveAction && (empPages.includes('/admin/attendance') || empPages.includes('/admin/employees'))) ||
+          (isRewardAction && empPages.includes('/admin/rewards')) ||
+          (isSettingsAction && empPages.includes('/admin/settings')) ||
+          (isEmployeeAction && empPages.includes('/admin/employees'));
+
+        if (!hasPermission) {
+          return NextResponse.json(
+            { success: false, error: 'Forbidden: Admin module permission required to execute this operation.' },
+            { status: 403 }
+          );
+        }
+      } else {
         return NextResponse.json(
           { success: false, error: 'Forbidden: Admin access required to execute this operation.' },
           { status: 403 }
@@ -1320,6 +1444,101 @@ export async function POST(req: Request) {
         }
 
         return NextResponse.json({ success: true, record, summary });
+      }
+
+      case 'DELETE_ATTENDANCE': {
+        const { id, recordId, employeeId, employeeCode, employeeName, date } = payload;
+
+        try {
+          // 1. Delete matching Daily Attendance Summary records
+          if (id) {
+            await prisma.dailyAttendanceSummary.deleteMany({
+              where: { id }
+            });
+          }
+          if (employeeId && date) {
+            const cleanEmpId = String(employeeId).replace(/^user-/, '');
+            await prisma.dailyAttendanceSummary.deleteMany({
+              where: {
+                date: String(date),
+                OR: [
+                  { employeeId: String(employeeId) },
+                  { employeeId: cleanEmpId },
+                  { employeeCode: String(employeeId) },
+                  ...(employeeCode ? [{ employeeCode: String(employeeCode) }] : [])
+                ]
+              }
+            });
+          }
+
+          // 2. Delete matching raw punch Attendance Records
+          if (recordId) {
+            await prisma.attendanceRecord.deleteMany({
+              where: { id: recordId }
+            });
+          }
+          if (id) {
+            await prisma.attendanceRecord.deleteMany({
+              where: { id }
+            });
+          }
+          if (employeeId && date) {
+            const dateStr = String(date).split('T')[0];
+            const startOfDay = new Date(`${dateStr}T00:00:00.000Z`);
+            const endOfDay = new Date(`${dateStr}T23:59:59.999Z`);
+            const cleanEmpId = String(employeeId).replace(/^user-/, '');
+
+            await prisma.attendanceRecord.deleteMany({
+              where: {
+                timestamp: { gte: startOfDay, lte: endOfDay },
+                OR: [
+                  { employeeId: String(employeeId) },
+                  { employeeId: cleanEmpId }
+                ]
+              }
+            });
+          }
+
+          // 3. If deleting today's attendance, reset employee on-field status
+          const today = new Date().toISOString().split('T')[0];
+          if (!date || String(date).startsWith(today)) {
+            if (employeeId) {
+              const cleanEmpId = String(employeeId).replace(/^user-/, '');
+              await prisma.employee.updateMany({
+                where: {
+                  OR: [
+                    { id: String(employeeId) },
+                    { id: cleanEmpId },
+                    { code: String(employeeId) },
+                    ...(employeeCode ? [{ code: String(employeeCode) }] : [])
+                  ]
+                },
+                data: {
+                  checkInStatus: 'CHECKED_OUT',
+                  lastCheckInTime: null,
+                  lastLocation: null
+                }
+              });
+            }
+          }
+
+          // 4. Record tamper-evident audit log
+          await recordAudit(
+            session,
+            'DELETE_ATTENDANCE',
+            'ATTENDANCE',
+            id || recordId || `${employeeId}-${date}`,
+            `Samir deleted attendance record for ${employeeName || employeeId || 'Employee'} (${date || 'Today'})`
+          );
+
+          return NextResponse.json({ success: true, deleted: { id, recordId, employeeId, date } });
+        } catch (delErr: any) {
+          console.error('DELETE_ATTENDANCE error:', delErr);
+          return NextResponse.json(
+            { success: false, error: delErr?.message || 'Failed to delete attendance record.' },
+            { status: 500 }
+          );
+        }
       }
 
       case 'ALLOCATE_PLUMBER_REWARD': {

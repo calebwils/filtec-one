@@ -151,7 +151,8 @@ export async function POST(req: Request) {
         dealerId: newDealer.id,
         role: 'DEALER',
         phone: newDealer.phone,
-        name: newDealer.name
+        name: newDealer.name,
+        allowedPages: authenticatedUser.allowedPages
       });
 
       const { password: _dlrPass, ...safeDealer } = newDealer;
@@ -253,7 +254,8 @@ export async function POST(req: Request) {
         role: 'EMPLOYEE',
         employeeCode: newEmployee.code,
         phone: newEmployee.phone,
-        name: newEmployee.name
+        name: newEmployee.name,
+        allowedPages
       });
 
       const { password: _empPass, ...safeEmployee } = newEmployee;

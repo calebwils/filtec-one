@@ -46,9 +46,11 @@ export function MobileBottomNav() {
   const adminNavItems = [
     { path: '/admin', label: 'Control', icon: Activity },
     { path: '/admin/orders', label: 'Orders', icon: FileCheck, count: pendingApprovalsCount },
+    { path: '/admin/attendance', label: 'Tracking', icon: Radio },
     { path: '/admin/catalogue', label: 'Catalogue', icon: BookOpen },
     { path: '/admin/dealers', label: 'Dealers', icon: Building2 },
     { path: '/admin/employees', label: 'Staff', icon: Users },
+    { path: '/admin/rewards', label: 'Rewards', icon: Award },
     { path: '/admin/settings', label: 'Settings', icon: Settings }
   ];
 
