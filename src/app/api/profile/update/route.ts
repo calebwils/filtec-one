@@ -182,7 +182,8 @@ export async function POST(req: Request) {
           sameSite: 'lax',
           path: '/',
           secure: process.env.NODE_ENV === 'production',
-          maxAge: SESSION_MAX_AGE_SECONDS
+          maxAge: SESSION_MAX_AGE_SECONDS,
+          expires: new Date(Date.now() + SESSION_MAX_AGE_SECONDS * 1000)
         });
       }
 
@@ -337,7 +338,8 @@ export async function POST(req: Request) {
           sameSite: 'lax',
           path: '/',
           secure: process.env.NODE_ENV === 'production',
-          maxAge: SESSION_MAX_AGE_SECONDS
+          maxAge: SESSION_MAX_AGE_SECONDS,
+          expires: new Date(Date.now() + SESSION_MAX_AGE_SECONDS * 1000)
         });
       }
 

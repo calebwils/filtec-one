@@ -40,3 +40,4 @@ export function isSamirUser(user: MinimalUserOrSession | null | undefined): bool
     phone.endsWith('05814')
   );
 }
+

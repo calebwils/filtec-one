@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { store } from '@/data/store';
@@ -38,6 +38,26 @@ interface PendingFirstLogin {
 
 export default function LoginPage() {
   const router = useRouter();
+
+  // Auto-redirect if existing valid session cookie is present
+  useEffect(() => {
+    fetch('/api/data')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.success && data?.sessionUser) {
+          const user = data.sessionUser;
+          store.setUser(user);
+          if (user.role === 'ADMIN') {
+            router.replace('/admin');
+          } else if (user.role === 'EMPLOYEE') {
+            router.replace('/employee');
+          } else if (user.role === 'DEALER') {
+            router.replace('/dealer');
+          }
+        }
+      })
+      .catch(() => {});
+  }, [router]);
 
   // Mode: Sign in or Register
   const [authMode, setAuthMode] = useState<AuthMode>('SIGN_IN');

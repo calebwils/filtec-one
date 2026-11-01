@@ -342,7 +342,8 @@ export async function GET(req: Request) {
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
       path: '/',
-      maxAge: SESSION_MAX_AGE_SECONDS
+      maxAge: SESSION_MAX_AGE_SECONDS,
+      expires: new Date(Date.now() + SESSION_MAX_AGE_SECONDS * 1000)
     });
 
     return res;

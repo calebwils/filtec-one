@@ -73,6 +73,18 @@ async function verifyEdgeToken(token: string): Promise<TokenData | null> {
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
 
+  // If user visits the root / login page with an existing valid session,
+  // automatically redirect them to their authenticated portal
+  if (pathname === '/') {
+    const token = request.cookies.get(SESSION_COOKIE_NAME)?.value;
+    const user = token ? await verifyEdgeToken(token) : null;
+    if (user) {
+      const target = user.role === 'ADMIN' ? '/admin' : user.role === 'EMPLOYEE' ? '/employee' : '/dealer';
+      return NextResponse.redirect(new URL(target, request.url));
+    }
+    return NextResponse.next();
+  }
+
   // Protected portal boundaries
   const isAdminRoute = pathname.startsWith('/admin') || pathname === '/dashboard';
   const isEmployeeRoute = pathname.startsWith('/employee');
@@ -136,6 +148,7 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
+    '/',
     '/admin/:path*',
     '/dashboard/:path*',
     '/employee/:path*',

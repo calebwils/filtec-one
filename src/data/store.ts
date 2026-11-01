@@ -49,7 +49,7 @@ import { useEffect, useSyncExternalStore } from 'react';
 import { sortProductsNaturally } from '@/lib/catalogueUtils';
 import { isWithinRetentionWindow } from '@/utils/attendanceRetention';
 
-const STORAGE_KEY = 'filtec_pretech1_state_v10';
+const STORAGE_KEY = 'filtec_pretech1_state_v11';
 
 export interface AppState {
   currentUser: User;
@@ -199,6 +199,7 @@ export const store = {
     try {
       hasInitializedFromStorage = true;
       try {
+        localStorage.removeItem('filtec_pretech1_state_v10');
         localStorage.removeItem('filtec_pretech1_state_v9');
         localStorage.removeItem('filtec_pretech1_state_v8');
       } catch {}
@@ -493,27 +494,17 @@ export const store = {
               orders: Array.isArray(d.orders) ? d.orders : [],
               leaveRequests: d.leaveRequests?.length ? d.leaveRequests : globalState.leaveRequests,
               dailyAttendance: Array.isArray(d.dailyAttendance)
-                ? (() => {
-                    const remote = d.dailyAttendance.filter((da: any) => isWithinRetentionWindow(da.date));
-                    const remoteIds = new Set(remote.map((item: any) => item.id));
-                    const unsyncedLocal = globalState.dailyAttendance.filter(
-                      (item) => !remoteIds.has(item.id) && isWithinRetentionWindow(item.date)
-                    );
-                    return [...unsyncedLocal, ...remote].sort((a, b) => b.date.localeCompare(a.date));
-                  })()
-                : globalState.dailyAttendance.filter((da) => isWithinRetentionWindow(da.date)),
+                ? d.dailyAttendance
+                    .filter((da: any) => isWithinRetentionWindow(da.date))
+                    .sort((a: any, b: any) => b.date.localeCompare(a.date))
+                : [],
               attendanceRecords: Array.isArray(d.attendanceRecords)
-                ? (() => {
-                    const remote = d.attendanceRecords.filter((r: any) => isWithinRetentionWindow(r.timestamp));
-                    const remoteIds = new Set(remote.map((r: any) => r.id));
-                    const unsyncedLocal = globalState.attendanceRecords.filter(
-                      (r) => !remoteIds.has(r.id) && isWithinRetentionWindow(r.timestamp)
-                    );
-                    return [...unsyncedLocal, ...remote].sort(
-                      (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-                    );
-                  })()
-                : globalState.attendanceRecords.filter((r) => isWithinRetentionWindow(r.timestamp)),
+                ? d.attendanceRecords
+                    .filter((r: any) => isWithinRetentionWindow(r.timestamp))
+                    .sort(
+                      (a: any, b: any) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+                    )
+                : [],
               rewardLedger: Array.isArray(d.rewardLedger) ? d.rewardLedger : [],
               auditLogs: Array.isArray(d.auditLogs) ? d.auditLogs : [],
               integrationEvents: Array.isArray(d.integrationEvents) ? d.integrationEvents : [],
