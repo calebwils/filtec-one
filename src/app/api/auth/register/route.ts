@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { User, Role } from '@/types';
 import { checkRateLimit } from '@/lib/rateLimit';
-import { hashPassword, createSessionToken } from '@/lib/security';
+import { hashPassword, createSessionToken, SESSION_MAX_AGE_SECONDS } from '@/lib/security';
 
 function extractDigits(str: string): string {
   return (str || '').replace(/\D/g, '');
@@ -169,7 +169,7 @@ export async function POST(req: Request) {
         sameSite: 'lax',
         path: '/',
         secure: process.env.NODE_ENV === 'production',
-        maxAge: 72 * 3600
+        maxAge: SESSION_MAX_AGE_SECONDS
       });
 
       return response;
@@ -271,7 +271,7 @@ export async function POST(req: Request) {
         sameSite: 'lax',
         path: '/',
         secure: process.env.NODE_ENV === 'production',
-        maxAge: 72 * 3600
+        maxAge: SESSION_MAX_AGE_SECONDS
       });
 
       return response;

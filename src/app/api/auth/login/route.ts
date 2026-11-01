@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { User, Role } from '@/types';
 import { checkRateLimit } from '@/lib/rateLimit';
-import { hashPassword, verifyPassword, createSessionToken } from '@/lib/security';
+import { hashPassword, verifyPassword, createSessionToken, SESSION_MAX_AGE_SECONDS } from '@/lib/security';
 
 // Helper to extract clean digits from phone
 function extractDigits(str: string): string {
@@ -191,13 +191,13 @@ export async function POST(req: Request) {
           employee: safeEmployee
         });
 
-        // Set HttpOnly, secure session cookie
+        // Set HttpOnly, secure session cookie (90 days retention)
         res.cookies.set('filtec_session', sessionToken, {
           httpOnly: true,
           secure: process.env.NODE_ENV === 'production',
           sameSite: 'lax',
           path: '/',
-          maxAge: 72 * 3600
+          maxAge: SESSION_MAX_AGE_SECONDS
         });
 
         return res;
@@ -316,7 +316,7 @@ export async function POST(req: Request) {
           secure: process.env.NODE_ENV === 'production',
           sameSite: 'lax',
           path: '/',
-          maxAge: 72 * 3600
+          maxAge: SESSION_MAX_AGE_SECONDS
         });
 
         return res;

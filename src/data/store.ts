@@ -47,6 +47,7 @@ import {
 import { calculateDistanceMeters, formatDistanceToFiltec } from '@/utils/distance';
 import { useEffect, useSyncExternalStore } from 'react';
 import { sortProductsNaturally } from '@/lib/catalogueUtils';
+import { isWithinRetentionWindow } from '@/utils/attendanceRetention';
 
 const STORAGE_KEY = 'filtec_pretech1_state_v10';
 
@@ -310,10 +311,8 @@ export const store = {
                 d.id === 'att-sum-3' ||
                 d.id === 'att-sum-4' ||
                 d.id === 'att-sum-5' ||
-                d.id === 'att-sum-emp-1-2026-10-01' ||
-                d.date === '2026-09-11' ||
-                d.date === '2026-10-01';
-              return !isMock;
+                d.id === 'att-sum-emp-1-2026-10-01';
+              return !isMock && isWithinRetentionWindow(d.date);
             })
           : [];
 
@@ -324,11 +323,8 @@ export const store = {
                 r.id === 'att-2' ||
                 r.id === 'att-3' ||
                 r.id === 'att-4' ||
-                r.id === 'att-5' ||
-                r.id === 'att-1790861294717' ||
-                r.id === 'att-1790861301898' ||
-                (r.timestamp && (r.timestamp.startsWith('2026-09-11') || r.timestamp.startsWith('2026-10-01')));
-              return !isMock;
+                r.id === 'att-5';
+              return !isMock && isWithinRetentionWindow(r.timestamp);
             })
           : [];
 
@@ -382,6 +378,61 @@ export const store = {
           const json = await res.json();
           if (json.success && json.data) {
             const d = json.data;
+            const sessionUser = json.sessionUser;
+
+            let syncedCurrentUser = globalState.currentUser;
+            if (sessionUser && sessionUser.id) {
+              const cleanSessionId = sessionUser.id.replace(/^user-/, '');
+              if (sessionUser.role === 'ADMIN' || sessionUser.role === 'EMPLOYEE') {
+                const availableEmps = (d.employees?.length ? d.employees : globalState.employees) as Employee[];
+                const matchedEmp = availableEmps.find(
+                  (e: Employee) =>
+                    e.id === sessionUser.id ||
+                    e.id === cleanSessionId ||
+                    e.code === sessionUser.employeeCode ||
+                    `user-${e.id}` === sessionUser.id
+                );
+                if (matchedEmp) {
+                  syncedCurrentUser = {
+                    id: sessionUser.id,
+                    name: matchedEmp.name,
+                    email: matchedEmp.email || `${matchedEmp.code.toLowerCase().replace(/[^a-z0-9]/g, '')}@filtec.in`,
+                    phone: matchedEmp.phone,
+                    role: (matchedEmp.systemRole as Role) || sessionUser.role,
+                    employeeCode: matchedEmp.code,
+                    allowedPages:
+                      matchedEmp.allowedPages && matchedEmp.allowedPages.length > 0
+                        ? matchedEmp.allowedPages
+                        : sessionUser.role === 'ADMIN'
+                        ? ALL_ADMIN_PAGES
+                        : ALL_EMPLOYEE_PAGES,
+                    avatarUrl: matchedEmp.avatarUrl,
+                    mustChangePassword: false
+                  };
+                }
+              } else if (sessionUser.role === 'DEALER') {
+                const availableDealers = (d.dealers?.length ? d.dealers : globalState.dealers) as Dealer[];
+                const matchedDealer = availableDealers.find(
+                  (dlr: Dealer) =>
+                    dlr.id === sessionUser.dealerId ||
+                    dlr.id === cleanSessionId ||
+                    dlr.id === sessionUser.id
+                );
+                if (matchedDealer) {
+                  syncedCurrentUser = {
+                    id: sessionUser.id,
+                    name: matchedDealer.name,
+                    email: matchedDealer.email || `${matchedDealer.code.toLowerCase()}@filtec-dealers.in`,
+                    phone: matchedDealer.phone,
+                    role: 'DEALER',
+                    dealerId: matchedDealer.id,
+                    allowedPages: ALL_DEALER_PAGES,
+                    mustChangePassword: false
+                  };
+                }
+              }
+            }
+
             const syncedProducts: Product[] = sortProductsNaturally<Product>(
               (d.products?.length ? d.products : globalState.products).map((p: any) => {
                 const seed = CATALOGUE_PRODUCTS.find(
@@ -396,6 +447,7 @@ export const store = {
 
             globalState = {
               ...globalState,
+              currentUser: syncedCurrentUser,
               products: syncedProducts,
               dealers: Array.isArray(d.dealers) && d.dealers.length > 0
                 ? (() => {
@@ -438,22 +490,28 @@ export const store = {
               plumbers: Array.isArray(d.plumbers) ? d.plumbers : [],
               orders: Array.isArray(d.orders) ? d.orders : [],
               leaveRequests: d.leaveRequests?.length ? d.leaveRequests : globalState.leaveRequests,
-              dailyAttendance: Array.isArray(d.dailyAttendance) && d.dailyAttendance.length > 0
+              dailyAttendance: Array.isArray(d.dailyAttendance)
                 ? (() => {
-                    const remote = d.dailyAttendance;
+                    const remote = d.dailyAttendance.filter((da: any) => isWithinRetentionWindow(da.date));
                     const remoteIds = new Set(remote.map((item: any) => item.id));
-                    const unsyncedLocal = globalState.dailyAttendance.filter((item) => !remoteIds.has(item.id));
-                    return [...unsyncedLocal, ...remote];
+                    const unsyncedLocal = globalState.dailyAttendance.filter(
+                      (item) => !remoteIds.has(item.id) && isWithinRetentionWindow(item.date)
+                    );
+                    return [...unsyncedLocal, ...remote].sort((a, b) => b.date.localeCompare(a.date));
                   })()
-                : globalState.dailyAttendance,
-              attendanceRecords: Array.isArray(d.attendanceRecords) && d.attendanceRecords.length > 0
+                : globalState.dailyAttendance.filter((da) => isWithinRetentionWindow(da.date)),
+              attendanceRecords: Array.isArray(d.attendanceRecords)
                 ? (() => {
-                    const remote = d.attendanceRecords;
+                    const remote = d.attendanceRecords.filter((r: any) => isWithinRetentionWindow(r.timestamp));
                     const remoteIds = new Set(remote.map((r: any) => r.id));
-                    const unsyncedLocal = globalState.attendanceRecords.filter((r) => !remoteIds.has(r.id));
-                    return [...unsyncedLocal, ...remote];
+                    const unsyncedLocal = globalState.attendanceRecords.filter(
+                      (r) => !remoteIds.has(r.id) && isWithinRetentionWindow(r.timestamp)
+                    );
+                    return [...unsyncedLocal, ...remote].sort(
+                      (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+                    );
                   })()
-                : globalState.attendanceRecords,
+                : globalState.attendanceRecords.filter((r) => isWithinRetentionWindow(r.timestamp)),
               rewardLedger: Array.isArray(d.rewardLedger) ? d.rewardLedger : [],
               auditLogs: Array.isArray(d.auditLogs) ? d.auditLogs : [],
               integrationEvents: Array.isArray(d.integrationEvents) ? d.integrationEvents : [],

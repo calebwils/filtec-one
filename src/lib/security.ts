@@ -87,6 +87,9 @@ export function verifyPassword(
   return { valid: match, needsUpgrade: match };
 }
 
+export const SESSION_MAX_AGE_SECONDS = 90 * 24 * 3600; // 90 days in seconds (7,776,000s)
+export const SESSION_MAX_AGE_HOURS = 90 * 24; // 2,160 hours (90 days)
+
 export interface SessionPayload {
   userId: string;
   role: 'ADMIN' | 'EMPLOYEE' | 'DEALER';
@@ -98,9 +101,10 @@ export interface SessionPayload {
 }
 
 /**
- * Creates a signed tamper-proof session token using HMAC-SHA256
+ * Creates a signed tamper-proof session token using HMAC-SHA256.
+ * Defaults to 90 days (2,160 hours) session duration.
  */
-export function createSessionToken(data: Omit<SessionPayload, 'exp'>, expiresInHours: number = 72): string {
+export function createSessionToken(data: Omit<SessionPayload, 'exp'>, expiresInHours: number = SESSION_MAX_AGE_HOURS): string {
   const exp = Math.floor(Date.now() / 1000) + expiresInHours * 3600;
   const payload: SessionPayload = { ...data, exp };
   const encodedPayload = Buffer.from(JSON.stringify(payload)).toString('base64url');

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { sortProductsNaturally } from '@/lib/catalogueUtils';
 import { getSessionFromRequest } from '@/lib/security';
+import { getAttendanceRetentionCutoff, pruneExpiredAttendanceRecords } from '@/lib/attendanceRetention';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,6 +15,9 @@ export async function GET(req: Request) {
         { status: 401 }
       );
     }
+
+    // Retention policy: Keep exactly 1 full year (12 calendar months) of attendance history
+    const { cutoffDate, cutoffDateStr } = getAttendanceRetentionCutoff();
 
     const [
       products,
@@ -43,8 +47,14 @@ export async function GET(req: Request) {
       }),
       prisma.appSetting.findMany(),
       prisma.leaveRequest.findMany({ orderBy: { createdAt: 'desc' } }),
-      prisma.dailyAttendanceSummary.findMany({ orderBy: { date: 'desc' } }),
-      prisma.attendanceRecord.findMany({ orderBy: { timestamp: 'desc' }, take: 200 }),
+      prisma.dailyAttendanceSummary.findMany({
+        where: { date: { gte: cutoffDateStr } },
+        orderBy: { date: 'desc' }
+      }),
+      prisma.attendanceRecord.findMany({
+        where: { timestamp: { gte: cutoffDate } },
+        orderBy: { timestamp: 'desc' }
+      }),
       prisma.rewardTransaction.findMany({ orderBy: { createdAt: 'desc' } }),
       prisma.auditLog.findMany({ orderBy: { timestamp: 'desc' }, take: 100 }),
       prisma.integrationEvent.findMany({ orderBy: { timestamp: 'desc' }, take: 100 }),
@@ -167,12 +177,25 @@ export async function GET(req: Request) {
       return false;
     });
 
-    // 7. Scoped daily attendance & GPS records: Employee only sees their OWN attendance
+    // 7. Scoped daily attendance & GPS records: Employee only sees their OWN attendance, Admin sees ALL staff
+    const cleanEmpId = session.userId.replace(/^user-/, '');
     const scopedDailyAttendance = dailyAttendance
       .filter((d) => {
         if (isCallerAdmin) return true;
         if (isCallerEmployee) {
-          return d.employeeId === session.userId || d.employeeCode === session.employeeCode || (currentEmp && d.employeeId === currentEmp.id);
+          const cleanDEmpId = (d.employeeId || '').replace(/^user-/, '');
+          return (
+            d.employeeId === session.userId ||
+            cleanDEmpId === cleanEmpId ||
+            (session.employeeCode && (d.employeeCode === session.employeeCode || d.employeeId === session.employeeCode)) ||
+            (currentEmp && (
+              d.employeeId === currentEmp.id ||
+              cleanDEmpId === currentEmp.id ||
+              d.employeeCode === currentEmp.code ||
+              d.employeeId === currentEmp.code
+            )) ||
+            (session.name && d.employeeName && d.employeeName.trim().toLowerCase() === session.name.trim().toLowerCase())
+          );
         }
         return false;
       })
@@ -186,7 +209,19 @@ export async function GET(req: Request) {
       .filter((r) => {
         if (isCallerAdmin) return true;
         if (isCallerEmployee) {
-          return r.employeeId === session.userId || (currentEmp && r.employeeId === currentEmp.id);
+          const cleanRecordEmpId = (r.employeeId || '').replace(/^user-/, '');
+          return (
+            r.employeeId === session.userId ||
+            cleanRecordEmpId === cleanEmpId ||
+            (session.employeeCode && (r.employeeId === session.employeeCode || cleanRecordEmpId === session.employeeCode)) ||
+            (currentEmp && (
+              r.employeeId === currentEmp.id ||
+              cleanRecordEmpId === currentEmp.id ||
+              r.employeeId === currentEmp.code ||
+              cleanRecordEmpId === currentEmp.code
+            )) ||
+            (session.name && r.employeeName && r.employeeName.trim().toLowerCase() === session.name.trim().toLowerCase())
+          );
         }
         return false;
       })
@@ -233,6 +268,14 @@ export async function GET(req: Request) {
 
     return NextResponse.json({
       success: true,
+      sessionUser: {
+        id: session.userId,
+        role: session.role,
+        name: session.name,
+        phone: session.phone,
+        employeeCode: session.employeeCode,
+        dealerId: session.dealerId
+      },
       data: {
         products: parsedProducts,
         dealers: scopedDealers,
@@ -435,7 +478,20 @@ export async function POST(req: Request) {
           );
         }
         const targetEmp = payload.employeeId || payload.record?.employeeId || payload.summary?.employeeId;
-        const isSelf = targetEmp === session.userId || targetEmp === cleanEmpId || targetEmp === session.employeeCode;
+        const currentEmployee = await prisma.employee.findFirst({
+          where: {
+            OR: [
+              { id: session.userId },
+              { id: cleanEmpId },
+              { code: session.employeeCode || '' }
+            ]
+          }
+        });
+        const isSelf =
+          targetEmp === session.userId ||
+          targetEmp === cleanEmpId ||
+          targetEmp === session.employeeCode ||
+          (currentEmployee && (targetEmp === currentEmployee.id || targetEmp === currentEmployee.code));
         if (!isSelf) {
           return NextResponse.json(
             { success: false, error: 'Forbidden: Cannot submit attendance records for another staff member.' },
@@ -1254,6 +1310,13 @@ export async function POST(req: Request) {
           }
         } catch (empErr) {
           console.warn('Could not update employee status in DB:', empErr);
+        }
+
+        try {
+          // Enforce 1-year retention policy: prune records older than 12 months (deleting 1 month every 13th month)
+          await pruneExpiredAttendanceRecords();
+        } catch (pruneErr) {
+          console.warn('Prune attendance records error:', pruneErr);
         }
 
         return NextResponse.json({ success: true, record, summary });

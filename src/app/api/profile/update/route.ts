@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { User, Role } from '@/types';
 import { checkRateLimit } from '@/lib/rateLimit';
-import { hashPassword, getSessionFromRequest, createSessionToken } from '@/lib/security';
+import { hashPassword, getSessionFromRequest, createSessionToken, SESSION_MAX_AGE_SECONDS } from '@/lib/security';
 
 // Helper to format clean Indian phone numbers
 function formatPhone(phone: string): string {
@@ -181,7 +181,7 @@ export async function POST(req: Request) {
           sameSite: 'lax',
           path: '/',
           secure: process.env.NODE_ENV === 'production',
-          maxAge: 72 * 3600
+          maxAge: SESSION_MAX_AGE_SECONDS
         });
       }
 
@@ -335,7 +335,7 @@ export async function POST(req: Request) {
           sameSite: 'lax',
           path: '/',
           secure: process.env.NODE_ENV === 'production',
-          maxAge: 72 * 3600
+          maxAge: SESSION_MAX_AGE_SECONDS
         });
       }
 
