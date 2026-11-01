@@ -243,23 +243,17 @@ export default function LoginPage() {
 
     try {
       const payload: any = {
-        role: registerRole,
+        role: 'DEALER',
         phone: regPhone.trim(),
         password: regPassword.trim(),
         name: regName.trim(),
+        ownerName: regOwnerName.trim() || regName.trim(),
+        city: regCity.trim() || 'Odisha',
+        state: regState.trim() || 'Odisha',
+        address: regAddress.trim() || 'Odisha, India',
+        gstin: regGstin.trim() || undefined,
         email: regEmail.trim() || undefined
       };
-
-      if (registerRole === 'DEALER') {
-        payload.ownerName = regOwnerName.trim() || regName.trim();
-        payload.city = regCity.trim() || 'Odisha';
-        payload.state = regState.trim() || 'Odisha';
-        payload.address = regAddress.trim() || 'Odisha, India';
-        payload.gstin = regGstin.trim() || undefined;
-      } else {
-        payload.designation = regDesignation.trim();
-        payload.territory = regTerritory.trim();
-      }
 
       const res = await fetch('/api/auth/register', {
         method: 'POST',
@@ -270,21 +264,17 @@ export default function LoginPage() {
       const data = await res.json();
 
       if (!res.ok || !data.success) {
-        setErrorMessage(data.error || 'Failed to create account. Please verify input.');
+        setErrorMessage(data.error || 'Failed to create dealer account. Please verify input.');
         setIsRegistering(false);
         return;
       }
 
       // Registration successful! Set user into store and navigate
       store.setUser(data.user);
-      setRegisterSuccess('Account created successfully! Logging you in...');
+      setRegisterSuccess('Dealership account created successfully! Logging you in...');
 
       setTimeout(() => {
-        if (data.user.role === 'EMPLOYEE') {
-          router.push('/employee');
-        } else {
-          router.push('/dealer');
-        }
+        router.push('/dealer');
       }, 1200);
     } catch (err: any) {
       setErrorMessage(err.message || 'Network error occurred during registration.');
@@ -420,29 +410,6 @@ export default function LoginPage() {
                   </button>
                 </div>
 
-                <div className="bg-neutral-50 rounded-xl p-3 border border-neutral-200">
-                  <p className="text-[11px] text-neutral-600 leading-relaxed">
-                    {activeTab === 'EMPLOYEE' && (
-                      <>
-                        <span className="font-semibold text-neutral-900">Staff Portal: </span>
-                        Sign in with your registered phone number. If it is your first time, your password is the <span className="font-semibold text-blue-700">last 5 digits of your phone</span>.
-                      </>
-                    )}
-                    {activeTab === 'DEALER' && (
-                      <>
-                        <span className="font-semibold text-neutral-900">Dealer Portal: </span>
-                        Sign in with your authorized dealership phone. If it is your first time, your password is the <span className="font-semibold text-[#DC2626]">last 5 digits of your phone</span>.
-                      </>
-                    )}
-                    {activeTab === 'ADMIN' && (
-                      <>
-                        <span className="font-semibold text-neutral-900">Operations Control: </span>
-                        Management and administrator login with phone and password.
-                      </>
-                    )}
-                  </p>
-                </div>
-
                 {/* Sign In Form */}
                 <form onSubmit={handleSignIn} className="space-y-3.5">
                   <div>
@@ -463,14 +430,9 @@ export default function LoginPage() {
                   </div>
 
                   <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <label className="text-xs font-semibold text-[#374151]">
-                        Password
-                      </label>
-                      <span className="text-[10px] text-neutral-500 font-mono">
-                        Initial: Last 5 digits of phone
-                      </span>
-                    </div>
+                    <label className="text-xs font-semibold text-[#374151] block mb-1">
+                      Password
+                    </label>
                     <div className="relative">
                       <Lock className="w-4 h-4 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2" />
                       <input
@@ -529,190 +491,107 @@ export default function LoginPage() {
               </div>
             )}
 
-            {/* ===================== MODE 2: CREATE ACCOUNT ===================== */}
+            {/* ===================== MODE 2: CREATE ACCOUNT (DEALERS ONLY) ===================== */}
             {authMode === 'REGISTER' && (
               <div className="space-y-4">
-                {/* Account Type Selector */}
-                <div className="grid grid-cols-2 p-1 bg-neutral-100 rounded-xl text-xs font-semibold">
-                  <button
-                    type="button"
-                    onClick={() => setRegisterRole('DEALER')}
-                    className={`py-2 px-2 rounded-lg text-center transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
-                      registerRole === 'DEALER'
-                        ? 'bg-white text-[#DC2626] shadow-xs font-bold'
-                        : 'text-neutral-600 hover:text-neutral-900'
-                    }`}
-                  >
-                    <Building2 className="w-3.5 h-3.5" />
-                    <span>Dealer Account</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setRegisterRole('EMPLOYEE')}
-                    className={`py-2 px-2 rounded-lg text-center transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
-                      registerRole === 'EMPLOYEE'
-                        ? 'bg-white text-blue-700 shadow-xs font-bold'
-                        : 'text-neutral-600 hover:text-neutral-900'
-                    }`}
-                  >
-                    <Users className="w-3.5 h-3.5" />
-                    <span>Employee Account</span>
-                  </button>
+                <div className="flex items-center gap-2.5 pb-2 border-b border-neutral-100">
+                  <div className="w-8 h-8 rounded-xl bg-red-100 text-[#DC2626] flex items-center justify-center shrink-0">
+                    <Building2 className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-xs font-bold text-neutral-900">Dealer Account Registration</h3>
+                    <p className="text-[10px] text-neutral-500">
+                      Create an authorized dealership account to place orders and manage rewards.
+                    </p>
+                  </div>
                 </div>
 
                 <form onSubmit={handleRegister} className="space-y-3">
                   {/* Dealer Specific Fields */}
-                  {registerRole === 'DEALER' && (
-                    <>
-                      <div>
-                        <label className="text-xs font-semibold text-[#374151] block mb-1">
-                          Firm / Dealership Name *
-                        </label>
-                        <input
-                          type="text"
-                          required
-                          value={regName}
-                          onChange={(e) => setRegName(e.target.value)}
-                          placeholder="e.g. Maa Tarini Sanitary & Hardware"
-                          className="w-full px-3 py-2 text-xs rounded-xl border border-[#D1D5DB] bg-white focus:outline-none focus:ring-2 focus:ring-[#DC2626]"
-                        />
-                      </div>
+                  <div>
+                    <label className="text-xs font-semibold text-[#374151] block mb-1">
+                      Firm / Dealership Name *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={regName}
+                      onChange={(e) => setRegName(e.target.value)}
+                      placeholder="e.g. Maa Tarini Sanitary & Hardware"
+                      className="w-full px-3 py-2 text-xs rounded-xl border border-[#D1D5DB] bg-white focus:outline-none focus:ring-2 focus:ring-[#DC2626]"
+                    />
+                  </div>
 
-                      <div>
-                        <label className="text-xs font-semibold text-[#374151] block mb-1">
-                          Proprietor / Owner Name *
-                        </label>
-                        <input
-                          type="text"
-                          required
-                          value={regOwnerName}
-                          onChange={(e) => setRegOwnerName(e.target.value)}
-                          placeholder="e.g. Suresh Kumar Mohanty"
-                          className="w-full px-3 py-2 text-xs rounded-xl border border-[#D1D5DB] bg-white focus:outline-none focus:ring-2 focus:ring-[#DC2626]"
-                        />
-                      </div>
+                  <div>
+                    <label className="text-xs font-semibold text-[#374151] block mb-1">
+                      Proprietor / Owner Name *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={regOwnerName}
+                      onChange={(e) => setRegOwnerName(e.target.value)}
+                      placeholder="e.g. Suresh Kumar Mohanty"
+                      className="w-full px-3 py-2 text-xs rounded-xl border border-[#D1D5DB] bg-white focus:outline-none focus:ring-2 focus:ring-[#DC2626]"
+                    />
+                  </div>
 
-                      <div className="grid grid-cols-2 gap-2">
-                        <div>
-                          <label className="text-xs font-semibold text-[#374151] block mb-1">
-                            City / Town *
-                          </label>
-                          <input
-                            type="text"
-                            required
-                            value={regCity}
-                            onChange={(e) => setRegCity(e.target.value)}
-                            placeholder="e.g. Cuttack"
-                            className="w-full px-3 py-2 text-xs rounded-xl border border-[#D1D5DB] bg-white focus:outline-none focus:ring-2 focus:ring-[#DC2626]"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-xs font-semibold text-[#374151] block mb-1">
-                            State
-                          </label>
-                          <input
-                            type="text"
-                            value={regState}
-                            onChange={(e) => setRegState(e.target.value)}
-                            placeholder="Odisha"
-                            className="w-full px-3 py-2 text-xs rounded-xl border border-[#D1D5DB] bg-white focus:outline-none focus:ring-2 focus:ring-[#DC2626]"
-                          />
-                        </div>
-                      </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-xs font-semibold text-[#374151] block mb-1">
+                        City / Town *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={regCity}
+                        onChange={(e) => setRegCity(e.target.value)}
+                        placeholder="e.g. Cuttack"
+                        className="w-full px-3 py-2 text-xs rounded-xl border border-[#D1D5DB] bg-white focus:outline-none focus:ring-2 focus:ring-[#DC2626]"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-semibold text-[#374151] block mb-1">
+                        State
+                      </label>
+                      <input
+                        type="text"
+                        value={regState}
+                        onChange={(e) => setRegState(e.target.value)}
+                        placeholder="Odisha"
+                        className="w-full px-3 py-2 text-xs rounded-xl border border-[#D1D5DB] bg-white focus:outline-none focus:ring-2 focus:ring-[#DC2626]"
+                      />
+                    </div>
+                  </div>
 
-                      <div>
-                        <label className="text-xs font-semibold text-[#374151] block mb-1">
-                          Business Address *
-                        </label>
-                        <input
-                          type="text"
-                          required
-                          value={regAddress}
-                          onChange={(e) => setRegAddress(e.target.value)}
-                          placeholder="Shop No. 12, Main Market Road"
-                          className="w-full px-3 py-2 text-xs rounded-xl border border-[#D1D5DB] bg-white focus:outline-none focus:ring-2 focus:ring-[#DC2626]"
-                        />
-                      </div>
+                  <div>
+                    <label className="text-xs font-semibold text-[#374151] block mb-1">
+                      Business Address *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={regAddress}
+                      onChange={(e) => setRegAddress(e.target.value)}
+                      placeholder="Shop No. 12, Main Market Road"
+                      className="w-full px-3 py-2 text-xs rounded-xl border border-[#D1D5DB] bg-white focus:outline-none focus:ring-2 focus:ring-[#DC2626]"
+                    />
+                  </div>
 
-                      <div>
-                        <label className="text-xs font-semibold text-[#374151] block mb-1">
-                          GSTIN <span className="text-neutral-400 font-normal">(Optional)</span>
-                        </label>
-                        <input
-                          type="text"
-                          value={regGstin}
-                          onChange={(e) => setRegGstin(e.target.value)}
-                          placeholder="21AAAAA0000A1Z5"
-                          className="w-full px-3 py-2 text-xs rounded-xl border border-[#D1D5DB] bg-white focus:outline-none focus:ring-2 focus:ring-[#DC2626] font-mono"
-                        />
-                      </div>
-                    </>
-                  )}
+                  <div>
+                    <label className="text-xs font-semibold text-[#374151] block mb-1">
+                      GSTIN <span className="text-neutral-400 font-normal">(Optional)</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={regGstin}
+                      onChange={(e) => setRegGstin(e.target.value)}
+                      placeholder="21AAAAA0000A1Z5"
+                      className="w-full px-3 py-2 text-xs rounded-xl border border-[#D1D5DB] bg-white focus:outline-none focus:ring-2 focus:ring-[#DC2626] font-mono"
+                    />
+                  </div>
 
-                  {/* Employee Specific Fields */}
-                  {registerRole === 'EMPLOYEE' && (
-                    <>
-                      <div>
-                        <label className="text-xs font-semibold text-[#374151] block mb-1">
-                          Full Name *
-                        </label>
-                        <input
-                          type="text"
-                          required
-                          value={regName}
-                          onChange={(e) => setRegName(e.target.value)}
-                          placeholder="e.g. Ramesh Chandra Behera"
-                          className="w-full px-3 py-2 text-xs rounded-xl border border-[#D1D5DB] bg-white focus:outline-none focus:ring-2 focus:ring-blue-600"
-                        />
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-2">
-                        <div>
-                          <label className="text-xs font-semibold text-[#374151] block mb-1">
-                            Designation *
-                          </label>
-                          <input
-                            type="text"
-                            required
-                            value={regDesignation}
-                            onChange={(e) => setRegDesignation(e.target.value)}
-                            placeholder="Field Representative"
-                            className="w-full px-3 py-2 text-xs rounded-xl border border-[#D1D5DB] bg-white focus:outline-none focus:ring-2 focus:ring-blue-600"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="text-xs font-semibold text-[#374151] block mb-1">
-                            Territory *
-                          </label>
-                          <input
-                            type="text"
-                            required
-                            value={regTerritory}
-                            onChange={(e) => setRegTerritory(e.target.value)}
-                            placeholder="Bhubaneswar"
-                            className="w-full px-3 py-2 text-xs rounded-xl border border-[#D1D5DB] bg-white focus:outline-none focus:ring-2 focus:ring-blue-600"
-                          />
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="text-xs font-semibold text-[#374151] block mb-1">
-                          Email Address <span className="text-neutral-400 font-normal">(Optional)</span>
-                        </label>
-                        <input
-                          type="email"
-                          value={regEmail}
-                          onChange={(e) => setRegEmail(e.target.value)}
-                          placeholder="ramesh@filtec.in"
-                          className="w-full px-3 py-2 text-xs rounded-xl border border-[#D1D5DB] bg-white focus:outline-none focus:ring-2 focus:ring-blue-600"
-                        />
-                      </div>
-                    </>
-                  )}
-
-                  {/* Common Credentials */}
+                  {/* Dealer Credentials */}
                   <div>
                     <label className="text-xs font-semibold text-[#374151] block mb-1">
                       Mobile Phone Number *
@@ -768,11 +647,11 @@ export default function LoginPage() {
                     {isRegistering ? (
                       <>
                         <Loader2 className="w-4 h-4 animate-spin" />
-                        <span>Registering account...</span>
+                        <span>Creating dealer account...</span>
                       </>
                     ) : (
                       <>
-                        <span>Create {registerRole === 'DEALER' ? 'Dealer' : 'Employee'} Account</span>
+                        <span>Create Dealer Account</span>
                         <ArrowRight className="w-4 h-4" />
                       </>
                     )}
@@ -799,11 +678,6 @@ export default function LoginPage() {
             )}
           </div>
         </div>
-
-        {/* Clean Footer */}
-        <div className="mt-6 text-center text-[11px] text-[#9CA3AF] font-mono">
-          PRE-TECH PIPES & FITTINGS PVT LTD • FILTEC ONE
-        </div>
       </div>
 
       {/* ===================== FIRST-TIME LOGIN PASSWORD SETUP MODAL ===================== */}
@@ -828,7 +702,7 @@ export default function LoginPage() {
 
             <div className="p-5 space-y-4">
               <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-900 leading-relaxed">
-                Welcome, <span className="font-bold">{pendingFirstLogin.name}</span>! You have successfully signed in with your default password. To secure your account, please replace it with a personal password of your choice.
+                Welcome, <span className="font-bold">{pendingFirstLogin.name}</span>! You have signed in with credentials provided by your administrator. To secure your account, please set your personal password below.
               </div>
 
               {passwordChangeError && (
