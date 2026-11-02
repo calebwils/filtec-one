@@ -1,12 +1,13 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { TopContextBar } from '@/components/navigation/TopContextBar';
 import { DesktopSubNav } from '@/components/navigation/DesktopSubNav';
 import { MobileBottomNav } from '@/components/navigation/MobileBottomNav';
 import { CameraCaptureModal } from '@/components/attendance/CameraCaptureModal';
 import { ApplyLeaveModal } from '@/components/employee/ApplyLeaveModal';
 import { store, useAppStore } from '@/data/store';
+import { TrackingManager } from '@/services/TrackingManager';
 import {
   Radio,
   MapPin,
@@ -82,6 +83,13 @@ export default function AttendancePage() {
   const myPayroll = currentEmployee
     ? calculateEmployeePayroll(currentEmployee, selectedPayslipMonth, dailyAttendance, leaveRequests)
     : null;
+
+  // Active Field Tracking: Automatically track during the work shift while checked in
+  useEffect(() => {
+    if (currentEmployee && currentEmployee.checkInStatus === 'CHECKED_IN') {
+      TrackingManager.startTracking(currentEmployee.id, currentEmployee.name);
+    }
+  }, [currentEmployee?.id, currentEmployee?.checkInStatus]);
 
   const thisMonthStart = getMonthStart(today);
   const thisMonthEnd = getMonthEnd(today);

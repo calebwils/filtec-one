@@ -77,9 +77,9 @@ export async function POST(req: Request) {
         const phoneDigits = extractDigits(matchedEmployee.phone);
         const defaultLast5 = phoneDigits.slice(-5);
 
-        // Password check: secure PBKDF2 verification or default last 5 digits
+        // Password check: secure PBKDF2 verification or temporary credential
         const hasCustomPassword = Boolean(matchedEmployee.password && matchedEmployee.password.trim());
-        const isDefaultPasswordMatch = trimmedPassword === defaultLast5;
+        const isDefaultPasswordMatch = !hasCustomPassword && trimmedPassword === defaultLast5;
         const passwordCheck = hasCustomPassword
           ? verifyPassword(trimmedPassword, matchedEmployee.password)
           : { valid: false, needsUpgrade: false };
@@ -88,9 +88,7 @@ export async function POST(req: Request) {
           return NextResponse.json(
             {
               success: false,
-              error: hasCustomPassword
-                ? 'Incorrect password. Please verify and try again.'
-                : 'Incorrect password. Default password is the last 5 digits of your phone number.'
+              error: 'Incorrect credentials. Please verify your phone number and password provided by your administrator.'
             },
             { status: 401 }
           );
@@ -220,29 +218,34 @@ export async function POST(req: Request) {
       });
 
       if (matchedDealer) {
-        const phoneDigits = extractDigits(matchedDealer.phone);
-        const defaultLast5 = phoneDigits.slice(-5);
-
+        // Dealers MUST create account with their password on the Create Account page.
+        // They do not log in using the last 5 digits of their phone.
         const hasCustomPassword = Boolean(matchedDealer.password && matchedDealer.password.trim());
-        const isDefaultPasswordMatch = trimmedPassword === defaultLast5;
-        const passwordCheck = hasCustomPassword
-          ? verifyPassword(trimmedPassword, matchedDealer.password)
-          : { valid: false, needsUpgrade: false };
 
-        if (!passwordCheck.valid && !isDefaultPasswordMatch) {
+        if (!hasCustomPassword) {
           return NextResponse.json(
             {
               success: false,
-              error: hasCustomPassword
-                ? 'Incorrect password. Please verify and try again.'
-                : 'Incorrect password. Default password is the last 5 digits of your phone number.'
+              error: 'No account password found. Please create an account on the "Create Account" page before signing in.'
+            },
+            { status: 401 }
+          );
+        }
+
+        const passwordCheck = verifyPassword(trimmedPassword, matchedDealer.password);
+
+        if (!passwordCheck.valid) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: 'Incorrect password. Please verify your credentials or create an account if you haven\'t yet.'
             },
             { status: 401 }
           );
         }
 
         // Automatic security upgrade: hash plaintext or legacy passwords
-        if (passwordCheck.needsUpgrade || (!matchedDealer.password?.startsWith('pbkdf2$') && isDefaultPasswordMatch)) {
+        if (passwordCheck.needsUpgrade) {
           try {
             const secureHash = hashPassword(trimmedPassword);
             await prisma.dealer.update({
@@ -254,7 +257,7 @@ export async function POST(req: Request) {
           }
         }
 
-        const mustChangePassword = matchedDealer.mustChangePassword ?? !hasCustomPassword;
+        const mustChangePassword = false;
 
         let avatarUrl: string | undefined = undefined;
         try {

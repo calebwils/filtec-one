@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { calculateDistanceMeters, formatDistanceToFiltec, formatDistanceShort } from '@/utils/distance';
 import { isSamirUser } from '@/utils/samirAuth';
+import { EmployeeRouteModal } from '@/components/attendance/EmployeeRouteModal';
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 function todayStr() {
@@ -54,6 +55,11 @@ export default function AdminAttendancePage() {
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [selectedRecord, setSelectedRecord] = useState<DailyAttendanceSummary | null>(null);
   const [selectedPunchPhoto, setSelectedPunchPhoto] = useState<string | null>(null);
+  const [selectedRouteTarget, setSelectedRouteTarget] = useState<{
+    employeeId: string;
+    employeeName: string;
+    date?: string;
+  } | null>(null);
   const [reminderSentForId, setReminderSentForId] = useState<string | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
 
@@ -423,6 +429,19 @@ export default function AdminAttendancePage() {
                               <span>View on Map</span>
                               <ExternalLink className="w-2.5 h-2.5" />
                             </a>
+                            <button
+                              type="button"
+                              onClick={() => setSelectedRouteTarget({
+                                employeeId: punch.employeeId,
+                                employeeName: punch.employeeName,
+                                date: new Date(punch.timestamp).toISOString().split('T')[0]
+                              })}
+                              className="text-emerald-700 hover:text-emerald-900 font-semibold inline-flex items-center gap-1 cursor-pointer bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200"
+                              title="View full day route tracking on interactive map"
+                            >
+                              <Navigation className="w-3 h-3 text-emerald-600" />
+                              <span>Tracking</span>
+                            </button>
                           </div>
                         </div>
                       </div>
@@ -440,10 +459,9 @@ export default function AdminAttendancePage() {
                             type="button"
                             onClick={() => setDeleteTarget({ type: 'PUNCH_RECORD', punch })}
                             title="Delete Punch (Samir Only)"
-                            className="mt-2 inline-flex items-center gap-1 border border-red-200 bg-red-50 hover:bg-red-100 text-red-600 text-[10px] font-semibold px-2 py-1 rounded transition-all cursor-pointer"
+                            className="mt-2 inline-flex items-center justify-center border border-red-200 bg-red-50 hover:bg-red-100 text-red-600 p-1.5 rounded transition-all cursor-pointer"
                           >
-                            <Trash2 className="w-3 h-3 text-red-500" />
-                            <span>Delete Punch</span>
+                            <Trash2 className="w-3.5 h-3.5 text-red-500" />
                           </button>
                         )}
                       </div>
@@ -625,13 +643,29 @@ export default function AdminAttendancePage() {
                                   {reminderSentForId === record.employeeId ? 'Sent!' : 'WhatsApp Alert'}
                                 </button>
                               ) : record.checkIn ? (
-                                <button
-                                  type="button"
-                                  onClick={() => setSelectedRecord(record)}
-                                  className="inline-flex items-center gap-1 border border-[#E5E7EB] hover:bg-neutral-100 text-[#111827] text-[11px] font-medium px-2.5 py-1.5 rounded transition-all cursor-pointer"
-                                >
-                                  <Eye className="w-3.5 h-3.5 text-neutral-500" /> Inspect GPS/Photo
-                                </button>
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={() => setSelectedRouteTarget({
+                                      employeeId: record.employeeId,
+                                      employeeName: record.employeeName,
+                                      date: record.date
+                                    })}
+                                    className="inline-flex items-center gap-1.5 bg-blue-50 border border-blue-200 hover:bg-blue-100 text-blue-700 text-[11px] font-semibold px-2.5 py-1.5 rounded-lg transition-all cursor-pointer shadow-2xs"
+                                    title="View full day route tracking on interactive map"
+                                  >
+                                    <Navigation className="w-3.5 h-3.5 text-blue-600" />
+                                    <span>Tracking</span>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setSelectedRecord(record)}
+                                    title="Inspect GPS & Photo"
+                                    className="inline-flex items-center justify-center border border-[#E5E7EB] hover:bg-neutral-100 text-[#111827] p-1.5 rounded-lg transition-all cursor-pointer shadow-2xs"
+                                  >
+                                    <Eye className="w-3.5 h-3.5 text-neutral-600" />
+                                  </button>
+                                </>
                               ) : (
                                 <span className="text-neutral-400 text-xs font-mono">—</span>
                               )}
@@ -642,10 +676,9 @@ export default function AdminAttendancePage() {
                                   type="button"
                                   onClick={() => setDeleteTarget({ type: 'DAILY_SUMMARY', summary: record })}
                                   title="Delete Attendance Record (Samir Only)"
-                                  className="inline-flex items-center gap-1 border border-red-200 bg-red-50 hover:bg-red-100 text-red-600 text-[11px] font-semibold px-2.5 py-1.5 rounded transition-all cursor-pointer"
+                                  className="inline-flex items-center justify-center border border-red-200 bg-red-50 hover:bg-red-100 text-red-600 p-1.5 rounded-lg transition-all cursor-pointer shadow-2xs"
                                 >
                                   <Trash2 className="w-3.5 h-3.5 text-red-500" />
-                                  <span>Delete</span>
                                 </button>
                               )}
                             </div>
@@ -748,13 +781,31 @@ export default function AdminAttendancePage() {
                   <span>Delete Record</span>
                 </button>
               ) : <div />}
-              <button
-                type="button"
-                onClick={() => setSelectedRecord(null)}
-                className="bg-[#111827] hover:bg-black text-white text-xs font-semibold px-4 py-2 rounded-lg cursor-pointer"
-              >
-                Done
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const rec = selectedRecord;
+                    setSelectedRecord(null);
+                    setSelectedRouteTarget({
+                      employeeId: rec.employeeId,
+                      employeeName: rec.employeeName,
+                      date: rec.date
+                    });
+                  }}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold transition cursor-pointer shadow-xs"
+                >
+                  <Navigation className="w-3.5 h-3.5" />
+                  <span>View GPS Route</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedRecord(null)}
+                  className="bg-[#111827] hover:bg-black text-white text-xs font-semibold px-4 py-2 rounded-lg cursor-pointer"
+                >
+                  Done
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -874,6 +925,17 @@ export default function AdminAttendancePage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Interactive Employee Route Map Modal */}
+      {selectedRouteTarget && (
+        <EmployeeRouteModal
+          isOpen={!!selectedRouteTarget}
+          onClose={() => setSelectedRouteTarget(null)}
+          employeeId={selectedRouteTarget.employeeId}
+          employeeName={selectedRouteTarget.employeeName}
+          initialDate={selectedRouteTarget.date}
+        />
       )}
 
     </div>

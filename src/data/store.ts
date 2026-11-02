@@ -2854,6 +2854,8 @@ export const store = {
     remarks?: string;
     systemRole?: Role;
     allowedPages?: string[];
+    temporaryPassword?: string;
+    mustChangePassword?: boolean;
   }): Employee {
     const timestamp = new Date().toISOString();
     const todayDateStr = timestamp.split('T')[0];
@@ -2910,7 +2912,9 @@ export const store = {
       email: data.email || '(-)',
       remarks,
       systemRole,
-      allowedPages
+      allowedPages,
+      password: data.temporaryPassword,
+      mustChangePassword: data.mustChangePassword !== undefined ? data.mustChangePassword : true
     };
 
     // Add to dailyAttendance roster
@@ -2935,7 +2939,9 @@ export const store = {
       recipientPhone: data.phone,
       recipientName: data.name,
       templateName: 'employee_welcome_onboarding',
-      messageBody: `Welcome ${data.name} to FILTEC Polyplast Pvt Ltd! Your Pre-Tech 1 account (${employeeCode}) is active. Access the portal to record daily GPS attendance and manage operations. Designation: ${data.designation || '(-)'}. Territory: ${territory}.`,
+      messageBody: `Welcome ${data.name} to FILTEC Polyplast Pvt Ltd! Your Pre-Tech 1 account (${employeeCode}) is active.${
+        data.temporaryPassword ? ` Temporary Password: ${data.temporaryPassword} (change on 1st login).` : ''
+      } Access the portal to record daily GPS attendance and manage operations. Designation: ${data.designation || '(-)'}. Territory: ${territory}.`,
       sentAt: timestamp,
       status: 'DELIVERED'
     };

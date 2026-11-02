@@ -1,4 +1,5 @@
 import { store } from '@/data/store';
+import { TrackingManager } from '@/services/TrackingManager';
 import {
   FILTEC_HQ,
   calculateDistanceMeters,
@@ -217,6 +218,14 @@ export class AttendanceService {
       photoUrl,
       verified: true
     });
+
+    // Start background/active field tracking and record check_in milestone
+    try {
+      TrackingManager.startTracking(employeeId, employeeName);
+      TrackingManager.recordEvent('check_in', { photoUrl, accuracy: locationData.accuracy }, locationData.locationName);
+    } catch (e) {
+      console.warn('Could not start tracking manager:', e);
+    }
   }
 
   static recordCheckOut(
@@ -249,6 +258,14 @@ export class AttendanceService {
       photoUrl,
       verified: true
     });
+
+    // Record check_out milestone and stop tracking
+    try {
+      TrackingManager.recordEvent('check_out', { photoUrl, accuracy: locationData.accuracy }, locationData.locationName);
+      TrackingManager.stopTracking();
+    } catch (e) {
+      console.warn('Could not stop tracking manager:', e);
+    }
   }
 }
 

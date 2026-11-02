@@ -40,9 +40,19 @@ export async function POST(req: Request) {
       email
     } = body;
 
-    if (!role || (role !== 'DEALER' && role !== 'EMPLOYEE')) {
+    if (role === 'EMPLOYEE') {
       return NextResponse.json(
-        { success: false, error: 'Please specify whether you are registering as a Dealer or Employee.' },
+        {
+          success: false,
+          error: 'Employees cannot self-register. Staff accounts can only be onboarded directly by an administrator.'
+        },
+        { status: 403 }
+      );
+    }
+
+    if (role !== 'DEALER') {
+      return NextResponse.json(
+        { success: false, error: 'Registration is currently available for Dealership accounts only.' },
         { status: 400 }
       );
     }
@@ -79,61 +89,81 @@ export async function POST(req: Request) {
       }
 
       // Check if phone already registered as dealer
-      const allDealers = await prisma.dealer.findMany({ select: { id: true, phone: true } });
+      const allDealers = await prisma.dealer.findMany({ select: { id: true, phone: true, password: true } });
       const duplicateDealer = allDealers.find((d) => {
         const dDigits = extractDigits(d.phone);
         return dDigits.slice(-10) === inputLast10;
       });
 
-      if (duplicateDealer) {
+      if (duplicateDealer && duplicateDealer.password) {
         return NextResponse.json(
-          { success: false, error: 'A dealership with this phone number is already registered. Please sign in.' },
+          { success: false, error: 'A dealership account with this phone number is already registered. Please sign in.' },
           { status: 409 }
         );
       }
 
-      // Generate unique dealer code
-      const count = await prisma.dealer.count();
-      let nextCodeNum = count + 1;
-      let candidateCode = `DLR-${String(nextCodeNum).padStart(3, '0')}`;
-      while (await prisma.dealer.findUnique({ where: { code: candidateCode } })) {
-        nextCodeNum++;
-        candidateCode = `DLR-${String(nextCodeNum).padStart(3, '0')}`;
+      let activeDealer;
+
+      if (duplicateDealer) {
+        // Pre-existing dealership record claiming / activating account with a personal password
+        activeDealer = await prisma.dealer.update({
+          where: { id: duplicateDealer.id },
+          data: {
+            name: name.trim(),
+            ownerName: (ownerName || name).trim(),
+            password: hashedPassword,
+            mustChangePassword: false,
+            ...(city?.trim() ? { city: city.trim() } : {}),
+            ...(state?.trim() ? { state: state.trim() } : {}),
+            ...(address?.trim() ? { address: address.trim() } : {}),
+            ...(pincode?.trim() ? { pincode: pincode.trim() } : {}),
+            ...(gstin?.trim() ? { gstin: gstin.trim() } : {})
+          }
+        });
+      } else {
+        // Generate unique dealer code
+        const count = await prisma.dealer.count();
+        let nextCodeNum = count + 1;
+        let candidateCode = `DLR-${String(nextCodeNum).padStart(3, '0')}`;
+        while (await prisma.dealer.findUnique({ where: { code: candidateCode } })) {
+          nextCodeNum++;
+          candidateCode = `DLR-${String(nextCodeNum).padStart(3, '0')}`;
+        }
+
+        const dealerId = `dlr-${Date.now()}`;
+        activeDealer = await prisma.dealer.create({
+          data: {
+            id: dealerId,
+            code: candidateCode,
+            name: name.trim(),
+            ownerName: (ownerName || name).trim(),
+            phone: formattedPhone,
+            email: email?.trim() || `${candidateCode.toLowerCase()}@filtec-dealers.in`,
+            city: city?.trim() || 'Odisha',
+            state: state?.trim() || 'Odisha',
+            address: address?.trim() || 'Odisha, India',
+            pincode: pincode?.trim() || null,
+            gstin: gstin?.trim() || null,
+            password: hashedPassword,
+            mustChangePassword: false, // Set password during registration
+            tier: 'Silver',
+            creditLimit: 0,
+            outstandingBalance: 0,
+            totalPurchases: 0,
+            availableRewards: 0,
+            pendingPlumberRewards: 0,
+            plumbersCount: 0
+          }
+        });
       }
 
-      const dealerId = `dlr-${Date.now()}`;
-      const newDealer = await prisma.dealer.create({
-        data: {
-          id: dealerId,
-          code: candidateCode,
-          name: name.trim(),
-          ownerName: (ownerName || name).trim(),
-          phone: formattedPhone,
-          email: email?.trim() || `${candidateCode.toLowerCase()}@filtec-dealers.in`,
-          city: city?.trim() || 'Odisha',
-          state: state?.trim() || 'Odisha',
-          address: address?.trim() || 'Odisha, India',
-          pincode: pincode?.trim() || null,
-          gstin: gstin?.trim() || null,
-          password: hashedPassword,
-          mustChangePassword: false, // Set password during registration so no prompt needed
-          tier: 'Silver',
-          creditLimit: 0,
-          outstandingBalance: 0,
-          totalPurchases: 0,
-          availableRewards: 0,
-          pendingPlumberRewards: 0,
-          plumbersCount: 0
-        }
-      });
-
       const authenticatedUser: User = {
-        id: `user-${newDealer.id}`,
-        name: newDealer.name,
-        email: newDealer.email || `${newDealer.code.toLowerCase()}@filtec-dealers.in`,
-        phone: newDealer.phone,
+        id: `user-${activeDealer.id}`,
+        name: activeDealer.name,
+        email: activeDealer.email || `${activeDealer.code.toLowerCase()}@filtec-dealers.in`,
+        phone: activeDealer.phone,
         role: 'DEALER',
-        dealerId: newDealer.id,
+        dealerId: activeDealer.id,
         allowedPages: [
           '/dealer',
           '/dealer/catalogue',
@@ -147,15 +177,15 @@ export async function POST(req: Request) {
       };
 
       const sessionToken = createSessionToken({
-        userId: newDealer.id,
-        dealerId: newDealer.id,
+        userId: activeDealer.id,
+        dealerId: activeDealer.id,
         role: 'DEALER',
-        phone: newDealer.phone,
-        name: newDealer.name,
+        phone: activeDealer.phone,
+        name: activeDealer.name,
         allowedPages: authenticatedUser.allowedPages
       });
 
-      const { password: _dlrPass, ...safeDealer } = newDealer;
+      const { password: _dlrPass, ...safeDealer } = activeDealer;
 
       const response = NextResponse.json({
         success: true,
@@ -177,112 +207,8 @@ export async function POST(req: Request) {
       return response;
     }
 
-    // 2. REGISTER EMPLOYEE
-    if (role === 'EMPLOYEE') {
-      if (!name || !name.trim()) {
-        return NextResponse.json(
-          { success: false, error: 'Staff full name is required.' },
-          { status: 400 }
-        );
-      }
-
-      // Check if phone already registered as employee
-      const allEmployees = await prisma.employee.findMany({ select: { id: true, phone: true } });
-      const duplicateEmployee = allEmployees.find((e) => {
-        const eDigits = extractDigits(e.phone);
-        return eDigits.slice(-10) === inputLast10;
-      });
-
-      if (duplicateEmployee) {
-        return NextResponse.json(
-          { success: false, error: 'A staff member with this phone number is already registered. Please sign in.' },
-          { status: 409 }
-        );
-      }
-
-      // Generate unique employee code
-      const count = await prisma.employee.count();
-      let nextCodeNum = count + 1;
-      let candidateCode = `FPPL/OD-${String(nextCodeNum).padStart(3, '0')}`;
-      while (await prisma.employee.findUnique({ where: { code: candidateCode } })) {
-        nextCodeNum++;
-        candidateCode = `FPPL/OD-${String(nextCodeNum).padStart(3, '0')}`;
-      }
-
-      const empId = `emp-${Date.now()}`;
-      const allowedPages = [
-        '/employee',
-        '/employee/dealers',
-        '/employee/catalogue',
-        '/employee/orders',
-        '/employee/attendance'
-      ];
-
-      const newEmployee = await prisma.employee.create({
-        data: {
-          id: empId,
-          code: candidateCode,
-          name: name.trim(),
-          phone: formattedPhone,
-          email: email?.trim() || `${candidateCode.toLowerCase().replace(/[^a-z0-9]/g, '')}@filtec.in`,
-          designation: designation?.trim() || 'Field Representative',
-          territory: territory?.trim() || 'Odisha Hub',
-          password: hashedPassword,
-          mustChangePassword: false,
-          systemRole: 'EMPLOYEE',
-          allowedPages: JSON.stringify(allowedPages),
-          targetMonthly: 300000,
-          currentMonthSales: 0,
-          activeOrdersCount: 0,
-          baseSalary: 30000,
-          checkInStatus: 'CHECKED_OUT'
-        }
-      });
-
-      const authenticatedUser: User = {
-        id: `user-${newEmployee.id}`,
-        name: newEmployee.name,
-        email: newEmployee.email || `${newEmployee.code.toLowerCase().replace(/[^a-z0-9]/g, '')}@filtec.in`,
-        phone: newEmployee.phone,
-        role: 'EMPLOYEE',
-        employeeCode: newEmployee.code,
-        allowedPages,
-        mustChangePassword: false
-      };
-
-      const sessionToken = createSessionToken({
-        userId: newEmployee.id,
-        role: 'EMPLOYEE',
-        employeeCode: newEmployee.code,
-        phone: newEmployee.phone,
-        name: newEmployee.name,
-        allowedPages
-      });
-
-      const { password: _empPass, ...safeEmployee } = newEmployee;
-
-      const response = NextResponse.json({
-        success: true,
-        message: 'Employee account successfully created!',
-        user: authenticatedUser,
-        employee: safeEmployee,
-        token: sessionToken
-      });
-
-      response.cookies.set('filtec_session', sessionToken, {
-        httpOnly: true,
-        sameSite: 'lax',
-        path: '/',
-        secure: process.env.NODE_ENV === 'production',
-        maxAge: SESSION_MAX_AGE_SECONDS,
-        expires: new Date(Date.now() + SESSION_MAX_AGE_SECONDS * 1000)
-      });
-
-      return response;
-    }
-
     return NextResponse.json(
-      { success: false, error: 'Invalid role specified.' },
+      { success: false, error: 'Invalid registration request.' },
       { status: 400 }
     );
   } catch (error: any) {

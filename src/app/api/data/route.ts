@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { sortProductsNaturally } from '@/lib/catalogueUtils';
-import { getSessionFromRequest, createSessionToken, SESSION_MAX_AGE_SECONDS } from '@/lib/security';
+import { getSessionFromRequest, createSessionToken, SESSION_MAX_AGE_SECONDS, hashPassword } from '@/lib/security';
 import { getAttendanceRetentionCutoff, pruneExpiredAttendanceRecords } from '@/lib/attendanceRetention';
 import { ALL_ADMIN_PAGES, ALL_EMPLOYEE_PAGES, ALL_DEALER_PAGES } from '@/data/initialSeed';
 import { isSamirUser } from '@/utils/samirAuth';
@@ -896,13 +896,16 @@ export async function POST(req: Request) {
       }
 
       case 'CREATE_EMPLOYEE': {
-        const { id, code, name, phone, systemRole, allowedPages, assignedDealerIds, ...rest } = payload;
+        const { id, code, name, phone, systemRole, allowedPages, assignedDealerIds, password, mustChangePassword, ...rest } = payload;
+        const hashedPassword = password ? (password.startsWith('pbkdf2$') ? password : hashPassword(password)) : undefined;
         const created = await prisma.employee.create({
           data: {
             id,
             code,
             name,
             phone,
+            password: hashedPassword,
+            mustChangePassword: mustChangePassword !== undefined ? mustChangePassword : true,
             systemRole: systemRole || 'EMPLOYEE',
             allowedPages: typeof allowedPages === 'string' ? allowedPages : JSON.stringify(allowedPages || []),
             assignedDealerIds: typeof assignedDealerIds === 'string' ? assignedDealerIds : JSON.stringify(assignedDealerIds || []),

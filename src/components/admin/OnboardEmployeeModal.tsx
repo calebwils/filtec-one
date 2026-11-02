@@ -16,7 +16,11 @@ import {
   MessageSquare,
   Shield,
   UserCheck,
-  Sparkles
+  Sparkles,
+  Lock,
+  KeyRound,
+  Copy,
+  Check
 } from 'lucide-react';
 import { useAppStore, store } from '@/data/store';
 import { Employee, Role } from '@/types';
@@ -89,11 +93,14 @@ export function OnboardEmployeeModal({
     baseSalary: 0,
     remarks: '(-)',
     selectedDealerIds: [] as string[],
-    allowedPages: [...ALL_EMPLOYEE_PAGES]
+    allowedPages: [...ALL_EMPLOYEE_PAGES],
+    temporaryPassword: 'Filtec@2026'
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successEmployee, setSuccessEmployee] = useState<Employee | null>(null);
+  const [submittedTempPassword, setSubmittedTempPassword] = useState('Filtec@2026');
+  const [copied, setCopied] = useState(false);
 
   if (!isOpen) return null;
 
@@ -200,10 +207,21 @@ export function OnboardEmployeeModal({
     });
   };
 
+  const handleCopyCredentials = () => {
+    if (!successEmployee) return;
+    const origin = typeof window !== 'undefined' ? window.location.origin : '';
+    const text = `FILTEC ONE - Staff Login Credentials\n\nName: ${successEmployee.name}\nDesignation: ${successEmployee.designation || 'Staff'}\nLogin Phone: ${successEmployee.phone}\nTemporary Password: ${submittedTempPassword}\nPortal Link: ${origin}\n\n*Note: On your first login, the system will prompt you to set your new personal password.`;
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name.trim() || !formData.phone.trim()) return;
 
+    const tempPass = formData.temporaryPassword.trim() || 'Filtec@2026';
+    setSubmittedTempPassword(tempPass);
     setIsSubmitting(true);
     setTimeout(() => {
       const created = store.onboardEmployee({
@@ -218,7 +236,9 @@ export function OnboardEmployeeModal({
         remarks: formData.remarks.trim() || '(-)',
         assignedDealerIds: formData.selectedDealerIds,
         systemRole: systemRole,
-        allowedPages: formData.allowedPages
+        allowedPages: formData.allowedPages,
+        temporaryPassword: tempPass,
+        mustChangePassword: true
       });
 
       setIsSubmitting(false);
@@ -275,7 +295,67 @@ export function OnboardEmployeeModal({
               </div>
             </div>
 
-            <div className="pt-4 flex justify-center">
+            {/* Login Credentials Card to Send to Employee */}
+            <div className="bg-neutral-50 border border-neutral-200 rounded-xl p-4 text-left space-y-3">
+              <div className="flex items-center justify-between pb-2 border-b border-neutral-200">
+                <div className="flex items-center gap-2">
+                  <KeyRound className="w-4 h-4 text-[#DC2626]" />
+                  <span className="text-xs font-bold text-neutral-900">Employee Login Credentials</span>
+                </div>
+                <span className="text-[10px] bg-amber-100 text-amber-800 font-semibold px-2 py-0.5 rounded-full">
+                  Change password on 1st login
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs font-mono">
+                <div className="bg-white p-2.5 rounded-lg border border-neutral-200">
+                  <span className="text-[10px] text-neutral-500 font-sans block">Phone (Login ID):</span>
+                  <span className="font-bold text-neutral-900">{successEmployee.phone}</span>
+                </div>
+                <div className="bg-white p-2.5 rounded-lg border border-neutral-200">
+                  <span className="text-[10px] text-neutral-500 font-sans block">Temporary Password:</span>
+                  <span className="font-bold text-[#DC2626]">{submittedTempPassword}</span>
+                </div>
+              </div>
+
+              <p className="text-[11px] text-neutral-600 leading-relaxed">
+                Send these credentials to {successEmployee.name}. When they sign in with this temporary password, the system will prompt them to set their own permanent password.
+              </p>
+
+              <div className="flex flex-col sm:flex-row gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={handleCopyCredentials}
+                  className="flex-1 py-2 px-3 rounded-lg bg-neutral-900 text-white text-xs font-semibold hover:bg-black flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                >
+                  {copied ? (
+                    <>
+                      <Check className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>Copied to Clipboard!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-3.5 h-3.5" />
+                      <span>Copy Credentials</span>
+                    </>
+                  )}
+                </button>
+
+                <a
+                  href={`https://wa.me/${successEmployee.phone.replace(/\D/g, '')}?text=${encodeURIComponent(
+                    `Welcome ${successEmployee.name} to FILTEC ONE!\n\nYour staff account has been created.\nLogin Phone: ${successEmployee.phone}\nTemporary Password: ${submittedTempPassword}\nPortal Link: ${typeof window !== 'undefined' ? window.location.origin : ''}\n\n*Note: You will be prompted to set your personal password upon your first login.`
+                  )}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex-1 py-2 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition-all text-center"
+                >
+                  <MessageSquare className="w-3.5 h-3.5" />
+                  <span>Send via WhatsApp</span>
+                </a>
+              </div>
+            </div>
+
+            <div className="pt-2 flex justify-center">
               <button
                 type="button"
                 onClick={handleClose}
@@ -580,6 +660,39 @@ export function OnboardEmployeeModal({
                     </option>
                   ))}
                 </select>
+              </div>
+
+              <div className="sm:col-span-2 p-3 bg-amber-50/60 rounded-xl border border-amber-200">
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-xs font-semibold text-neutral-900 flex items-center gap-1.5">
+                    <Lock className="w-3.5 h-3.5 text-amber-700" />
+                    <span>Temporary Password (for employee's first login) *</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const rand = Math.floor(1000 + Math.random() * 9000);
+                      setFormData({ ...formData, temporaryPassword: `Filtec@${rand}` });
+                    }}
+                    className="text-[11px] text-amber-800 hover:text-amber-950 font-semibold cursor-pointer underline"
+                  >
+                    Generate Random
+                  </button>
+                </div>
+                <div className="relative">
+                  <KeyRound className="w-3.5 h-3.5 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    required
+                    value={formData.temporaryPassword}
+                    onChange={(e) => setFormData({ ...formData, temporaryPassword: e.target.value })}
+                    placeholder="e.g. Filtec@2026"
+                    className="w-full text-xs pl-8 p-2.5 rounded-lg border border-neutral-300 font-mono focus:outline-none focus:ring-1 focus:ring-[#DC2626] bg-white text-neutral-900"
+                  />
+                </div>
+                <p className="text-[10px] text-neutral-500 mt-1">
+                  Send this password to {formData.name || 'the employee'}. Upon their first login, they will be prompted to replace this with their personal password.
+                </p>
               </div>
             </div>
 

@@ -251,6 +251,27 @@ model AttendanceRecord {
   @@index([type])
 }
 
+model LocationLog {
+  id           String   @id @default(uuid())
+  employeeId   String
+  employeeName String?
+  date         String   // YYYY-MM-DD
+  timestamp    DateTime @default(now())
+  latitude     Float
+  longitude    Float
+  accuracy     Float?
+  speed        Float?
+  heading      Float?
+  batteryLevel Float?
+  eventType    String   @default("ping_routine") // "ping_routine" | "check_in" | "check_out" | "client_visit" | "stop"
+  locationName String?
+  metadata     String?  // JSON string: { dealerId, dealerName, orderId, orderNumber, notes }
+
+  @@index([employeeId, date, timestamp])
+  @@index([employeeId, timestamp])
+  @@index([date])
+}
+
 model DailyAttendanceSummary {
   id                String  @id
   date              String  // YYYY-MM-DD
